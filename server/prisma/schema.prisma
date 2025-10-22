@@ -179,13 +179,15 @@ model StudentClass {
   studentId      Int
   classId        Int
   academicYearId Int
-  status         String       @default("active") // active / promoted / repeated
+  status         String       @default("active") // active, promoted, transferred, graduated
+  promotedToId   Int?         // optional link to next class (for promotion tracking)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
+  // Relations
   student        Student      @relation(fields: [studentId], references: [id])
   class          Class        @relation(fields: [classId], references: [id])
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-
-  createdAt      DateTime     @default(now())
-
-  @@unique([studentId, academicYearId])
+  promotedTo     Class?       @relation("Promotion", fields: [promotedToId], references: [id])
 }
+
