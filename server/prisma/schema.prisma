@@ -1,0 +1,191 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model School {
+  id             Int       @id @default(autoincrement())
+  name           String
+  registrationNo String?   @unique
+  type           String?   // PUBLIC / PRIVATE
+  county         String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  users    User[]
+  classes  Class[]
+  students Student[]
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  firstName String
+  lastName  String
+  phone     String?
+  role      Role     @default(TEACHER)
+
+  schoolId  Int?
+  school    School?  @relation(fields: [schoolId], references: [id])
+
+  // Role profiles
+  student   Student?
+  teacher   Teacher?
+  guardian  Guardian?
+
+  // Relations to teaching and class assignment
+  classTeacherOf Class[]       @relation("ClassTeacher")
+  teachingSubjects ClassSubject[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+model Student {
+  id          Int       @id @default(autoincrement())
+  admissionNo String    @unique
+  firstName   String
+  middleName  String?
+  lastName    String
+  gender      Gender
+  dob         DateTime?
+
+  schoolId Int?
+  school   School? @relation(fields: [schoolId], references: [id])
+
+  // Linked user profile
+  userId Int?  @unique
+  user   User? @relation(fields: [userId], references: [id])
+
+  // Relations
+  classes  StudentClass[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  OTHER
+}
+
+model Teacher {
+  id             Int             @id @default(autoincrement())
+  userId         Int             @unique
+  user           User            @relation(fields: [userId], references: [id])
+  classSubjects  ClassSubject[]  // convenience relation
+}
+
+model Guardian {
+  id     Int  @id @default(autoincrement())
+  userId Int  @unique
+  user   User @relation(fields: [userId], references: [id])
+}
+
+// Academics
+
+model AcademicYear {
+  id        Int      @id @default(autoincrement())
+  year      Int      @unique
+  isActive  Boolean  @default(false)
+  terms     Term[]
+  classes   Class[]
+  classSubjects ClassSubject[]
+  studentClasses StudentClass[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Term {
+  id             Int      @id @default(autoincrement())
+  name           String
+  startDate      DateTime
+  endDate        DateTime
+  academicYearId Int
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  classSubjects  ClassSubject[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+model Class {
+  id             Int             @id @default(autoincrement())
+  name           String
+  grade          String
+  academicYearId Int
+  academicYear   AcademicYear    @relation(fields: [academicYearId], references: [id])
+  schoolId       Int
+  school         School          @relation(fields: [schoolId], references: [id])
+  curriculum     Curriculum
+  classTeacherId Int?
+  classTeacher   User?           @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  students       StudentClass[]
+  subjects       ClassSubject[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+enum Curriculum {
+  CBC
+  CBE
+  EIGHT_FOUR_FOUR
+  TVET
+}
+
+model Subject {
+  id          Int             @id @default(autoincrement())
+  name        String
+  code        String          @unique
+  category    String?         // Core / Elective
+  creditHours Int?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  classLinks  ClassSubject[]
+}
+
+model ClassSubject {
+  id             Int           @id @default(autoincrement())
+  classId        Int
+  subjectId      Int
+  teacherId      Int
+  termId         Int
+  academicYearId Int
+
+  class          Class         @relation(fields: [classId], references: [id])
+  subject        Subject       @relation(fields: [subjectId], references: [id])
+  teacher        User          @relation(fields: [teacherId], references: [id])
+  term           Term          @relation(fields: [termId], references: [id])
+  academicYear   AcademicYear  @relation(fields: [academicYearId], references: [id])
+
+  @@unique([classId, subjectId, termId, academicYearId])
+}
+
+model StudentClass {
+  id             Int          @id @default(autoincrement())
+  studentId      Int
+  classId        Int
+  academicYearId Int
+  status         String       @default("active") // active / promoted / repeated
+
+  student        Student      @relation(fields: [studentId], references: [id])
+  class          Class        @relation(fields: [classId], references: [id])
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+
+  createdAt      DateTime     @default(now())
+
+  @@unique([studentId, academicYearId])
+}
