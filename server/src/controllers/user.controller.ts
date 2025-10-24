@@ -1,65 +1,164 @@
-import { Request, Response, NextFunction } from 'express';
-import prisma from '../prismaClient';
-import { hashPassword } from '../utils/hash';
+import { Request, Response } from 'express';
+import { UserService } from '../services/user.service';
+import { ResponseUtil } from '../utils/response';
+import logger from '../utils/logger';
 
-export const createUser = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { email, password, firstName, lastName, role } = req.body;
+const userService = new UserService();
 
-    if (!email || !password || !firstName || !lastName || !role) {
-      return res.status(400).json({ success: false, message: 'All fields are required' });
+export class UserController {
+  async login(req: Request, res: Response) {
+    try {
+      const { email, password } = req.body;
+      const result = await userService.login(email, password);
+      return ResponseUtil.success(res, 'Login successful', result);
+    } catch (error: any) {
+      logger.warn('Login failed', { email: req.body.email, error: error.message });
+      return ResponseUtil.unauthorized(res, error.message);
     }
+  }
 
-    const existing = await prisma.user.findUnique({ where: { email } });
-    if (existing) {
-      return res.status(400).json({ success: false, message: 'Email already in use' });
+  async createUser(req: Request, res: Response) {
+    try {
+      const currentUser = req.user!;
+      const result = await userService.createUser(req.body, {
+        userId: currentUser.userId,
+        role: currentUser.role
+      });
+      
+      return ResponseUtil.created(res, 'User created successfully', result);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'User with this email, ID number, or TSC number already exists');
+      }
+      return ResponseUtil.error(res, error.message, 400);
     }
-
-    const hashedPassword = await hashPassword(password);
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        firstName,
-        lastName,
-        role,
-      },
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `${role} account created successfully`,
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
-    });
-  } catch (error) {
-    next(error);
   }
-};
 
-export const getAllUsers = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const users = await prisma.user.findMany({
-      select: { id: true, email: true, firstName: true, lastName: true, role: true },
-    });
-    res.json({ success: true, users });
-  } catch (error) {
-    next(error);
+  async getUsers(req: Request, res: Response) {
+    try {
+      const filters = req.query;
+      const result = await userService.getUsers({
+        role: filters.role as any,
+        schoolId: filters.schoolId as string,
+        isActive: filters.isActive ? filters.isActive === 'true' : undefined,
+        page: filters.page ? parseInt(filters.page as string) : undefined,
+        limit: filters.limit ? parseInt(filters.limit as string) : undefined,
+        search: filters.search as string,
+      });
+      
+      return ResponseUtil.paginated(res, 'Users retrieved successfully', result.users, result.pagination);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
-};
 
-export const deleteUser = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const userId = Number(req.params.id);
+  async getUserById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await userService.getUserById(id);
+      
+      if (!user) {
+        return ResponseUtil.notFound(res, 'User');
+      }
 
-    await prisma.user.delete({ where: { id: userId } });
-    res.json({ success: true, message: 'User deleted successfully' });
-  } catch (error) {
-    next(error);
+      return ResponseUtil.success(res, 'User retrieved successfully', user);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
-};
+
+  async updateUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await userService.updateUser(id, req.body);
+      
+      return ResponseUtil.success(res, 'User updated successfully', user);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'User');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async updatePassword(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { currentPassword, newPassword } = req.body;
+      
+      const user = await userService.updatePassword(id, currentPassword, newPassword);
+      return ResponseUtil.success(res, 'Password updated successfully', user);
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async activateUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await userService.setUserActiveStatus(id, true);
+      
+      return ResponseUtil.success(res, 'User activated successfully', user);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'User');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async deactivateUser(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await userService.setUserActiveStatus(id, false);
+      
+      return ResponseUtil.success(res, 'User deactivated successfully', user);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'User');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async getProfile(req: Request, res: Response) {
+    try {
+      const currentUser = req.user!;
+      const profile = await userService.getCompleteUserProfile(currentUser.userId);
+      
+      if (!profile) {
+        return ResponseUtil.notFound(res, 'User');
+      }
+
+      return ResponseUtil.success(res, 'Profile retrieved successfully', profile);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getUserStats(req: Request, res: Response) {
+    try {
+      const { schoolId } = req.query;
+      const stats = await userService.getUserStats(schoolId as string);
+      
+      return ResponseUtil.success(res, 'User statistics retrieved successfully', stats);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async searchUsers(req: Request, res: Response) {
+    try {
+      const { q, schoolId } = req.query;
+      
+      if (!q) {
+        return ResponseUtil.validationError(res, 'Search query is required');
+      }
+
+      const users = await userService.searchUsers(q as string, schoolId as string);
+      return ResponseUtil.success(res, 'Users found successfully', users, users.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+}

@@ -10,7 +10,7 @@ datasource db {
 // ===== SCHOOL & ORGANIZATION =====
 
 model School {
-  id             Int       @id @default(autoincrement())
+  id             String    @id @default(uuid())
   name           String
   registrationNo String?   @unique
   type           SchoolType
@@ -74,7 +74,7 @@ enum SchoolGender {
 // ===== USERS & PROFILES =====
 
 model User {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   email     String   @unique
   password  String
   firstName String
@@ -85,7 +85,7 @@ model User {
   tscNumber String?   @unique  // For teachers - TSC number
   role      Role     @default(TEACHER)
 
-  schoolId  Int?
+  schoolId  String?
   school    School?  @relation(fields: [schoolId], references: [id])
 
   // Role profiles
@@ -116,7 +116,7 @@ enum Role {
 }
 
 model Student {
-  id              Int       @id @default(autoincrement())
+  id              String    @id @default(uuid())
   admissionNo     String    @unique
   upiNumber       String?   @unique  // Unique Personal Identifier
   nemisUpi        String?   @unique  // NEMIS UPI
@@ -141,10 +141,10 @@ model Student {
   medicalCondition String?
   allergies        String?
   
-  schoolId        Int?
+  schoolId        String?
   school          School?   @relation(fields: [schoolId], references: [id])
 
-  userId          Int?      @unique
+  userId          String?   @unique
   user            User?     @relation(fields: [userId], references: [id])
 
   // Relations
@@ -165,8 +165,8 @@ enum Gender {
 }
 
 model Guardian {
-  id              Int      @id @default(autoincrement())
-  userId          Int      @unique
+  id              String   @id @default(uuid())
+  userId          String   @unique
   user            User     @relation(fields: [userId], references: [id])
   
   relationship    String   // Father, Mother, Guardian, etc.
@@ -181,9 +181,9 @@ model Guardian {
 }
 
 model StudentGuardian {
-  id          Int      @id @default(autoincrement())
-  studentId   Int
-  guardianId  Int
+  id          String   @id @default(uuid())
+  studentId   String
+  guardianId  String
   isPrimary   Boolean  @default(false)
   
   student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -193,8 +193,8 @@ model StudentGuardian {
 }
 
 model Teacher {
-  id             Int      @id @default(autoincrement())
-  userId         Int      @unique
+  id             String   @id @default(uuid())
+  userId         String   @unique
   user           User     @relation(fields: [userId], references: [id])
   
   tscNumber      String   @unique
@@ -204,7 +204,7 @@ model Teacher {
   
   dateJoined     DateTime?
   
-  classSubjects  ClassSubject[]
+  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -221,7 +221,7 @@ enum EmploymentType {
 // ===== ACADEMIC STRUCTURE =====
 
 model AcademicYear {
-  id        Int      @id @default(autoincrement())
+  id        String   @id @default(uuid())
   year      Int      @unique  // e.g., 2024
   startDate DateTime
   endDate   DateTime
@@ -229,7 +229,7 @@ model AcademicYear {
   
   terms          Term[]
   classes        Class[]
-  classSubjects  ClassSubject[]
+  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
   studentClasses StudentClass[]
   
   createdAt DateTime @default(now())
@@ -239,16 +239,16 @@ model AcademicYear {
 }
 
 model Term {
-  id             Int      @id @default(autoincrement())
+  id             String   @id @default(uuid())
   name           TermName
   termNumber     Int      // 1, 2, or 3
   startDate      DateTime
   endDate        DateTime
   
-  academicYearId Int
+  academicYearId String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   
-  classSubjects  ClassSubject[]
+  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
   assessments    Assessment[]
   
   createdAt      DateTime @default(now())
@@ -267,18 +267,19 @@ enum TermName {
 // ===== CURRICULUM & CLASSES =====
 
 model Class {
-  id             Int          @id @default(autoincrement())
+  promotedStudents   StudentClass[]   @relation(\"Promotion\")
+  id             String      @id @default(uuid())
   name           String       // e.g., "Grade 7", "Form 3"
   level          String       // Grade/Form level
   curriculum     Curriculum
   
-  academicYearId Int
+  academicYearId String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   
-  schoolId       Int
+  schoolId       String
   school         School       @relation(fields: [schoolId], references: [id])
   
-  classTeacherId Int?
+  classTeacherId String?
   classTeacher   User?        @relation("ClassTeacher", fields: [classTeacherId], references: [id])
   
   // For CBC: Track which pathway/strand
@@ -313,17 +314,17 @@ enum Pathway {
 
 // Streams within a class (e.g., Form 3 North, Form 3 South)
 model Stream {
-  id             Int      @id @default(autoincrement())
+  id             String   @id @default(uuid())
   name           String   // North, South, East, West, etc.
   capacity       Int?
   
-  classId        Int
+  classId        String
   class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
   
-  schoolId       Int
+  schoolId       String
   school         School   @relation(fields: [schoolId], references: [id])
   
-  streamTeacherId Int?
+  streamTeacherId String?
   streamTeacher   User?   @relation("StreamTeacher", fields: [streamTeacherId], references: [id])
   
   students       StudentClass[]
@@ -338,7 +339,7 @@ model Stream {
 // ===== SUBJECTS =====
 
 model Subject {
-  id            Int      @id @default(autoincrement())
+  id            String   @id @default(uuid())
   name          String
   code          String   @unique
   
@@ -397,9 +398,9 @@ enum SubjectGroup {
 
 // Subjects offered by a school
 model SubjectOffering {
-  id        Int      @id @default(autoincrement())
-  schoolId  Int
-  subjectId Int
+  id        String   @id @default(uuid())
+  schoolId  String
+  subjectId String
   
   school    School   @relation(fields: [schoolId], references: [id])
   subject   Subject  @relation(fields: [subjectId], references: [id])
@@ -410,12 +411,12 @@ model SubjectOffering {
 }
 
 model ClassSubject {
-  id             Int          @id @default(autoincrement())
-  classId        Int
-  subjectId      Int
-  teacherId      Int
-  termId         Int
-  academicYearId Int
+  id             String      @id @default(uuid())
+  classId        String
+  subjectId      String
+  teacherId      String
+  termId         String
+  academicYearId String
   
   class          Class        @relation(fields: [classId], references: [id])
   subject        Subject      @relation(fields: [subjectId], references: [id])
@@ -435,19 +436,19 @@ model ClassSubject {
 // ===== STUDENT ENROLLMENT =====
 
 model StudentClass {
-  id             Int          @id @default(autoincrement())
-  studentId      Int
-  classId        Int
-  streamId       Int?         // Optional stream assignment
-  academicYearId Int
+  id             String          @id @default(uuid())
+  studentId      String
+  classId        String
+  streamId       String?         // Optional stream assignment
+  academicYearId String
   
   status         EnrollmentStatus @default(ACTIVE)
   
   // For subject selection (especially CBC pathways & electives)
-  selectedSubjects Int[]       // Array of subject IDs
+  selectedSubjects String[]       // Array of subject IDs (now strings)
   
   // Promotion tracking
-  promotedToId   Int?
+  promotedToId   String?
   promotionDate  DateTime?
   
   // Transfer tracking
@@ -461,7 +462,7 @@ model StudentClass {
   class          Class        @relation(fields: [classId], references: [id])
   stream         Stream?      @relation(fields: [streamId], references: [id])
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  promotedTo     Class?       @relation("Promotion", fields: [promotedToId], references: [id])
+  promotedTo   Class?   @relation(\"Promotion\", fields: [promotedToId], references: [id])
   
   @@index([studentId])
   @@index([classId])
@@ -480,13 +481,13 @@ enum EnrollmentStatus {
 // ===== ASSESSMENT & GRADING =====
 
 model Assessment {
-  id             Int      @id @default(autoincrement())
+  id             String   @id @default(uuid())
   name           String   // CAT1, Midterm, End of Term, etc.
   type           AssessmentType
   
-  studentId      Int
-  classSubjectId Int
-  termId         Int
+  studentId      String
+  classSubjectId String
+  termId         String
   
   // Marks
   marksObtained  Float?
@@ -499,7 +500,7 @@ model Assessment {
   grade          String?  // A, B+, B, etc.
   
   remarks        String?
-  assessedBy     Int?     // Teacher ID
+  assessedBy     String?  
   assessedDate   DateTime?
   
   student        Student       @relation(fields: [studentId], references: [id])

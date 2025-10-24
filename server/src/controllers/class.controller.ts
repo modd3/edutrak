@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import prisma from '../prismaClient';
+import prisma from '../prismaClient.ts.old';
 import { successResponse, errorResponse } from '../utils/response';
 
 export const createClass = async (req: Request, res: Response) => {

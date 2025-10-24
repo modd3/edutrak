@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import prisma from '../prismaClient';
+import prisma from '../prismaClient.ts.old';
 import { hashPassword, comparePasswords } from '../utils/hash';
 import { generateToken } from '../utils/jwt';
 import log from '../logger';

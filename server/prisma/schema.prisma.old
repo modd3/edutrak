@@ -1,0 +1,307 @@
+// ========================================
+// EduTrak Institutional Backend Schema
+// ========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ ENUMS ============
+
+enum Role {
+  ADMIN
+  TEACHER
+  STUDENT
+  PARENT
+}
+
+enum ExamType {
+  OPENER
+  MIDTERM
+  ENDTERM
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  PROMOTED
+  TRANSFERRED
+  GRADUATED
+}
+
+enum TermName {
+  TERM_ONE
+  TERM_TWO
+  TERM_THREE
+}
+
+// ============ CORE MODELS ============
+
+model School {
+  id               String          @id @default(uuid())
+  name             String
+  registrationNo   String?         @unique
+  knecCode         String?   @unique  // KNEC school code
+  nemisCode        String?   @unique  // NEMIS code for reporting
+  motto            String?
+  email            String?
+  phone            String?
+  address          String?
+  county           String?
+  subCounty        String?
+  town             String?
+  logoUrl          String?
+  website          String?
+  type             String?         // e.g. Primary, Secondary, Technical
+  ownership        String?         // Public / Private
+  description      String?
+  curricula        Curriculum[]
+  users            User[]
+  classes          Class[]
+  academicYears    AcademicYear[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+model User {
+  id           String    @id @default(uuid())
+  name         String
+  email        String    @unique
+  password     String
+  role         Role
+  phone        String?
+  isActive     Boolean   @default(true)
+  schoolId     String?
+  school       School?   @relation(fields: [schoolId], references: [id])
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  teacher      Teacher?
+  student      Student?
+  parent       Parent?
+}
+
+// ============ PROFILES ============
+
+model Teacher {
+  id             String           @id @default(uuid())
+  userId         String           @unique
+  user           User             @relation(fields: [userId], references: [id])
+  staffNumber    String?          @unique
+  qualification  String?
+  specialization String?
+  hireDate       DateTime?
+  classSubjects  ClassSubject[]
+  classTaught    Class?           @relation("ClassTeacher", fields: [classTaughtId], references: [id])
+  classTaughtId  String?
+  createdAt      DateTime         @default(now())
+}
+
+model Parent {
+  id         String      @id @default(uuid())
+  userId     String      @unique
+  user       User        @relation(fields: [userId], references: [id])
+  phone      String?
+  address    String?
+  occupation String?
+  students   Student[]
+}
+
+model Student {
+  id             String          @id @default(uuid())
+  userId         String          @unique
+  user           User            @relation(fields: [userId], references: [id])
+  admissionNo    String          @unique
+  gender         String
+  dob            DateTime?
+  parentId       String?
+  parent         Parent?         @relation(fields: [parentId], references: [id])
+  enrollmentDate DateTime?       @default(now())
+  enrollments    StudentClass[]
+  results        Result[]
+  reportCards    ReportCard[]
+  createdAt      DateTime        @default(now())
+}
+
+// ============ ACADEMIC STRUCTURE ============
+
+model AcademicYear {
+  id         String     @id @default(uuid())
+  schoolId   String
+  school     School     @relation(fields: [schoolId], references: [id])
+  label      String     @unique
+  startDate  DateTime
+  endDate    DateTime
+  classes    Class[]
+  results    Result[]
+  createdAt  DateTime   @default(now())
+}
+
+model Term {
+  id        String    @id @default(uuid())
+  name      TermName
+  order     Int
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id])
+  results   Result[]
+  classSubjects ClassSubject[]
+}
+
+model Class {
+  id              String           @id @default(uuid())
+  code            String           @unique
+  name            String
+  grade           String
+  stream          String?
+  capacity        Int?
+  schoolId        String
+  school          School           @relation(fields: [schoolId], references: [id])
+  classTeacherId  String?
+  classTeacher    Teacher?         @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  academicYearId  String
+  academicYear    AcademicYear     @relation(fields: [academicYearId], references: [id])
+  subjects        ClassSubject[]
+  enrollments     StudentClass[]
+  createdAt       DateTime         @default(now())
+}
+
+model Subject {
+  id             String           @id @default(uuid())
+  code           String           @unique
+  title          String
+  category       String?          // Core / Elective
+  creditHours    Int?
+  curriculumId   String?
+  curriculum     Curriculum?      @relation(fields: [curriculumId], references: [id])
+  schoolId       String?
+  school         School?          @relation(fields: [schoolId], references: [id])
+  classSubjects  ClassSubject[]
+}
+
+model Curriculum {
+  id             String          @id @default(uuid())
+  name           String
+  shortName      String?
+  type           String?         // CBC, CBE, KCSE
+  description    String?
+  schoolId       String
+  school         School          @relation(fields: [schoolId], references: [id])
+  subjects       Subject[]
+  gradeScales    GradeScale[]
+  createdAt      DateTime        @default(now())
+}
+
+// ============ RELATION TABLES ============
+
+model ClassSubject {
+  id              String        @id @default(uuid())
+  classId         String
+  class           Class         @relation(fields: [classId], references: [id])
+  subjectId       String
+  subject         Subject       @relation(fields: [subjectId], references: [id])
+  teacherId       String
+  teacher         Teacher       @relation(fields: [teacherId], references: [id])
+  academicYearId  String
+  academicYear    AcademicYear  @relation(fields: [academicYearId], references: [id])
+  termId          String?
+  term            Term?         @relation(fields: [termId], references: [id])
+  results         Result[]
+}
+
+model StudentClass {
+  id               String            @id @default(uuid())
+  studentId        String
+  student          Student           @relation(fields: [studentId], references: [id])
+  classId          String
+  class            Class             @relation(fields: [classId], references: [id])
+  academicYearId   String
+  academicYear     AcademicYear      @relation(fields: [academicYearId], references: [id])
+  status           EnrollmentStatus  @default(ACTIVE)
+  promotedToClassId String?
+  promotedToClass   Class?           @relation("PromotionLink", fields: [promotedToClassId], references: [id])
+  createdAt        DateTime          @default(now())
+
+  @@unique([studentId, classId, academicYearId])
+}
+
+// ============ RESULTS & GRADING ============
+
+model Result {
+  id               String        @id @default(uuid())
+  studentId        String
+  student          Student       @relation(fields: [studentId], references: [id])
+  classSubjectId   String
+  classSubject     ClassSubject  @relation(fields: [classSubjectId], references: [id])
+  academicYearId   String
+  academicYear     AcademicYear  @relation(fields: [academicYearId], references: [id])
+  termId           String?
+  term             Term?         @relation(fields: [termId], references: [id])
+  examType         ExamType
+  marksObtained    Float
+  outOf            Float
+  percentage       Float
+  grade            String?
+  points           Int?
+  comment          String?
+  weightedFinal    Float?
+  createdAt        DateTime      @default(now())
+
+  @@index([studentId, classSubjectId, academicYearId])
+}
+
+model GradeScale {
+  id             String         @id @default(uuid())
+  curriculumId   String
+  curriculum     Curriculum     @relation(fields: [curriculumId], references: [id])
+  grade          String
+  points         Int
+  min            Float
+  max            Float
+  remark         String?
+}
+
+model ReportCard {
+  id             String        @id @default(uuid())
+  studentId      String
+  student        Student       @relation(fields: [studentId], references: [id])
+  academicYearId String
+  academicYear   AcademicYear  @relation(fields: [academicYearId], references: [id])
+  termId         String?
+  term           Term?         @relation(fields: [termId], references: [id])
+  finalAverage   Float?
+  remarks        String?
+  compiledJson   Json?
+  published      Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+
+  @@unique([studentId, academicYearId, termId])
+}
+
+// ============ OPTIONAL SUPPORT MODELS ============
+
+model Attendance {
+  id         String     @id @default(uuid())
+  studentId  String
+  student    Student    @relation(fields: [studentId], references: [id])
+  classId    String
+  class      Class      @relation(fields: [classId], references: [id])
+  date       DateTime
+  status     String
+}
+
+model Announcement {
+  id          String     @id @default(uuid())
+  title       String
+  message     String
+  targetRole  Role?
+  classId     String?
+  class       Class?     @relation(fields: [classId], references: [id])
+  schoolId    String?
+  school      School?    @relation(fields: [schoolId], references: [id])
+  createdAt   DateTime   @default(now())
+}

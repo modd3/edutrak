@@ -1,166 +1,114 @@
 import { Request, Response } from 'express';
-import prisma from '../prismaClient';
-import { successResponse, errorResponse } from '../utils/response';
+import { SchoolService } from '../services/school.service';
+import { ResponseUtil } from '../utils/response';
+import logger from '../utils/logger';
 
-/**
- * Create a new school with Kenyan-specific details
- */
-export const createSchool = async (req: Request, res: Response) => {
-  try {
-    const {
-      name,
-      registrationNo,
-      type,
-      county,
-      subCounty,
-      ward,
-      knecCode,
-      nemisCode,
-      phone,
-      email,
-      ownership,
-      boardingStatus,
-      gender,
-    } = req.body;
+const schoolService = new SchoolService();
 
-    // Check for duplicate
-    const existing = await prisma.school.findFirst({
-      where: {
-        OR: [
-          { registrationNo },
-          { knecCode },
-          { nemisCode },
-        ],
-      },
-    });
-
-    if (existing) {
-      return errorResponse(res, 400, 'School with this registration/KNEC/NEMIS code already exists');
+export class SchoolController {
+  async createSchool(req: Request, res: Response) {
+    try {
+      const currentUser = req.user!;
+      
+      const school = await schoolService.createSchool(req.body, {
+        userId: currentUser.userId,
+        role: currentUser.role
+      });
+      return ResponseUtil.created(res, 'School created successfully', school);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'School with this registration number, KNEC code, or NEMIS code already exists');
+      }
+      return ResponseUtil.error(res, error.message, 400);
     }
-
-    const school = await prisma.school.create({
-      data: {
-        name,
-        registrationNo,
-        type,
-        county,
-        subCounty,
-        ward,
-        knecCode,
-        nemisCode,
-        phone,
-        email,
-        ownership,
-        boardingStatus,
-        gender,
-      },
-    });
-
-    return successResponse(res, 201, 'School created successfully', school);
-  } catch (err) {
-    return errorResponse(res, 500, 'Error creating school', err);
   }
-};
 
-/**
- * Get schools with filtering
- */
-export const getSchools = async (req: Request, res: Response) => {
-  try {
-    const { county, type, ownership } = req.query;
-
-    const where: any = {};
-    if (county) where.county = county;
-    if (type) where.type = type;
-    if (ownership) where.ownership = ownership;
-
-    const schools = await prisma.school.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            students: true,
-            users: true,
-            classes: true,
-          },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
-
-    return successResponse(res, 200, 'Schools fetched successfully', schools);
-  } catch (err) {
-    return errorResponse(res, 500, 'Error fetching schools', err);
-  }
-};
-
-/**
- * Get school statistics
- */
-export const getSchoolStats = async (req: Request, res: Response) => {
-  try {
-    const { schoolId } = req.params;
-
-    const stats = await prisma.school.findUnique({
-      where: { id: Number(schoolId) },
-      include: {
-        _count: {
-          select: {
-            students: true,
-            users: true,
-            classes: true,
-            streams: true,
-          },
-        },
-      },
-    });
-
-    if (!stats) {
-      return errorResponse(res, 404, 'School not found');
+  async getSchools(req: Request, res: Response) {
+    try {
+      const filters = req.query;
+      const result = await schoolService.getSchools({
+        county: filters.county as string,
+        type: filters.type as any,
+        ownership: filters.ownership as any,
+        boardingStatus: filters.boardingStatus as any,
+        gender: filters.gender as any,
+        page: filters.page ? parseInt(filters.page as string) : undefined,
+        limit: filters.limit ? parseInt(filters.limit as string) : undefined,
+        search: filters.search as string,
+      });
+      
+      return ResponseUtil.paginated(res, 'Schools retrieved successfully', result.schools, result.pagination);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
     }
-
-    // Get enrollment by gender
-    const maleCount = await prisma.student.count({
-      where: { schoolId: Number(schoolId), gender: 'MALE' },
-    });
-
-    const femaleCount = await prisma.student.count({
-      where: { schoolId: Number(schoolId), gender: 'FEMALE' },
-    });
-
-    // Get teacher count
-    const teacherCount = await prisma.user.count({
-      where: { schoolId: Number(schoolId), role: 'TEACHER', isActive: true },
-    });
-
-    return successResponse(res, 200, 'School statistics fetched', {
-      ...stats,
-      genderDistribution: {
-        male: maleCount,
-        female: femaleCount,
-      },
-      teacherCount,
-    });
-  } catch (err) {
-    return errorResponse(res, 500, 'Error fetching school statistics', err);
   }
-};
 
-/**
- * Update school details
- */
-export const updateSchool = async (req: Request, res: Response) => {
-  try {
-    const { schoolId } = req.params;
-    const updateData = req.body;
+  async getSchoolById(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const school = await schoolService.getSchoolById(id);
+      
+      if (!school) {
+        return ResponseUtil.notFound(res, 'School');
+      }
 
-    const school = await prisma.school.update({
-      where: { id: Number(schoolId) },
-      data: updateData,
-    });
-
-    return successResponse(res, 200, 'School updated successfully', school);
-  } catch (err) {
-    return errorResponse(res, 500, 'Error updating school', err);
+      return ResponseUtil.success(res, 'School retrieved successfully', school);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
-};
+
+  async updateSchool(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const school = await schoolService.updateSchool(id, req.body);
+      
+      return ResponseUtil.success(res, 'School updated successfully', school);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'School');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async deleteSchool(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      await schoolService.deleteSchool(id);
+      
+      return ResponseUtil.success(res, 'School deleted successfully');
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'School');
+      }
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getSchoolStatistics(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const statistics = await schoolService.getSchoolStatistics(id);
+      
+      return ResponseUtil.success(res, 'School statistics retrieved successfully', statistics);
+    } catch (error: any) {
+      if (error.message === 'School not found') {
+        return ResponseUtil.notFound(res, 'School');
+      }
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getSchoolPerformance(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { academicYearId } = req.query;
+      
+      const performance = await schoolService.getSchoolPerformance(id, academicYearId as string);
+      return ResponseUtil.success(res, 'School performance retrieved successfully', performance);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+}
