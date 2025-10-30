@@ -6,7 +6,7 @@ import logger from '../utils/logger';
 const assessmentService = new AssessmentService();
 
 export class AssessmentController {
-  async createAssessment(req: Request, res: Response) {
+  async createAssessment(req: Request, res: Response): Promise<Response> {
     try {
       const { name, type, studentId, classSubjectId, termId, maxMarks } = req.body;
       
@@ -21,7 +21,7 @@ export class AssessmentController {
     }
   }
 
-  async createBulkAssessments(req: Request, res: Response) {
+  async createBulkAssessments(req: Request, res: Response): Promise<Response> {
     try {
       const { assessments } = req.body;
       
@@ -36,9 +36,14 @@ export class AssessmentController {
     }
   }
 
-  async getAssessmentById(req: Request, res: Response) {
+  async getAssessmentById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Assessment ID is required', 400);
+      }
+      
       const assessment = await assessmentService.getAssessmentById(id);
       
       if (!assessment) {
@@ -51,9 +56,14 @@ export class AssessmentController {
     }
   }
 
-  async updateAssessment(req: Request, res: Response) {
+  async updateAssessment(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Assessment ID is required', 400);
+      }
+      
       const assessment = await assessmentService.updateAssessment(id, req.body);
       
       return ResponseUtil.success(res, 'Assessment updated successfully', assessment);
@@ -65,9 +75,14 @@ export class AssessmentController {
     }
   }
 
-  async deleteAssessment(req: Request, res: Response) {
+  async deleteAssessment(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Assessment ID is required', 400);
+      }
+      
       await assessmentService.deleteAssessment(id);
       
       return ResponseUtil.success(res, 'Assessment deleted successfully');
@@ -79,10 +94,14 @@ export class AssessmentController {
     }
   }
 
-  async getStudentAssessments(req: Request, res: Response) {
+  async getStudentAssessments(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
       const filters = req.query;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
       
       const result = await assessmentService.getStudentAssessments(studentId, {
         termId: filters.termId as string,
@@ -98,9 +117,14 @@ export class AssessmentController {
     }
   }
 
-  async getClassSubjectAssessments(req: Request, res: Response) {
+  async getClassSubjectAssessments(req: Request, res: Response): Promise<Response> {
     try {
       const { classSubjectId } = req.params;
+      
+      if (!classSubjectId) {
+        return ResponseUtil.error(res, 'Class subject ID is required', 400);
+      }
+      
       const assessments = await assessmentService.getClassSubjectAssessments(classSubjectId);
       
       return ResponseUtil.success(res, 'Class subject assessments retrieved successfully', assessments, assessments.length);
@@ -109,10 +133,14 @@ export class AssessmentController {
     }
   }
 
-  async calculateStudentTermAverage(req: Request, res: Response) {
+  async calculateStudentTermAverage(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
       const { termId } = req.query;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
       
       if (!termId) {
         return ResponseUtil.validationError(res, 'termId query parameter is required');
@@ -125,9 +153,14 @@ export class AssessmentController {
     }
   }
 
-  async getClassSubjectStatistics(req: Request, res: Response) {
+  async getClassSubjectStatistics(req: Request, res: Response): Promise<Response> {
     try {
       const { classSubjectId } = req.params;
+      
+      if (!classSubjectId) {
+        return ResponseUtil.error(res, 'Class subject ID is required', 400);
+      }
+      
       const statistics = await assessmentService.getClassSubjectStatistics(classSubjectId);
       
       return ResponseUtil.success(res, 'Class subject statistics retrieved successfully', statistics);
@@ -136,7 +169,7 @@ export class AssessmentController {
     }
   }
 
-  async convertMarksToGrade(req: Request, res: Response) {
+  async convertMarksToGrade(req: Request, res: Response): Promise<Response> {
     try {
       const { marks, maxMarks, curriculum } = req.body;
       
@@ -151,10 +184,14 @@ export class AssessmentController {
     }
   }
 
-  async generateStudentTermReport(req: Request, res: Response) {
+  async generateStudentTermReport(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
       const { termId } = req.query;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
       
       if (!termId) {
         return ResponseUtil.validationError(res, 'termId query parameter is required');
@@ -167,10 +204,14 @@ export class AssessmentController {
     }
   }
 
-  async generateClassTermReport(req: Request, res: Response) {
+  /*async generateClassTermReport(req: Request, res: Response): Promise<Response> {
     try {
       const { classId } = req.params;
       const { termId } = req.query;
+      
+      if (!classId) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
       
       if (!termId) {
         return ResponseUtil.validationError(res, 'termId query parameter is required');
@@ -183,15 +224,19 @@ export class AssessmentController {
     }
   }
 
-  async getAssessmentTrends(req: Request, res: Response) {
+  async getAssessmentTrends(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
       const { subjectId } = req.query;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
       
       const trends = await assessmentService.getAssessmentTrends(studentId, subjectId as string);
       return ResponseUtil.success(res, 'Assessment trends retrieved successfully', trends);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
     }
-  }
-}
+  }*/
+} 

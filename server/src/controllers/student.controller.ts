@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { StudentService } from '../services/student.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
+import { Role } from '@prisma/client';
 
 const studentService = new StudentService();
 
 export class StudentController {
-  async createStudent(req: Request, res: Response) {
+  async createStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { admissionNo, firstName, lastName, gender, schoolId } = req.body;
       
@@ -24,7 +25,7 @@ export class StudentController {
     }
   }
 
-  async createStudentWithUser(req: Request, res: Response) {
+  async createStudentWithUser(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
       const { admissionNo, firstName, lastName, gender, schoolId, email } = req.body;
@@ -35,7 +36,7 @@ export class StudentController {
 
       const student = await studentService.createStudentWithUser(req.body, {
         userId: currentUser.userId,
-        role: currentUser.role
+        role: currentUser.role as Role
       });
       return ResponseUtil.created(res, 'Student with user account created successfully', student);
     } catch (error: any) {
@@ -46,7 +47,7 @@ export class StudentController {
     }
   }
 
-  async getStudents(req: Request, res: Response) {
+  async getStudents(req: Request, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await studentService.getStudents({
@@ -67,9 +68,14 @@ export class StudentController {
     }
   }
 
-  async getStudentById(req: Request, res: Response) {
+  async getStudentById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
+      
       const student = await studentService.getStudentById(id);
       
       if (!student) {
@@ -82,9 +88,14 @@ export class StudentController {
     }
   }
 
-  async getStudentByAdmissionNo(req: Request, res: Response) {
+  async getStudentByAdmissionNo(req: Request, res: Response): Promise<Response> {
     try {
       const { admissionNo } = req.params;
+      
+      if (!admissionNo) {
+        return ResponseUtil.error(res, 'Admission number is required', 400);
+      }
+      
       const student = await studentService.getStudentByAdmissionNo(admissionNo);
       
       if (!student) {
@@ -97,9 +108,14 @@ export class StudentController {
     }
   }
 
-  async updateStudent(req: Request, res: Response) {
+  async updateStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
+      
       const student = await studentService.updateStudent(id, req.body);
       
       return ResponseUtil.success(res, 'Student updated successfully', student);
@@ -111,7 +127,7 @@ export class StudentController {
     }
   }
 
-  async enrollStudent(req: Request, res: Response) {
+  async enrollStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, classId, academicYearId } = req.body;
       
@@ -126,10 +142,14 @@ export class StudentController {
     }
   }
 
-  async updateEnrollmentStatus(req: Request, res: Response) {
+  async updateEnrollmentStatus(req: Request, res: Response): Promise<Response> {
     try {
       const { enrollmentId } = req.params;
       const { status } = req.body;
+      
+      if (!enrollmentId) {
+        return ResponseUtil.error(res, 'Enrollment ID is required', 400);
+      }
       
       if (!status) {
         return ResponseUtil.validationError(res, 'Status is required');
@@ -145,7 +165,7 @@ export class StudentController {
     }
   }
 
-  async promoteStudent(req: Request, res: Response) {
+  async promoteStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, currentClassId, newClassId, academicYearId } = req.body;
       
@@ -160,7 +180,7 @@ export class StudentController {
     }
   }
 
-  async transferStudent(req: Request, res: Response) {
+  async transferStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, newSchoolId, transferReason } = req.body;
       
@@ -181,7 +201,7 @@ export class StudentController {
     }
   }
 
-  async addGuardianToStudent(req: Request, res: Response) {
+  async addGuardianToStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, guardianId } = req.body;
       
@@ -199,9 +219,14 @@ export class StudentController {
     }
   }
 
-  async getStudentsByClass(req: Request, res: Response) {
+  async getStudentsByClass(req: Request, res: Response): Promise<Response> {
     try {
       const { classId } = req.params;
+      
+      if (!classId) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
+      
       const students = await studentService.getStudentsByClass(classId);
       
       return ResponseUtil.success(res, 'Students retrieved successfully', students, students.length);
@@ -210,10 +235,14 @@ export class StudentController {
     }
   }
 
-  async getStudentPerformance(req: Request, res: Response) {
+  async getStudentPerformance(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
       const { academicYearId } = req.query;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
       
       const performance = await studentService.getStudentPerformance(studentId, academicYearId as string);
       return ResponseUtil.success(res, 'Student performance retrieved successfully', performance);
@@ -222,7 +251,7 @@ export class StudentController {
     }
   }
 
-  async bulkCreateStudents(req: Request, res: Response) {
+  async bulkCreateStudents(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
       const { students, schoolId } = req.body;

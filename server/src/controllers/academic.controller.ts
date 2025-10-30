@@ -1,530 +1,343 @@
-import { PrismaClient, AcademicYear, Term, Class, Stream, Curriculum, Pathway, TermName } from '@prisma/client';
-import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
+import { Request, Response } from 'express';
+import { AcademicService } from '../services/academic.service';
+import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 
-export class AcademicService {
-  private prisma: PrismaClient;
+const academicService = new AcademicService();
 
-  constructor() {
-    this.prisma = prisma;
-  }
-
+export class AcademicController {
   // Academic Years
-  async createAcademicYear(data: {
-    year: number;
-    startDate: Date;
-    endDate: Date;
-    isActive?: boolean;
-  }): Promise<AcademicYear> {
-    if (data.isActive) {
-      await this.prisma.academicYear.updateMany({
-        where: { isActive: true },
-        data: { isActive: false },
-      });
+  async createAcademicYear(req: Request, res: Response): Promise<Response> {
+    try {
+      const { year, startDate, endDate } = req.body;
+      
+      if (!year || !startDate || !endDate) {
+        return ResponseUtil.validationError(res, 'Required fields: year, startDate, endDate');
+      }
+
+      const academicYear = await academicService.createAcademicYear(req.body);
+      return ResponseUtil.created(res, 'Academic year created successfully', academicYear);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'Academic year already exists');
+      }
+      return ResponseUtil.error(res, error.message, 400);
     }
-
-    const academicYear = await this.prisma.academicYear.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
-
-    logger.info('Academic year created successfully', { 
-      academicYearId: academicYear.id, 
-      year: academicYear.year,
-      isActive: academicYear.isActive 
-    });
-
-    return academicYear;
   }
 
-  async getAcademicYears() {
-    return await this.prisma.academicYear.findMany({
-      orderBy: { year: 'desc' },
-      include: {
-        _count: {
-          select: {
-            classes: true,
-            terms: true,
-            studentClasses: true,
-          },
-        },
-      },
-    });
+  async getAcademicYears(req: Request, res: Response): Promise<Response> {
+    try {
+      const academicYears = await academicService.getAcademicYears();
+      return ResponseUtil.success(res, 'Academic years retrieved successfully', academicYears, academicYears.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async getActiveAcademicYear(): Promise<AcademicYear | null> {
-    return await this.prisma.academicYear.findFirst({
-      where: { isActive: true },
-      include: {
-        terms: {
-          orderBy: { termNumber: 'asc' },
-        },
-        classes: {
-          include: {
-            _count: {
-              select: { students: true },
-            },
-          },
-        },
-      },
-    });
+  async getActiveAcademicYear(req: Request, res: Response): Promise<Response> {
+    try {
+      const academicYear = await academicService.getActiveAcademicYear();
+      
+      if (!academicYear) {
+        return ResponseUtil.notFound(res, 'Active academic year');
+      }
+
+      return ResponseUtil.success(res, 'Active academic year retrieved successfully', academicYear);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async getAcademicYearById(id: string): Promise<AcademicYear | null> {
-    return await this.prisma.academicYear.findUnique({
-      where: { id },
-      include: {
-        terms: {
-          orderBy: { termNumber: 'asc' },
-        },
-        classes: {
-          include: {
-            school: true,
-            streams: true,
-            _count: {
-              select: { students: true },
-            },
-          },
-        },
-        studentClasses: {
-          include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
-            class: true,
-          },
-          take: 10, // Recent enrollments
-        },
-      },
-    });
+  async getAcademicYearById(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Academic year ID is required', 400);
+      }
+      
+      const academicYear = await academicService.getAcademicYearById(id);
+      
+      if (!academicYear) {
+        return ResponseUtil.notFound(res, 'Academic year');
+      }
+
+      return ResponseUtil.success(res, 'Academic year retrieved successfully', academicYear);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async setActiveAcademicYear(id: string): Promise<AcademicYear> {
-    await this.prisma.academicYear.updateMany({
-      where: { isActive: true },
-      data: { isActive: false },
-    });
-
-    const academicYear = await this.prisma.academicYear.update({
-      where: { id },
-      data: { isActive: true },
-    });
-
-    logger.info('Active academic year set', { academicYearId: id, year: academicYear.year });
-    return academicYear;
+  async setActiveAcademicYear(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Academic year ID is required', 400);
+      }
+      
+      const academicYear = await academicService.setActiveAcademicYear(id);
+      
+      return ResponseUtil.success(res, 'Academic year set as active successfully', academicYear);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'Academic year');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
   }
 
   // Terms
-  async createTerm(data: {
-    name: TermName;
-    termNumber: number;
-    startDate: Date;
-    endDate: Date;
-    academicYearId: string;
-  }): Promise<Term> {
-    const term = await this.prisma.term.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
+  async createTerm(req: Request, res: Response): Promise<Response> {
+    try {
+      const { name, termNumber, startDate, endDate, academicYearId } = req.body;
+      
+      if (!name || !termNumber || !startDate || !endDate || !academicYearId) {
+        return ResponseUtil.validationError(res, 'Required fields: name, termNumber, startDate, endDate, academicYearId');
+      }
 
-    logger.info('Term created successfully', { 
-      termId: term.id, 
-      name: term.name,
-      academicYearId: data.academicYearId 
-    });
-
-    return term;
+      const term = await academicService.createTerm(req.body);
+      return ResponseUtil.created(res, 'Term created successfully', term);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'Term already exists for this academic year');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
   }
 
-  async getTermById(id: string): Promise<Term | null> {
-    return await this.prisma.term.findUnique({
-      where: { id },
-      include: {
-        academicYear: true,
-        classSubjects: {
-          include: {
-            class: true,
-            subject: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
-          },
-        },
-        assessments: {
-          include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
-            classSubject: {
-              include: {
-                subject: true,
-              },
-            },
-          },
-          take: 10, // Recent assessments
-        },
-      },
-    });
+  async getTermById(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Term ID is required', 400);
+      }
+      
+      const term = await academicService.getTermById(id);
+      
+      if (!term) {
+        return ResponseUtil.notFound(res, 'Term');
+      }
+
+      return ResponseUtil.success(res, 'Term retrieved successfully', term);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async getTermsByAcademicYear(academicYearId: string): Promise<Term[]> {
-    return await this.prisma.term.findMany({
-      where: { academicYearId },
-      orderBy: { termNumber: 'asc' },
-      include: {
-        _count: {
-          select: {
-            assessments: true,
-            classSubjects: true,
-          },
-        },
-      },
-    });
+  async getTermsByAcademicYear(req: Request, res: Response): Promise<Response> {
+    try {
+      const { academicYearId } = req.params;
+      
+      if (!academicYearId) {
+        return ResponseUtil.error(res, 'Academic year ID is required', 400);
+      }
+      
+      const terms = await academicService.getTermsByAcademicYear(academicYearId);
+      
+      return ResponseUtil.success(res, 'Terms retrieved successfully', terms, terms.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
   // Classes
-  async createClass(data: {
-    name: string;
-    level: string;
-    curriculum: Curriculum;
-    academicYearId: string;
-    schoolId: string;
-    classTeacherId?: string;
-    pathway?: Pathway;
-  }): Promise<Class> {
-    const classData = await this.prisma.class.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
+  async createClass(req: Request, res: Response): Promise<Response> {
+    try {
+      const { name, level, curriculum, academicYearId, schoolId } = req.body;
+      
+      if (!name || !level || !curriculum || !academicYearId || !schoolId) {
+        return ResponseUtil.validationError(res, 'Required fields: name, level, curriculum, academicYearId, schoolId');
+      }
 
-    logger.info('Class created successfully', { 
-      classId: classData.id, 
-      name: classData.name,
-      schoolId: data.schoolId 
-    });
-
-    return classData;
+      const classData = await academicService.createClass(req.body);
+      return ResponseUtil.created(res, 'Class created successfully', classData);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'Class already exists for this academic year and school');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
   }
 
-  async getClassById(id: string): Promise<Class | null> {
-    return await this.prisma.class.findUnique({
-      where: { id },
-      include: {
-        academicYear: true,
-        school: true,
-        classTeacher: {
-          include: {
-            user: true,
-          },
-        },
-        streams: {
-          include: {
-            _count: {
-              select: { students: true },
-            },
-            streamTeacher: {
-              include: {
-                user: true,
-              },
-            },
-          },
-        },
-        students: {
-          where: { status: 'ACTIVE' },
-          include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
-          },
-        },
-        subjects: {
-          include: {
-            subject: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
-            _count: {
-              select: {
-                assessments: true,
-              },
-            },
-          },
-        },
-      },
-    });
+  async getClassById(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
+      
+      const classData = await academicService.getClassById(id);
+      
+      if (!classData) {
+        return ResponseUtil.notFound(res, 'Class');
+      }
+
+      return ResponseUtil.success(res, 'Class retrieved successfully', classData);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async getSchoolClasses(schoolId: string, academicYearId?: string) {
-    const where: any = { schoolId };
-    if (academicYearId) where.academicYearId = academicYearId;
-
-    const classes = await this.prisma.class.findMany({
-      where,
-      include: {
-        academicYear: true,
-        classTeacher: {
-          include: {
-            user: true,
-          },
-        },
-        _count: {
-          select: {
-            students: true,
-            streams: true,
-            subjects: true,
-          },
-        },
-      },
-      orderBy: [
-        { level: 'asc' },
-        { name: 'asc' },
-      ],
-    });
-
-    return classes;
+  async getSchoolClasses(req: Request, res: Response): Promise<Response> {
+    try {
+      const { schoolId } = req.params;
+      const { academicYearId } = req.query;
+      
+      if (!schoolId) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
+      const classes = await academicService.getSchoolClasses(
+        schoolId, 
+        academicYearId as string
+      );
+      
+      return ResponseUtil.success(res, 'School classes retrieved successfully', classes, classes.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 
-  async updateClass(id: string, data: Partial<Class>): Promise<Class> {
-    const classData = await this.prisma.class.update({
-      where: { id },
-      data,
-    });
-
-    logger.info('Class updated successfully', { classId: id });
-    return classData;
+  async updateClass(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
+      
+      const classData = await academicService.updateClass(id, req.body);
+      
+      return ResponseUtil.success(res, 'Class updated successfully', classData);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'Class');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
   }
 
   // Streams
-  async createStream(data: {
-    name: string;
-    capacity?: number;
-    classId: string;
-    schoolId: string;
-    streamTeacherId?: string;
-  }): Promise<Stream> {
-    const stream = await this.prisma.stream.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
+  async createStream(req: Request, res: Response): Promise<Response> {
+    try {
+      const { name, classId, schoolId } = req.body;
+      
+      if (!name || !classId || !schoolId) {
+        return ResponseUtil.validationError(res, 'Required fields: name, classId, schoolId');
+      }
 
-    logger.info('Stream created successfully', { 
-      streamId: stream.id, 
-      name: stream.name,
-      classId: data.classId 
-    });
-
-    return stream;
-  }
-
-  async getStreamById(id: string): Promise<Stream | null> {
-    return await this.prisma.stream.findUnique({
-      where: { id },
-      include: {
-        class: true,
-        school: true,
-        streamTeacher: {
-          include: {
-            user: true,
-          },
-        },
-        students: {
-          where: { status: 'ACTIVE' },
-          include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  async getClassStreams(classId: string): Promise<Stream[]> {
-    return await this.prisma.stream.findMany({
-      where: { classId },
-      include: {
-        streamTeacher: {
-          include: {
-            user: true,
-          },
-        },
-        _count: {
-          select: { students: true },
-        },
-      },
-      orderBy: { name: 'asc' },
-    });
-  }
-
-  async updateStream(id: string, data: Partial<Stream>): Promise<Stream> {
-    const stream = await this.prisma.stream.update({
-      where: { id },
-      data,
-    });
-
-    logger.info('Stream updated successfully', { streamId: id });
-    return stream;
-  }
-
-  async deleteStream(id: string): Promise<Stream> {
-    const stream = await this.prisma.stream.delete({
-      where: { id },
-    });
-
-    logger.info('Stream deleted successfully', { streamId: id });
-    return stream;
-  }
-
-  // Academic Statistics
-  async getAcademicStatistics(academicYearId?: string) {
-    const where = academicYearId ? { academicYearId } : {};
-
-    const [
-      totalStudents,
-      totalTeachers,
-      totalClasses,
-      totalAssessments,
-      classDistribution,
-      assessmentTrends
-    ] = await Promise.all([
-      this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
-      this.prisma.teacher.count(),
-      this.prisma.class.count({ where }),
-      this.prisma.assessment.count({ where }),
-      this.prisma.class.findMany({
-        where,
-        include: {
-          _count: {
-            select: {
-              students: true,
-            },
-          },
-        },
-      }),
-      this.prisma.assessment.groupBy({
-        by: ['type'],
-        where,
-        _count: {
-          id: true,
-        },
-      }),
-    ]);
-
-    return {
-      totalStudents,
-      totalTeachers,
-      totalClasses,
-      totalAssessments,
-      classDistribution: classDistribution.map(cls => ({
-        className: cls.name,
-        studentCount: cls._count.students,
-      })),
-      assessmentTypes: assessmentTrends.map(trend => ({
-        type: trend.type,
-        count: trend._count.id,
-      })),
-    };
-  }
-
-  async getClassPerformance(classId: string, termId?: string) {
-    const where: any = {
-      classSubject: {
-        classId,
-      },
-    };
-
-    if (termId) {
-      where.termId = termId;
+      const stream = await academicService.createStream(req.body);
+      return ResponseUtil.created(res, 'Stream created successfully', stream);
+    } catch (error: any) {
+      if (error.code === 'P2002') {
+        return ResponseUtil.conflict(res, 'Stream already exists for this class');
+      }
+      return ResponseUtil.error(res, error.message, 400);
     }
+  }
 
-    const assessments = await this.prisma.assessment.findMany({
-      where,
-      include: {
-        student: {
-          include: {
-            user: true,
-          },
-        },
-        classSubject: {
-          include: {
-            subject: true,
-          },
-        },
-      },
-    });
-
-    const performanceByStudent = assessments.reduce((acc, assessment) => {
-      const studentId = assessment.studentId;
-      const studentName = `${assessment.student.user?.firstName} ${assessment.student.user?.lastName}`;
+  async getStreamById(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
       
-      if (!acc[studentId]) {
-        acc[studentId] = {
-          studentId,
-          studentName,
-          totalMarks: 0,
-          totalMaxMarks: 0,
-          count: 0,
-          subjects: {},
-        };
+      if (!id) {
+        return ResponseUtil.error(res, 'Stream ID is required', 400);
       }
       
-      if (assessment.marksObtained && assessment.maxMarks) {
-        acc[studentId].totalMarks += assessment.marksObtained;
-        acc[studentId].totalMaxMarks += assessment.maxMarks;
-        acc[studentId].count += 1;
-
-        const subjectName = assessment.classSubject.subject.name;
-        if (!acc[studentId].subjects[subjectName]) {
-          acc[studentId].subjects[subjectName] = {
-            totalMarks: 0,
-            totalMaxMarks: 0,
-            count: 0,
-          };
-        }
-        
-        acc[studentId].subjects[subjectName].totalMarks += assessment.marksObtained;
-        acc[studentId].subjects[subjectName].totalMaxMarks += assessment.maxMarks;
-        acc[studentId].subjects[subjectName].count += 1;
+      const stream = await academicService.getStreamById(id);
+      
+      if (!stream) {
+        return ResponseUtil.notFound(res, 'Stream');
       }
 
-      return acc;
-    }, {} as any);
+      return ResponseUtil.success(res, 'Stream retrieved successfully', stream);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
 
-    // Calculate averages
-    Object.values(performanceByStudent).forEach((student: any) => {
-      student.average = student.count > 0 ? (student.totalMarks / student.totalMaxMarks) * 100 : 0;
+  async getClassStreams(req: Request, res: Response): Promise<Response> {
+    try {
+      const { classId } = req.params;
       
-      Object.keys(student.subjects).forEach(subject => {
-        const subjectData = student.subjects[subject];
-        subjectData.average = subjectData.count > 0 ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 : 0;
-      });
-    });
+      if (!classId) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
+      
+      const streams = await academicService.getClassStreams(classId);
+      
+      return ResponseUtil.success(res, 'Class streams retrieved successfully', streams, streams.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
 
-    return {
-      classId,
-      performance: Object.values(performanceByStudent),
-      classAverage: Object.values(performanceByStudent).reduce((total: number, student: any) => total + student.average, 0) / Object.keys(performanceByStudent).length,
-    };
+  async updateStream(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Stream ID is required', 400);
+      }
+      
+      const stream = await academicService.updateStream(id, req.body);
+      
+      return ResponseUtil.success(res, 'Stream updated successfully', stream);
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'Stream');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async deleteStream(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Stream ID is required', 400);
+      }
+      
+      await academicService.deleteStream(id);
+      
+      return ResponseUtil.success(res, 'Stream deleted successfully');
+    } catch (error: any) {
+      if (error.code === 'P2025') {
+        return ResponseUtil.notFound(res, 'Stream');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  // Statistics
+  async getAcademicStatistics(req: Request, res: Response): Promise<Response> {
+    try {
+      const { academicYearId } = req.query;
+      const statistics = await academicService.getAcademicStatistics(academicYearId as string);
+      
+      return ResponseUtil.success(res, 'Academic statistics retrieved successfully', statistics);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getClassPerformance(req: Request, res: Response): Promise<Response> {
+    try {
+      const { classId } = req.params;
+      const { termId } = req.query;
+      
+      if (!classId) {
+        return ResponseUtil.error(res, 'Class ID is required', 400);
+      }
+      
+      const performance = await academicService.getClassPerformance(classId, termId as string);
+      return ResponseUtil.success(res, 'Class performance retrieved successfully', performance);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
 }

@@ -245,11 +245,7 @@ export class TeacherService {
       include: {
         class: true,
         subject: true,
-        teacher: {
-          include: {
-            user: true,
-          },
-        },
+        teacher: true,
         term: true,
         academicYear: true,
       },

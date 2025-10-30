@@ -71,11 +71,7 @@ export class SubjectService {
           classLinks: {
             include: {
               class: true,
-              teacher: {
-                include: {
-                  user: true,
-                },
-              },
+              teacher: true,
             },
           },
         },
@@ -109,11 +105,7 @@ export class SubjectService {
         classLinks: {
           include: {
             class: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
+            teacher: true,
             assessments: {
               include: {
                 student: {

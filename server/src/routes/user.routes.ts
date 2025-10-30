@@ -28,7 +28,7 @@ router.use(authenticateToken);
 router.post('/', requireAdmin, validateCreateUser, userController.createUser);
 router.get('/', requireAdmin, validatePagination, userController.getUsers);
 router.get('/stats', requireAdmin, userController.getUserStats);
-router.get('/search', requireAdmin, userController.searchUsers);
+
 
 // User profile and management
 router.get('/profile', userController.getProfile);

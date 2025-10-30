@@ -329,7 +329,9 @@ export class GuardianService {
     
     const notifications = guardianStudents.flatMap(relationship => {
       const student = relationship.student;
-      const recentAssessments = student.assessments.slice(0, 3); // Latest 3 assessments
+      // Filter for assessments with a date and take the latest 3
+      const recentAssessments = student.assessments
+        .filter(assessment => assessment.assessedDate !== null).slice(0, 3);
       
       return recentAssessments.map(assessment => ({
         type: 'ASSESSMENT_UPDATE',
@@ -337,7 +339,7 @@ export class GuardianService {
         message: `${student.user?.firstName} scored ${assessment.marksObtained}/${assessment.maxMarks} in ${assessment.classSubject.subject.name}`,
         studentId: student.id,
         studentName: `${student.user?.firstName} ${student.user?.lastName}`,
-        date: assessment.assessedDate,
+        date: assessment.assessedDate!, // We can use non-null assertion as we've filtered out nulls
         priority: 'MEDIUM',
       }));
     });

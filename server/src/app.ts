@@ -76,18 +76,4 @@ app.use('*', (req, res) => {
 // Global error handler
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 3000;
-
-app.listen(PORT, () => {
-  logger.info(`🚀 EduTrak School Management API running on port ${PORT}`, {
-    environment: process.env.NODE_ENV || 'development',
-    port: PORT
-  });
-  
-  console.log(`🚀 Kenya School Management API running on port ${PORT}`);
-  console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`);
-  console.log(`📚 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
-});
-
 export default app;

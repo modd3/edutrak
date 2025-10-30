@@ -204,7 +204,7 @@ model Teacher {
   
   dateJoined     DateTime?
   
-  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
+  classSubjects  ClassSubject[]   @relation("TeacherClassSubjects")
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -229,7 +229,7 @@ model AcademicYear {
   
   terms          Term[]
   classes        Class[]
-  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
+  classSubjects  ClassSubject[]   @relation("AcademicYearClassSubjects")
   studentClasses StudentClass[]
   
   createdAt DateTime @default(now())
@@ -248,7 +248,7 @@ model Term {
   academicYearId String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   
-  classSubjects  ClassSubject[]   @relation(\"TeacherClassSubjects\")
+  classSubjects  ClassSubject[]   @relation("TermClassSubjects")
   assessments    Assessment[]
   
   createdAt      DateTime @default(now())
@@ -267,7 +267,6 @@ enum TermName {
 // ===== CURRICULUM & CLASSES =====
 
 model Class {
-  promotedStudents   StudentClass[]   @relation(\"Promotion\")
   id             String      @id @default(uuid())
   name           String       // e.g., "Grade 7", "Form 3"
   level          String       // Grade/Form level
@@ -288,6 +287,7 @@ model Class {
   streams        Stream[]
   students       StudentClass[]
   subjects       ClassSubject[]
+  promotedStudents StudentClass[] @relation("Promotion")
   
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
@@ -421,8 +421,9 @@ model ClassSubject {
   class          Class        @relation(fields: [classId], references: [id])
   subject        Subject      @relation(fields: [subjectId], references: [id])
   teacher        User         @relation(fields: [teacherId], references: [id])
-  term           Term         @relation(fields: [termId], references: [id])
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  term           Term         @relation("TermClassSubjects", fields: [termId], references: [id])
+  academicYear   AcademicYear @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
+  teacherProfile Teacher      @relation("TeacherClassSubjects", fields: [teacherId], references: [id], map: "ClassSubject_teacherProfile_fkey")
   
   // CBC: Strand/Sub-strand tracking
   strands        String?      // JSON array of strand IDs
@@ -462,7 +463,7 @@ model StudentClass {
   class          Class        @relation(fields: [classId], references: [id])
   stream         Stream?      @relation(fields: [streamId], references: [id])
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  promotedTo   Class?   @relation(\"Promotion\", fields: [promotedToId], references: [id])
+  promotedTo     Class?       @relation("Promotion", fields: [promotedToId], references: [id])
   
   @@index([studentId])
   @@index([classId])

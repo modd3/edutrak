@@ -22,13 +22,13 @@ router.get('/class-subjects/:classSubjectId', validateUUIDParam, assessmentContr
 // Statistics and calculations
 router.get('/students/:studentId/average', validateUUIDParam, assessmentController.calculateStudentTermAverage);
 router.get('/class-subjects/:classSubjectId/statistics', validateUUIDParam, assessmentController.getClassSubjectStatistics);
-router.get('/students/:studentId/trends', validateUUIDParam, assessmentController.getAssessmentTrends);
+//router.get('/students/:studentId/trends', validateUUIDParam, assessmentController.getAssessmentTrends);
 
 // Grading
 router.post('/convert-grade', assessmentController.convertMarksToGrade);
 
 // Reports
 router.get('/students/:studentId/report', validateUUIDParam, assessmentController.generateStudentTermReport);
-router.get('/classes/:classId/report', validateUUIDParam, assessmentController.generateClassTermReport);
+//router.get('/classes/:classId/report', validateUUIDParam, assessmentController.generateClassTermReport);
 
 export default router;

@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { TeacherService } from '../services/teacher.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
+import { Role } from '@prisma/client';
 
 const teacherService = new TeacherService();
 
 export class TeacherController {
-  async createTeacher(req: Request, res: Response) {
+  async createTeacher(req: Request, res: Response): Promise<Response> {
     try {
       const { userId, tscNumber, employmentType } = req.body;
       
@@ -24,7 +25,7 @@ export class TeacherController {
     }
   }
 
-  async createTeacherWithUser(req: Request, res: Response) {
+  async createTeacherWithUser(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
       const { email, password, firstName, lastName, tscNumber, employmentType } = req.body;
@@ -35,7 +36,7 @@ export class TeacherController {
 
       const teacher = await teacherService.createTeacherWithUser(req.body, {
         userId: currentUser.userId,
-        role: currentUser.role
+        role: currentUser.role as Role
       });
       return ResponseUtil.created(res, 'Teacher with user account created successfully', teacher);
     } catch (error: any) {
@@ -46,7 +47,7 @@ export class TeacherController {
     }
   }
 
-  async getTeachers(req: Request, res: Response) {
+  async getTeachers(req: Request, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await teacherService.getTeachers({
@@ -63,9 +64,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherById(req: Request, res: Response) {
+  async getTeacherById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Teacher ID is required', 400);
+      }
+      
       const teacher = await teacherService.getTeacherById(id);
       
       if (!teacher) {
@@ -78,9 +84,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherByUserId(req: Request, res: Response) {
+  async getTeacherByUserId(req: Request, res: Response): Promise<Response> {
     try {
       const { userId } = req.params;
+      
+      if (!userId) {
+        return ResponseUtil.error(res, 'User ID is required', 400);
+      }
+      
       const teacher = await teacherService.getTeacherByUserId(userId);
       
       if (!teacher) {
@@ -93,9 +104,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherByTscNumber(req: Request, res: Response) {
+  async getTeacherByTscNumber(req: Request, res: Response): Promise<Response> {
     try {
       const { tscNumber } = req.params;
+      
+      if (!tscNumber) {
+        return ResponseUtil.error(res, 'TSC number is required', 400);
+      }
+      
       const teacher = await teacherService.getTeacherByTscNumber(tscNumber);
       
       if (!teacher) {
@@ -108,9 +124,14 @@ export class TeacherController {
     }
   }
 
-  async updateTeacher(req: Request, res: Response) {
+  async updateTeacher(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Teacher ID is required', 400);
+      }
+      
       const teacher = await teacherService.updateTeacher(id, req.body);
       
       return ResponseUtil.success(res, 'Teacher updated successfully', teacher);
@@ -122,7 +143,7 @@ export class TeacherController {
     }
   }
 
-  async assignSubjectToTeacher(req: Request, res: Response) {
+  async assignSubjectToTeacher(req: Request, res: Response): Promise<Response> {
     try {
       const { classId, subjectId, teacherId, termId, academicYearId } = req.body;
       
@@ -140,10 +161,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherWorkload(req: Request, res: Response) {
+  async getTeacherWorkload(req: Request, res: Response): Promise<Response> {
     try {
       const { teacherId } = req.params;
       const { academicYearId } = req.query;
+      
+      if (!teacherId) {
+        return ResponseUtil.error(res, 'Teacher ID is required', 400);
+      }
       
       const workload = await teacherService.getTeacherWorkload(
         teacherId, 
@@ -156,10 +181,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherTimetable(req: Request, res: Response) {
+  async getTeacherTimetable(req: Request, res: Response): Promise<Response> {
     try {
       const { teacherId } = req.params;
       const { termId } = req.query;
+      
+      if (!teacherId) {
+        return ResponseUtil.error(res, 'Teacher ID is required', 400);
+      }
       
       if (!termId) {
         return ResponseUtil.validationError(res, 'termId query parameter is required');
@@ -172,10 +201,14 @@ export class TeacherController {
     }
   }
 
-  async getTeacherPerformance(req: Request, res: Response) {
+  async getTeacherPerformance(req: Request, res: Response): Promise<Response> {
     try {
       const { teacherId } = req.params;
       const { academicYearId } = req.query;
+      
+      if (!teacherId) {
+        return ResponseUtil.error(res, 'Teacher ID is required', 400);
+      }
       
       const performance = await teacherService.getTeacherPerformance(teacherId, academicYearId as string);
       return ResponseUtil.success(res, 'Teacher performance retrieved successfully', performance);

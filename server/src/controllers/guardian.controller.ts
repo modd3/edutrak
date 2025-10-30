@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { GuardianService } from '../services/guardian.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
+import { Role } from '@prisma/client';
 
 const guardianService = new GuardianService();
 
 export class GuardianController {
-  async createGuardian(req: Request, res: Response) {
+  async createGuardian(req: Request, res: Response): Promise<Response> {
     try {
       const { userId, relationship } = req.body;
       
@@ -24,7 +25,7 @@ export class GuardianController {
     }
   }
 
-  async createGuardianWithUser(req: Request, res: Response) {
+  async createGuardianWithUser(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
       const { email, password, firstName, lastName, relationship } = req.body;
@@ -35,7 +36,7 @@ export class GuardianController {
 
       const guardian = await guardianService.createGuardianWithUser(req.body, {
         userId: currentUser.userId,
-        role: currentUser.role
+        role: currentUser.role as Role
       });
       return ResponseUtil.created(res, 'Guardian with user account created successfully', guardian);
     } catch (error: any) {
@@ -46,7 +47,7 @@ export class GuardianController {
     }
   }
 
-  async getGuardians(req: Request, res: Response) {
+  async getGuardians(req: Request, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await guardianService.getGuardians({
@@ -62,9 +63,14 @@ export class GuardianController {
     }
   }
 
-  async getGuardianById(req: Request, res: Response) {
+  async getGuardianById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Guardian ID is required', 400);
+      }
+      
       const guardian = await guardianService.getGuardianById(id);
       
       if (!guardian) {
@@ -77,9 +83,14 @@ export class GuardianController {
     }
   }
 
-  async getGuardianByUserId(req: Request, res: Response) {
+  async getGuardianByUserId(req: Request, res: Response): Promise<Response> {
     try {
       const { userId } = req.params;
+      
+      if (!userId) {
+        return ResponseUtil.error(res, 'User ID is required', 400);
+      }
+      
       const guardian = await guardianService.getGuardianByUserId(userId);
       
       if (!guardian) {
@@ -92,9 +103,14 @@ export class GuardianController {
     }
   }
 
-  async updateGuardian(req: Request, res: Response) {
+  async updateGuardian(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Guardian ID is required', 400);
+      }
+      
       const guardian = await guardianService.updateGuardian(id, req.body);
       
       return ResponseUtil.success(res, 'Guardian updated successfully', guardian);
@@ -106,9 +122,14 @@ export class GuardianController {
     }
   }
 
-  async getGuardianStudents(req: Request, res: Response) {
+  async getGuardianStudents(req: Request, res: Response): Promise<Response> {
     try {
       const { guardianId } = req.params;
+      
+      if (!guardianId) {
+        return ResponseUtil.error(res, 'Guardian ID is required', 400);
+      }
+      
       const students = await guardianService.getGuardianStudents(guardianId);
       
       return ResponseUtil.success(res, 'Guardian students retrieved successfully', students, students.length);
@@ -117,9 +138,14 @@ export class GuardianController {
     }
   }
 
-  async getStudentGuardians(req: Request, res: Response) {
+  async getStudentGuardians(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId } = req.params;
+      
+      if (!studentId) {
+        return ResponseUtil.error(res, 'Student ID is required', 400);
+      }
+      
       const guardians = await guardianService.getStudentGuardians(studentId);
       
       return ResponseUtil.success(res, 'Student guardians retrieved successfully', guardians, guardians.length);
@@ -128,7 +154,7 @@ export class GuardianController {
     }
   }
 
-  async setPrimaryGuardian(req: Request, res: Response) {
+  async setPrimaryGuardian(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, guardianId } = req.body;
       
@@ -146,9 +172,13 @@ export class GuardianController {
     }
   }
 
-  async removeGuardianFromStudent(req: Request, res: Response) {
+  async removeGuardianFromStudent(req: Request, res: Response): Promise<Response> {
     try {
       const { studentId, guardianId } = req.params;
+      
+      if (!studentId || !guardianId) {
+        return ResponseUtil.error(res, 'Student ID and Guardian ID are required', 400);
+      }
       
       await guardianService.removeGuardianFromStudent(studentId, guardianId);
       return ResponseUtil.success(res, 'Guardian removed from student successfully');
@@ -160,9 +190,14 @@ export class GuardianController {
     }
   }
 
-  async getGuardianNotifications(req: Request, res: Response) {
+  async getGuardianNotifications(req: Request, res: Response): Promise<Response> {
     try {
       const { guardianId } = req.params;
+      
+      if (!guardianId) {
+        return ResponseUtil.error(res, 'Guardian ID is required', 400);
+      }
+      
       const notifications = await guardianService.getGuardianNotifications(guardianId);
       
       return ResponseUtil.success(res, 'Guardian notifications retrieved successfully', notifications);

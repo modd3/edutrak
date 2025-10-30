@@ -126,7 +126,7 @@ export class SchoolService {
             academicYear: true,
             classTeacher: {
               include: {
-                user: true,
+                teacher: true,
               },
             },
           },

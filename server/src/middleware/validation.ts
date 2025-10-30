@@ -2,16 +2,17 @@ import { Request, Response, NextFunction } from 'express';
 import { validationResult, body, param, query } from 'express-validator';
 import { ResponseUtil } from '../utils/response';
 
-export const handleValidationErrors = (req: Request, res: Response, next: NextFunction) => {
+export const handleValidationErrors = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
-    const errorMessages = errors.array().map(error => ({
-      field: error.param,
+    const errorMessages = errors.array().map((error: any) => ({
+      field: error.path || error.param || 'unknown',
       message: error.msg,
       value: error.value
     }));
     
-    return ResponseUtil.validationError(res, JSON.stringify(errorMessages));
+    ResponseUtil.validationError(res, JSON.stringify(errorMessages));
+    return;
   }
   next();
 };

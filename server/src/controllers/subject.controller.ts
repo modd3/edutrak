@@ -2,11 +2,12 @@ import { Request, Response } from 'express';
 import { SubjectService } from '../services/subject.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
+import { Curriculum } from '@prisma/client';
 
 const subjectService = new SubjectService();
 
 export class SubjectController {
-  async createSubject(req: Request, res: Response) {
+  async createSubject(req: Request, res: Response): Promise<Response> {
     try {
       const { name, code, category, curriculum } = req.body;
       
@@ -24,7 +25,7 @@ export class SubjectController {
     }
   }
 
-  async getSubjects(req: Request, res: Response) {
+  async getSubjects(req: Request, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await subjectService.getSubjects({
@@ -43,9 +44,14 @@ export class SubjectController {
     }
   }
 
-  async getSubjectById(req: Request, res: Response) {
+  async getSubjectById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Subject ID is required', 400);
+      }
+      
       const subject = await subjectService.getSubjectById(id);
       
       if (!subject) {
@@ -58,9 +64,14 @@ export class SubjectController {
     }
   }
 
-  async getSubjectByCode(req: Request, res: Response) {
+  async getSubjectByCode(req: Request, res: Response): Promise<Response> {
     try {
       const { code } = req.params;
+      
+      if (!code) {
+        return ResponseUtil.error(res, 'Subject code is required', 400);
+      }
+      
       const subject = await subjectService.getSubjectByCode(code);
       
       if (!subject) {
@@ -73,9 +84,14 @@ export class SubjectController {
     }
   }
 
-  async updateSubject(req: Request, res: Response) {
+  async updateSubject(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Subject ID is required', 400);
+      }
+      
       const subject = await subjectService.updateSubject(id, req.body);
       
       return ResponseUtil.success(res, 'Subject updated successfully', subject);
@@ -87,9 +103,14 @@ export class SubjectController {
     }
   }
 
-  async deleteSubject(req: Request, res: Response) {
+  async deleteSubject(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Subject ID is required', 400);
+      }
+      
       await subjectService.deleteSubject(id);
       
       return ResponseUtil.success(res, 'Subject deleted successfully');
@@ -101,7 +122,7 @@ export class SubjectController {
     }
   }
 
-  async addSubjectToSchool(req: Request, res: Response) {
+  async addSubjectToSchool(req: Request, res: Response): Promise<Response> {
     try {
       const { schoolId, subjectId } = req.body;
       
@@ -119,9 +140,14 @@ export class SubjectController {
     }
   }
 
-  async getSchoolSubjects(req: Request, res: Response) {
+  async getSchoolSubjects(req: Request, res: Response): Promise<Response> {
     try {
       const { schoolId } = req.params;
+      
+      if (!schoolId) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
       const subjects = await subjectService.getSchoolSubjects(schoolId);
       
       return ResponseUtil.success(res, 'School subjects retrieved successfully', subjects, subjects.length);
@@ -130,10 +156,14 @@ export class SubjectController {
     }
   }
 
-  async toggleSubjectOffering(req: Request, res: Response) {
+  async toggleSubjectOffering(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
       const { isActive } = req.body;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'Subject offering ID is required', 400);
+      }
       
       if (isActive === undefined) {
         return ResponseUtil.validationError(res, 'isActive field is required');
@@ -149,9 +179,13 @@ export class SubjectController {
     }
   }
 
-  async removeSubjectFromSchool(req: Request, res: Response) {
+  async removeSubjectFromSchool(req: Request, res: Response): Promise<Response> {
     try {
       const { schoolId, subjectId } = req.params;
+      
+      if (!schoolId || !subjectId) {
+        return ResponseUtil.error(res, 'School ID and Subject ID are required', 400);
+      }
       
       await subjectService.removeSubjectFromSchool(schoolId, subjectId);
       return ResponseUtil.success(res, 'Subject removed from school successfully');
@@ -163,9 +197,14 @@ export class SubjectController {
     }
   }
 
-  async getCBCSubjectsByLearningArea(req: Request, res: Response) {
+  async getCBCSubjectsByLearningArea(req: Request, res: Response): Promise<Response> {
     try {
       const { learningArea } = req.params;
+      
+      if (!learningArea) {
+        return ResponseUtil.error(res, 'Learning area is required', 400);
+      }
+      
       const subjects = await subjectService.getCBCSubjectsByLearningArea(learningArea as any);
       
       return ResponseUtil.success(res, 'CBC subjects retrieved successfully', subjects, subjects.length);
@@ -174,9 +213,14 @@ export class SubjectController {
     }
   }
 
-  async get844SubjectsByGroup(req: Request, res: Response) {
+  async get844SubjectsByGroup(req: Request, res: Response): Promise<Response> {
     try {
       const { subjectGroup } = req.params;
+      
+      if (!subjectGroup) {
+        return ResponseUtil.error(res, 'Subject group is required', 400);
+      }
+      
       const subjects = await subjectService.get844SubjectsByGroup(subjectGroup as any);
       
       return ResponseUtil.success(res, '8-4-4 subjects retrieved successfully', subjects, subjects.length);
@@ -185,10 +229,14 @@ export class SubjectController {
     }
   }
 
-  async getSubjectPerformance(req: Request, res: Response) {
+  async getSubjectPerformance(req: Request, res: Response): Promise<Response> {
     try {
       const { subjectId } = req.params;
       const { academicYearId } = req.query;
+      
+      if (!subjectId) {
+        return ResponseUtil.error(res, 'Subject ID is required', 400);
+      }
       
       const performance = await subjectService.getSubjectPerformance(subjectId, academicYearId as string);
       return ResponseUtil.success(res, 'Subject performance retrieved successfully', performance);
@@ -197,7 +245,7 @@ export class SubjectController {
     }
   }
 
-  async getCurriculumSubjects(req: Request, res: Response) {
+  async getCurriculumSubjects(req: Request, res: Response): Promise<Response> {
     try {
       const { curriculum } = req.params;
       

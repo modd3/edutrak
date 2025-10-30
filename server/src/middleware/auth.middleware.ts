@@ -15,12 +15,13 @@ declare global {
   }
 }
 
-export const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+export const authenticateToken = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1];
 
   if (!token) {
-    return ResponseUtil.unauthorized(res, 'Access token required');
+    ResponseUtil.unauthorized(res, 'Access token required');
+    return;
   }
 
   try {
@@ -36,12 +37,12 @@ export const authenticateToken = (req: Request, res: Response, next: NextFunctio
     next();
   } catch (error: any) {
     logger.warn('Authentication failed', { error: error.message, token: token.substring(0, 20) + '...' });
-    return ResponseUtil.unauthorized(res, error.message);
+    ResponseUtil.unauthorized(res, error.message);
   }
 };
 
 export const requireRole = (roles: string[]) => {
-  return (req: Request, res: Response, next: NextFunction) => {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const user = req.user;
     
     if (!user || !roles.includes(user.role)) {
@@ -51,18 +52,20 @@ export const requireRole = (roles: string[]) => {
         requiredRoles: roles,
         path: req.path 
       });
-      return ResponseUtil.forbidden(res);
+      ResponseUtil.forbidden(res);
+      return;
     }
     
     next();
   };
 };
 
-export const requireSchool = (req: Request, res: Response, next: NextFunction) => {
+export const requireSchool = (req: Request, res: Response, next: NextFunction): void => {
   const user = req.user;
   
   if (!user?.schoolId) {
-    return ResponseUtil.forbidden(res, 'School context required');
+    ResponseUtil.forbidden(res, 'School context required');
+    return;
   }
   
   next();
@@ -75,7 +78,7 @@ export const requireTeacher = requireRole(['TEACHER', 'ADMIN', 'SUPER_ADMIN']);
 export const requireStudent = requireRole(['STUDENT', 'ADMIN', 'SUPER_ADMIN']);
 export const requireGuardian = requireRole(['PARENT', 'ADMIN', 'SUPER_ADMIN']);
 
-export const canAccessProfile = (req: Request, res: Response, next: NextFunction) => {
+export const canAccessProfile = (req: Request, res: Response, next: NextFunction): void => {
   const user = req.user;
   const requestedUserId = req.params.id;
   
@@ -87,6 +90,6 @@ export const canAccessProfile = (req: Request, res: Response, next: NextFunction
       requestedUserId,
       path: req.path 
     });
-    return ResponseUtil.forbidden(res, 'You can only access your own profile');
+    ResponseUtil.forbidden(res, 'You can only access your own profile');
   }
 };

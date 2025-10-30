@@ -6,25 +6,28 @@ import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
 
+// Define a DTO for user creation to improve type safety and clarity
+type UserCreationData = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  phone?: string;
+  idNumber?: string;
+  tscNumber?: string;
+  role: Role;
+  schoolId?: string;
+};
+
 export class UserService {
   private prisma: PrismaClient;
 
   constructor() {
     this.prisma = prisma;
   }
-
-  async createUser(data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    phone?: string;
-    idNumber?: string;
-    tscNumber?: string;
-    role: Role;
-    schoolId?: string;
-  }, createdBy: { userId: string; role: Role }): Promise<{ user: User; token: string }> {
+  
+  async createUser(data: UserCreationData, createdBy: { userId: string; role: Role }): Promise<{ user: User; token: string }> {
     
     this.validateUserCreation(data.role, createdBy.role);
 
@@ -34,18 +37,27 @@ export class UserService {
 
     const hashedPassword = await hashPassword(data.password);
 
+    // Avoid spreading untrusted input. Explicitly map properties.
     const user = await this.prisma.user.create({
       data: {
         id: uuidv4(),
-        ...data,
+        email: data.email,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        tscNumber: data.tscNumber,
+        role: data.role,
         password: hashedPassword,
+        schoolId: data.schoolId,
       },
     });
 
     const token = generateToken({
       userId: user.id,
       role: user.role,
-      schoolId: user.schoolId
+      schoolId: user.schoolId || undefined // Convert null to undefined
     });
 
     // Send welcome email
@@ -81,27 +93,28 @@ export class UserService {
       where: { email },
       include: {
         school: true,
-        student: true,
-        teacher: true,
-        guardian: true,
+        // Defer loading heavy relations until after password check
       },
     });
 
     if (!user || !user.isActive) {
-      throw new Error('Invalid credentials or inactive account');
+      // Use a generic error message to prevent user enumeration
+      throw new Error('Invalid credentials');
     }
 
     const isValidPassword = await comparePasswords(password, user.password);
     if (!isValidPassword) {
+      // Use the same generic error message
       throw new Error('Invalid credentials');
     }
 
+    // Now that the user is authenticated, fetch their full profile
     const completeProfile = await this.getCompleteUserProfile(user.id);
 
     const token = generateToken({
       userId: user.id,
       role: user.role,
-      schoolId: user.schoolId
+      schoolId: user.schoolId || undefined // Convert null to undefined
     });
 
     logger.info('User logged in successfully', { userId: user.id, role: user.role });
@@ -109,6 +122,7 @@ export class UserService {
     return { user: completeProfile, token };
   }
 
+  // ... rest of your existing methods remain the same
   async getUsers(filters?: {
     role?: Role;
     schoolId?: string;
@@ -319,28 +333,6 @@ export class UserService {
         classTeacherOf: true,
         streamTeacherOf: true,
         teachingSubjects: true,
-      },
-    });
-  }
-
-  async searchUsers(query: string, schoolId?: string) {
-    return await this.prisma.user.findMany({
-      where: {
-        ...(schoolId && { schoolId }),
-        OR: [
-          { firstName: { contains: query, mode: 'insensitive' } },
-          { lastName: { contains: query, mode: 'insensitive' } },
-          { email: { contains: query, mode: 'insensitive' } },
-        ],
-      },
-      take: 10,
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        role: true,
-        school: { select: { name: true } },
       },
     });
   }

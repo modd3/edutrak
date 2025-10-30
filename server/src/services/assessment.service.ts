@@ -1,4 +1,4 @@
-import { PrismaClient, Assessment, AssessmentType, CompetencyLevel } from '@prisma/client';
+import { PrismaClient, Assessment, AssessmentType, CompetencyLevel, Student, User, Class, Stream, AcademicYear, ClassSubject, Subject, Term } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
@@ -99,11 +99,7 @@ export class AssessmentService {
           include: {
             subject: true,
             class: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
+            teacher: true,
           },
         },
         term: true,
@@ -113,10 +109,10 @@ export class AssessmentService {
 
   async updateAssessment(id: string, data: Partial<Assessment>): Promise<Assessment> {
     // Recalculate grade if marks are updated
-    if (data.marksObtained !== undefined && data.maxMarks !== undefined && !data.grade) {
+    if (data.marksObtained != null && data.maxMarks != null && !data.grade) {
       const assessment = await this.prisma.assessment.findUnique({ where: { id } });
       if (assessment) {
-        data.grade = this.calculateGrade(data.marksObtained, data.maxMarks, assessment.type);
+        data.grade = this.calculateGrade(data.marksObtained as number, data.maxMarks, assessment.type);
       }
     }
 
@@ -397,153 +393,4 @@ export class AssessmentService {
     };
   }
 
-  async generateClassTermReport(classId: string, termId: string) {
-    const classData = await this.prisma.class.findUnique({
-      where: { id: classId },
-      include: {
-        academicYear: true,
-        classTeacher: {
-          include: {
-            user: true,
-          },
-        },
-        students: {
-          where: { status: 'ACTIVE' },
-          include: {
-            student: {
-              include: {
-                user: true,
-                assessments: {
-                  where: { termId },
-                  include: {
-                    classSubject: {
-                      include: {
-                        subject: true,
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!classData) {
-      throw new Error('Class not found');
-    }
-
-    const studentReports = await Promise.all(
-      classData.students.map(async (enrollment) => {
-        const average = await this.calculateStudentTermAverage(enrollment.studentId, termId);
-        return {
-          student: enrollment.student,
-          average: average.average,
-          grade: average.grade,
-          totalSubjects: average.totalSubjects,
-        };
-      })
-    );
-
-    const classAverage = studentReports.reduce((sum, report) => sum + report.average, 0) / studentReports.length;
-    const classGrade = this.calculateGradeFromPercentage(classAverage);
-
-    // Calculate subject-wise class performance
-    const subjectPerformance = studentReports.reduce((acc, report) => {
-      report.student.assessments?.forEach(assessment => {
-        const subjectName = assessment.classSubject.subject.name;
-        if (!acc[subjectName]) {
-          acc[subjectName] = {
-            subject: subjectName,
-            totalMarks: 0,
-            totalMaxMarks: 0,
-            count: 0,
-          };
-        }
-        
-        if (assessment.marksObtained) {
-          acc[subjectName].totalMarks += assessment.marksObtained;
-          acc[subjectName].totalMaxMarks += assessment.maxMarks;
-          acc[subjectName].count += 1;
-        }
-      });
-      return acc;
-    }, {} as any);
-
-    Object.keys(subjectPerformance).forEach(subject => {
-      const subjectData = subjectPerformance[subject];
-      subjectData.average = subjectData.count > 0 ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 : 0;
-      subjectData.grade = this.calculateGradeFromPercentage(subjectData.average);
-    });
-
-    return {
-      class: classData,
-      studentReports: studentReports.sort((a, b) => b.average - a.average), // Sort by performance
-      classAverage,
-      classGrade,
-      subjectPerformance: Object.values(subjectPerformance),
-      totalStudents: studentReports.length,
-      topPerformer: studentReports[0], // Highest average
-    };
-  }
-
-  async getAssessmentTrends(studentId: string, subjectId?: string) {
-    const where: any = { studentId };
-    if (subjectId) {
-      where.classSubject = { subjectId };
-    }
-
-    const assessments = await this.prisma.assessment.findMany({
-      where,
-      include: {
-        classSubject: {
-          include: {
-            subject: true,
-          },
-        },
-        term: true,
-      },
-      orderBy: { assessedDate: 'asc' },
-    });
-
-    // Group by term and subject
-    const trends = assessments.reduce((acc, assessment) => {
-      const termName = assessment.term.name;
-      const subjectName = assessment.classSubject.subject.name;
-      
-      if (!acc[termName]) {
-        acc[termName] = {};
-      }
-      
-      if (!acc[termName][subjectName]) {
-        acc[termName][subjectName] = {
-          totalMarks: 0,
-          totalMaxMarks: 0,
-          count: 0,
-        };
-      }
-      
-      if (assessment.marksObtained) {
-        acc[termName][subjectName].totalMarks += assessment.marksObtained;
-        acc[termName][subjectName].totalMaxMarks += assessment.maxMarks;
-        acc[termName][subjectName].count += 1;
-      }
-
-      return acc;
-    }, {} as any);
-
-    // Calculate averages
-    Object.keys(trends).forEach(term => {
-      Object.keys(trends[term]).forEach(subject => {
-        const subjectData = trends[term][subject];
-        subjectData.average = subjectData.count > 0 ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 : 0;
-      });
-    });
-
-    return {
-      studentId,
-      trends,
-    };
-  }
 }

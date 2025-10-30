@@ -152,11 +152,7 @@ export class AcademicService {
           include: {
             class: true,
             subject: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
+            teacher: true,  // ✅ Fixed: removed nested user include
           },
         },
         assessments: {
@@ -225,21 +221,13 @@ export class AcademicService {
       include: {
         academicYear: true,
         school: true,
-        classTeacher: {
-          include: {
-            user: true,
-          },
-        },
+        classTeacher: true,  // ✅ Fixed: removed nested user include
         streams: {
           include: {
             _count: {
               select: { students: true },
             },
-            streamTeacher: {
-              include: {
-                user: true,
-              },
-            },
+            streamTeacher: true,  // ✅ Fixed: removed nested user include
           },
         },
         students: {
@@ -255,11 +243,7 @@ export class AcademicService {
         subjects: {
           include: {
             subject: true,
-            teacher: {
-              include: {
-                user: true,
-              },
-            },
+            teacher: true,  // ✅ Fixed: removed nested user include
             _count: {
               select: {
                 assessments: true,
@@ -279,11 +263,7 @@ export class AcademicService {
       where,
       include: {
         academicYear: true,
-        classTeacher: {
-          include: {
-            user: true,
-          },
-        },
+        classTeacher: true,  // ✅ Fixed: removed nested user include
         _count: {
           select: {
             students: true,
@@ -341,11 +321,7 @@ export class AcademicService {
       include: {
         class: true,
         school: true,
-        streamTeacher: {
-          include: {
-            user: true,
-          },
-        },
+        streamTeacher: true,  // ✅ Fixed: removed nested user include
         students: {
           where: { status: 'ACTIVE' },
           include: {
@@ -364,11 +340,7 @@ export class AcademicService {
     return await this.prisma.stream.findMany({
       where: { classId },
       include: {
-        streamTeacher: {
-          include: {
-            user: true,
-          },
-        },
+        streamTeacher: true,  // ✅ Fixed: removed nested user include
         _count: {
           select: { students: true },
         },
@@ -397,56 +369,65 @@ export class AcademicService {
   }
 
   // Academic Statistics
-  async getAcademicStatistics(academicYearId?: string) {
-    const where = academicYearId ? { academicYearId } : {};
+ // Academic Statistics
+async getAcademicStatistics(academicYearId?: string) {
+  const where = academicYearId ? { academicYearId } : {};
+  
+  // Assessment filters need to go through classSubject relation
+  const assessmentWhere = academicYearId 
+    ? { 
+        classSubject: { 
+          academicYearId: academicYearId 
+        } 
+      } 
+    : {};
 
-    const [
-      totalStudents,
-      totalTeachers,
-      totalClasses,
-      totalAssessments,
-      classDistribution,
-      assessmentTrends
-    ] = await Promise.all([
-      this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
-      this.prisma.teacher.count(),
-      this.prisma.class.count({ where }),
-      this.prisma.assessment.count({ where }),
-      this.prisma.class.findMany({
-        where,
-        include: {
-          _count: {
-            select: {
-              students: true,
-            },
+  const [
+    totalStudents,
+    totalTeachers,
+    totalClasses,
+    totalAssessments,
+    classDistribution,
+    assessmentTrends
+  ] = await Promise.all([
+    this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
+    this.prisma.teacher.count(),
+    this.prisma.class.count({ where }),
+    this.prisma.assessment.count({ where: assessmentWhere }),
+    this.prisma.class.findMany({
+      where,
+      include: {
+        _count: {
+          select: {
+            students: true,
           },
         },
-      }),
-      this.prisma.assessment.groupBy({
-        by: ['type'],
-        where,
-        _count: {
-          id: true,
-        },
-      }),
-    ]);
+      },
+    }),
+    this.prisma.assessment.groupBy({
+      by: ['type'],
+      where: assessmentWhere,
+      _count: {
+        id: true,
+      },
+    }),
+  ]);
 
-    return {
-      totalStudents,
-      totalTeachers,
-      totalClasses,
-      totalAssessments,
-      classDistribution: classDistribution.map(cls => ({
-        className: cls.name,
-        studentCount: cls._count.students,
-      })),
-      assessmentTypes: assessmentTrends.map(trend => ({
-        type: trend.type,
-        count: trend._count.id,
-      })),
-    };
-  }
-
+  return {
+    totalStudents,
+    totalTeachers,
+    totalClasses,
+    totalAssessments,
+    classDistribution: classDistribution.map(cls => ({
+      className: cls.name,
+      studentCount: cls._count.students,
+    })),
+    assessmentTypes: assessmentTrends.map(trend => ({
+      type: trend.type,
+      count: trend._count?.id || 0,
+    })),
+  };
+}
   async getClassPerformance(classId: string, termId?: string) {
     const where: any = {
       classSubject: {

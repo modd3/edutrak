@@ -2,17 +2,18 @@ import { Request, Response } from 'express';
 import { SchoolService } from '../services/school.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
+import { Role } from '@prisma/client';
 
 const schoolService = new SchoolService();
 
 export class SchoolController {
-  async createSchool(req: Request, res: Response) {
+  async createSchool(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
       
       const school = await schoolService.createSchool(req.body, {
         userId: currentUser.userId,
-        role: currentUser.role
+        role: currentUser.role as Role
       });
       return ResponseUtil.created(res, 'School created successfully', school);
     } catch (error: any) {
@@ -23,7 +24,7 @@ export class SchoolController {
     }
   }
 
-  async getSchools(req: Request, res: Response) {
+  async getSchools(req: Request, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await schoolService.getSchools({
@@ -43,9 +44,14 @@ export class SchoolController {
     }
   }
 
-  async getSchoolById(req: Request, res: Response) {
+  async getSchoolById(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
       const school = await schoolService.getSchoolById(id);
       
       if (!school) {
@@ -58,9 +64,14 @@ export class SchoolController {
     }
   }
 
-  async updateSchool(req: Request, res: Response) {
+  async updateSchool(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
       const school = await schoolService.updateSchool(id, req.body);
       
       return ResponseUtil.success(res, 'School updated successfully', school);
@@ -72,9 +83,14 @@ export class SchoolController {
     }
   }
 
-  async deleteSchool(req: Request, res: Response) {
+  async deleteSchool(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
       await schoolService.deleteSchool(id);
       
       return ResponseUtil.success(res, 'School deleted successfully');
@@ -86,9 +102,14 @@ export class SchoolController {
     }
   }
 
-  async getSchoolStatistics(req: Request, res: Response) {
+  async getSchoolStatistics(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
+      
       const statistics = await schoolService.getSchoolStatistics(id);
       
       return ResponseUtil.success(res, 'School statistics retrieved successfully', statistics);
@@ -100,10 +121,14 @@ export class SchoolController {
     }
   }
 
-  async getSchoolPerformance(req: Request, res: Response) {
+  async getSchoolPerformance(req: Request, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
       const { academicYearId } = req.query;
+      
+      if (!id) {
+        return ResponseUtil.error(res, 'School ID is required', 400);
+      }
       
       const performance = await schoolService.getSchoolPerformance(id, academicYearId as string);
       return ResponseUtil.success(res, 'School performance retrieved successfully', performance);
