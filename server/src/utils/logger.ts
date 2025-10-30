@@ -15,7 +15,7 @@ const logger = winston.createLogger({
     errors({ stack: true }),
     json()
   ),
-  defaultMeta: { service: 'kenya-school-api' },
+  defaultMeta: { service: 'EduTrak-school-api' },
   transports: [
     new winston.transports.File({ 
       filename: 'logs/error.log', 
