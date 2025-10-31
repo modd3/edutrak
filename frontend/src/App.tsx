@@ -1,91 +1,69 @@
-import React from 'react'
-import { Routes, Route } from 'react-router-dom'
-import { Toaster } from 'sonner'
-import Layout from './components/Layout'
-import ProtectedRoute from './components/ProtectedRoute'
-import LoadingSpinner from './components/ui/LoadingSpinner'
-
-// Lazy load pages for code splitting
-const Login = React.lazy(() => import('./pages/Login'))
-const Dashboard = React.lazy(() => import('./pages/Dashboard'))
-const Students = React.lazy(() => import('./pages/Students'))
-const Teachers = React.lazy(() => import('./pages/Teachers'))
-const Classes = React.lazy(() => import('./pages/Classes'))
-const Subjects = React.lazy(() => import('./pages/Subjects'))
-const Assessments = React.lazy(() => import('./pages/Assessments'))
-const Attendance = React.lazy(() => import('./pages/Attendance'))
-const Users = React.lazy(() => import('./pages/Users'))
-const Profile = React.lazy(() => import('./pages/Profile'))
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { Toaster } from 'sonner';
+import Login from './pages/Login';
+import Dashboard from './pages/Dashboard';
+import StudentsList from './pages/students/StudentsList';
+import StudentDetails from './pages/students/StudentDetails';
+import CreateStudent from './pages/students/CreateStudent';
+import EditStudent from './pages/students/EditStudent';
+import TeachersList from './pages/teachers/TeachersList';
+import TeacherDetails from './pages/teachers/TeacherDetails';
+import CreateTeacher from './pages/teachers/CreateTeacher';
+import ClassesList from './pages/classes/ClassesList';
+import ClassDetails from './pages/classes/ClassDetails';
+import CreateClass from './pages/classes/CreateClass';
+import AssessmentsList from './pages/assessments/AssessmentsList';
+import CreateAssessment from './pages/assessments/CreateAssessment';
+import SubjectsList from './pages/subjects/SubjectsList';
+import AcademicYearsList from './pages/academic-years/AcademicYearsList';
+import GuardiansList from './pages/guardians/GuardiansList';
+import Reports from './pages/reports/Reports';
+import Settings from './pages/settings/Settings';
+import SchoolsList from './pages/schools/SchoolsList';
+import ProtectedRoute from './components/layout/ProtectedRoute';
 
 function App() {
   return (
-    <>
-      <Toaster 
-        position="top-right"
-        duration={4000}
-        richColors
-        closeButton
-      />
+    <BrowserRouter>
       <Routes>
-        <Route path="/login" element={
-          <React.Suspense fallback={<LoadingSpinner />}>
-            <Login />
-          </React.Suspense>
-        } />
-        <Route path="/" element={
-          <ProtectedRoute>
-            <Layout />
-          </ProtectedRoute>
-        }>
-          <Route index element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Dashboard />
-            </React.Suspense>
-          } />
-          <Route path="students" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Students />
-            </React.Suspense>
-          } />
-          <Route path="teachers" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Teachers />
-            </React.Suspense>
-          } />
-          <Route path="classes" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Classes />
-            </React.Suspense>
-          } />
-          <Route path="subjects" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Subjects />
-            </React.Suspense>
-          } />
-          <Route path="assessments" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Assessments />
-            </React.Suspense>
-          } />
-          <Route path="attendance" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Attendance />
-            </React.Suspense>
-          } />
-          <Route path="users" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Users />
-            </React.Suspense>
-          } />
-          <Route path="profile" element={
-            <React.Suspense fallback={<LoadingSpinner />}>
-              <Profile />
-            </React.Suspense>
-          } />
+        <Route path="/login" element={<Login />} />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+        
+        <Route element={<ProtectedRoute />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          
+          {/* Students Routes */}
+          <Route path="/students" element={<StudentsList />} />
+          <Route path="/students/new" element={<CreateStudent />} />
+          <Route path="/students/:id" element={<StudentDetails />} />
+          <Route path="/students/:id/edit" element={<EditStudent />} />
+          
+          {/* Teachers Routes */}
+          <Route path="/teachers" element={<TeachersList />} />
+          <Route path="/teachers/new" element={<CreateTeacher />} />
+          <Route path="/teachers/:id" element={<TeacherDetails />} />
+          
+          {/* Classes Routes */}
+          <Route path="/classes" element={<ClassesList />} />
+          <Route path="/classes/new" element={<CreateClass />} />
+          <Route path="/classes/:id" element={<ClassDetails />} />
+          
+          {/* Assessments Routes */}
+          <Route path="/assessments" element={<AssessmentsList />} />
+          <Route path="/assessments/new" element={<CreateAssessment />} />
+          
+          {/* Other Routes */}
+          <Route path="/subjects" element={<SubjectsList />} />
+          <Route path="/academic-years" element={<AcademicYearsList />} />
+          <Route path="/guardians" element={<GuardiansList />} />
+          <Route path="/reports" element={<Reports />} />
+          <Route path="/settings" element={<Settings />} />
+          <Route path="/schools" element={<SchoolsList />} />
         </Route>
       </Routes>
-    </>
-  )
+      <Toaster position="top-right" richColors />
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
