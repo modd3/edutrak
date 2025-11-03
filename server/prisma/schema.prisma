@@ -345,8 +345,7 @@ model Subject {
   
   // Subject classification
   category      SubjectCategory
-  isCore        Boolean  @default(false)  // Compulsory for all
-  
+    
   // CBC-specific
   learningArea  LearningArea?  // For CBC subjects
   
@@ -417,6 +416,7 @@ model ClassSubject {
   teacherId      String
   termId         String
   academicYearId String
+  subjectCategory SubjectCategory
   
   class          Class        @relation(fields: [classId], references: [id])
   subject        Subject      @relation(fields: [subjectId], references: [id])

@@ -1,79 +1,97 @@
 import { Link, useLocation } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Users,
-  GraduationCap,
-  BookOpen,
-  ClipboardCheck,
-  Settings,
-  Building2,
-  Calendar,
-  UserCircle,
-  FileText,
+import { 
+  Home, Users, BookOpen, GraduationCap, 
+  BarChart4, Settings, CalendarDays 
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/store/auth-store';
+import { Role } from '@/types'; 
+import { cn } from '@/lib/utils'; // Tailwind utility helper
 
-const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
-  { name: 'Students', href: '/students', icon: GraduationCap },
-  { name: 'Teachers', href: '/teachers', icon: Users },
-  { name: 'Classes', href: '/classes', icon: BookOpen },
-  { name: 'Assessments', href: '/assessments', icon: ClipboardCheck },
-  { name: 'Subjects', href: '/subjects', icon: FileText },
-  { name: 'Guardians', href: '/guardians', icon: UserCircle },
-  { name: 'Academic Years', href: '/academic-years', icon: Calendar },
-  { name: 'Schools', href: '/schools', icon: Building2, adminOnly: true },
-  { name: 'Settings', href: '/settings', icon: Settings },
+// Define Navigation Items and their required roles
+const navItems = [
+  { 
+    name: 'Dashboard', 
+    path: '/', 
+    icon: Home, 
+    roles: [Role.ADMIN, Role.PRINCIPAL, Role.TEACHER] 
+  },
+  { 
+    name: 'Academic Setup', 
+    path: '/academic/classes', 
+    icon: CalendarDays, 
+    roles: [Role.ADMIN, Role.PRINCIPAL] 
+  },
+  { 
+    name: 'Staff Directory', 
+    path: '/teachers', 
+    icon: Users, 
+    roles: [Role.ADMIN, Role.PRINCIPAL] 
+  },
+  { 
+    name: 'Student Enrollment', 
+    path: '/students', 
+    icon: GraduationCap, 
+    roles: [Role.ADMIN, Role.PRINCIPAL, Role.TEACHER] 
+  },
+  { 
+    name: 'Subject Grading', 
+    path: '/grading/my-subjects', 
+    icon: BookOpen, 
+    roles: [Role.TEACHER] 
+  },
+  { 
+    name: 'Term Reports', 
+    path: '/grading/reports', 
+    icon: BarChart4, 
+    roles: [Role.ADMIN, Role.PRINCIPAL] 
+  },
+  { 
+    name: 'Settings', 
+    path: '/settings', 
+    icon: Settings, 
+    roles: [Role.ADMIN] 
+  },
 ];
 
-export default function Sidebar() {
-  const location = useLocation();
+export function Sidebar() {
   const { user } = useAuthStore();
+  const location = useLocation();
+  const userRole = user?.role as Role;
+  
+  if (!userRole) return null; // Should be handled by ProtectedRoute, but defensive coding is good
 
-  const filteredNavigation = navigation.filter(
-    (item) => !item.adminOnly || user?.role === 'SUPER_ADMIN' || user?.role === 'ADMIN'
-  );
+  const visibleItems = navItems.filter(item => item.roles.includes(userRole));
 
   return (
-    <div className="flex h-full w-64 flex-col border-r bg-card">
-      <div className="flex h-16 items-center border-b px-6">
-        <h1 className="text-xl font-bold text-primary">EduTrak</h1>
+    <div className="hidden md:flex flex-col w-64 bg-gray-900 text-white min-h-screen p-4 sticky top-0">
+      <div className="flex items-center justify-center h-16 border-b border-gray-700">
+        <h1 className="text-xl font-bold text-primary-500">EduTrak LMS</h1>
       </div>
-
-      <nav className="flex-1 space-y-1 overflow-y-auto p-4">
-        {filteredNavigation.map((item) => {
-          const isActive = location.pathname === item.href || location.pathname.startsWith(`${item.href}/`);
+      
+      <nav className="flex-1 mt-6 space-y-2">
+        {visibleItems.map((item) => {
+          const isActive = location.pathname === item.path || (
+            item.name === 'Academic Setup' && location.pathname.startsWith('/academic')
+          );
+          
           return (
             <Link
               key={item.name}
-              to={item.href}
+              to={item.path}
               className={cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary text-primary-foreground'
-                  : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                "flex items-center px-4 py-2 rounded-lg transition-colors group",
+                isActive ? "bg-primary text-white hover:bg-primary-dark" : "text-gray-300 hover:bg-gray-800 hover:text-white"
               )}
             >
-              <item.icon className="h-5 w-5" />
-              {item.name}
+              <item.icon className="mr-3 h-5 w-5" />
+              <span className="font-medium">{item.name}</span>
             </Link>
           );
         })}
       </nav>
-
-      <div className="border-t p-4">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
-            {user?.firstName?.[0]}{user?.lastName?.[0]}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium">
-              {user?.firstName} {user?.lastName}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">{user?.role}</p>
-          </div>
-        </div>
+      
+      <div className="mt-auto pt-4 border-t border-gray-700 text-sm text-gray-400">
+        Logged in as: <span className="font-semibold text-primary">{userRole}</span>
       </div>
     </div>
   );

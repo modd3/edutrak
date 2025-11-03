@@ -15,7 +15,7 @@ export type Pathway = 'STEM' | 'ARTS_SPORTS' | 'SOCIAL_SCIENCES';
 export type TermName = 'TERM_1' | 'TERM_2' | 'TERM_3';
 
 export interface User {
-  id: number;
+  id: string;
   email: string;
   firstName: string;
   lastName: string;
@@ -24,7 +24,7 @@ export interface User {
   idNumber?: string;
   tscNumber?: string;
   role: Role;
-  schoolId?: number;
+  schoolId?: string;
   school?: School;
   isActive: boolean;
   createdAt: string;
@@ -32,7 +32,7 @@ export interface User {
 }
 
 export interface School {
-  id: number;
+  id: string;
   name: string;
   registrationNo?: string;
   type: SchoolType;
@@ -52,7 +52,7 @@ export interface School {
 }
 
 export interface Student {
-  id: number;
+  id: string;
   admissionNo: string;
   upiNumber?: string;
   nemisUpi?: string;
@@ -69,17 +69,18 @@ export interface Student {
   specialNeedsType?: string;
   medicalCondition?: string;
   allergies?: string;
-  schoolId?: number;
+  schoolId?: string;
   school?: School;
-  userId?: number;
+  userId?: string;
   user?: User;
+  enrollments?: StudentClass[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Teacher {
-  id: number;
-  userId: number;
+  id: string;
+  userId: string;
   tscNumber: string;
   employmentType: EmploymentType;
   qualification?: string;
@@ -91,8 +92,8 @@ export interface Teacher {
 }
 
 export interface Guardian {
-  id: number;
-  userId: number;
+  id: string;
+  userId: string;
   relationship: string;
   occupation?: string;
   employer?: string;
@@ -103,7 +104,7 @@ export interface Guardian {
 }
 
 export interface AcademicYear {
-  id: number;
+  id: string;
   year: number;
   startDate: string;
   endDate: string;
@@ -113,26 +114,27 @@ export interface AcademicYear {
 }
 
 export interface Term {
-  id: number;
+  id: string;
   name: TermName;
   termNumber: number;
   startDate: string;
   endDate: string;
-  academicYearId: number;
+  academicYearId: string;
   academicYear?: AcademicYear;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Class {
-  id: number;
+  id: string;
   name: string;
   level: string;
   curriculum: Curriculum;
-  academicYearId: number;
-  schoolId: number;
-  classTeacherId?: number;
+  academicYearId: string;
+  schoolId: string;
+  classTeacherId?: string;
   pathway?: Pathway;
+  streams?: Stream[];
   school?: School;
   academicYear?: AcademicYear;
   classTeacher?: User;
@@ -141,12 +143,12 @@ export interface Class {
 }
 
 export interface Stream {
-  id: number;
+  id: string;
   name: string;
   capacity?: number;
-  classId: number;
-  schoolId: number;
-  streamTeacherId?: number;
+  classId: string;
+  schoolId: string;
+  streamTeacherId?: string;
   class?: Class;
   school?: School;
   streamTeacher?: User;
@@ -155,11 +157,10 @@ export interface Stream {
 }
 
 export interface Subject {
-  id: number;
+  id: string;
   name: string;
   code: string;
   category: SubjectCategory;
-  isCore: boolean;
   learningArea?: LearningArea;
   subjectGroup?: string;
   curriculum: Curriculum[];
@@ -169,34 +170,35 @@ export interface Subject {
 }
 
 export interface Assessment {
-  id: number;
+  id: string;
   name: string;
   type: AssessmentType;
-  studentId: number;
-  classSubjectId: number;
-  termId: number;
+  studentId: string;
+  classSubjectId: string;
+  termId: string;
   marksObtained?: number;
   maxMarks: number;
   competencyLevel?: CompetencyLevel;
   grade?: string;
   remarks?: string;
-  assessedBy?: number;
+  assessedBy?: string;
   assessedDate?: string;
   student?: Student;
   term?: Term;
+  classSubject?: ClassSubject;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface StudentClass {
-  id: number;
-  studentId: number;
-  classId: number;
-  streamId?: number;
-  academicYearId: number;
+  id: string;
+  studentId: string;
+  classId: string;
+  streamId?: string;
+  academicYearId: string;
   status: EnrollmentStatus;
-  selectedSubjects?: number[];
-  promotedToId?: number;
+  selectedSubjects?: string[];
+  promotedToId?: string;
   promotionDate?: string;
   transferredFrom?: string;
   transferDate?: string;
@@ -204,6 +206,26 @@ export interface StudentClass {
   class?: Class;
   stream?: Stream;
   academicYear?: AcademicYear;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ClassSubject {
+  id: string;
+  classId: string;
+  subjectId: string;
+  teacherId: string;
+  termId: string;
+  academicYearId: string;
+  subjectCategory: SubjectCategory; 
+  
+  class?: Class;
+  subject?: Subject;
+  teacher?: User; 
+  term?: Term;
+  academicYear?: AcademicYear;
+  strands?: string;
+  
   createdAt: string;
   updatedAt: string;
 }
