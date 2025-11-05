@@ -1,45 +1,44 @@
 import apiClient from '@/lib/api-client';
 import { Assessment, ApiResponse, PaginatedResponse } from '@/types';
 
-// --- Assessment Types ---
-export type AssessmentCreateInput = Omit<Assessment, 'id' | 'createdAt' | 'updatedAt' | 'student' | 'term' | 'classSubject'>;
+export type AssessmentCreateInput = {
+  name: string;
+  type: 'CAT' | 'MIDTERM' | 'END_OF_TERM' | 'MOCK' | 'NATIONAL_EXAM' | 'COMPETENCY_BASED';
+  studentId: string;
+  classSubjectId: string;
+  termId: string;
+  marksObtained?: number;
+  maxMarks: number;
+  competencyLevel?: 'EXCEEDING_EXPECTATIONS' | 'MEETING_EXPECTATIONS' | 'APPROACHING_EXPECTATIONS' | 'BELOW_EXPECTATIONS';
+  grade?: string;
+  remarks?: string;
+  assessedBy?: string;
+  assessedDate?: string;
+};
+
 export type AssessmentUpdateInput = Partial<AssessmentCreateInput>;
 
 export type BulkAssessmentInput = {
-  classSubjectId: string;
+  assessments: Array<Omit<AssessmentCreateInput, 'name' | 'type' | 'termId' | 'maxMarks'>>;
+  name: string;
+  type: AssessmentCreateInput['type'];
   termId: string;
-  assessmentName: string;
-  assessmentType: Assessment['type'];
   maxMarks: number;
-  entries: Array<{
-    studentId: string;
-    marksObtained?: number;
-    competencyLevel?: Assessment['competencyLevel'];
-    remarks?: string;
-  }>;
 };
 
 export const assessmentService = {
-  /**
-   * Fetches a paginated list of assessments.
-   */
   getAll: async (params?: {
-    page?: number;
-    pageSize?: number;
-    schoolId?: string;
-    studentId?: string;
     classId?: string;
     subjectId?: string;
     termId?: string;
-    academicYearId?: string;
+    type?: string;
+    page?: number;
+    pageSize?: number;
   }): Promise<PaginatedResponse<Assessment>> => {
-    const response = await apiClient.get('/assessments', { params });
+    const response = await apiClient.get<PaginatedResponse<Assessment>>('/assessments', { params });
     return response.data;
   },
 
-  /**
-   * Fetches a single assessment by its ID.
-   */
   getById: async (id: string): Promise<Assessment> => {
     const response = await apiClient.get<ApiResponse<Assessment>>(`/assessments/${id}`);
     if (!response.data.data) {
@@ -48,9 +47,6 @@ export const assessmentService = {
     return response.data.data;
   },
 
-  /**
-   * Creates a new assessment.
-   */
   create: async (data: AssessmentCreateInput): Promise<Assessment> => {
     const response = await apiClient.post<ApiResponse<Assessment>>('/assessments', data);
     if (!response.data.data) {
@@ -59,26 +55,32 @@ export const assessmentService = {
     return response.data.data;
   },
 
-  /**
-   * Creates multiple assessments in a single request.
-   */
-  bulkCreate: async (data: BulkAssessmentInput): Promise<{ count: number }> => {
-    const response = await apiClient.post<ApiResponse<{ count: number }>>('/assessments/bulk', data);
-    return response.data.data!;
-  },
-
-  /**
-   * Updates an existing assessment.
-   */
   update: async (id: string, data: AssessmentUpdateInput): Promise<Assessment> => {
-    const response = await apiClient.put<ApiResponse<Assessment>>(`/assessments/${id}`, data);
-    return response.data.data!;
+    const response = await apiClient.patch<ApiResponse<Assessment>>(`/assessments/${id}`, data);
+    if (!response.data.data) {
+      throw new Error('Failed to update assessment');
+    }
+    return response.data.data;
   },
 
-  /**
-   * Deletes an assessment by its ID.
-   */
   delete: async (id: string): Promise<void> => {
     await apiClient.delete(`/assessments/${id}`);
+  },
+
+  bulkCreate: async (data: BulkAssessmentInput): Promise<Assessment[]> => {
+    const response = await apiClient.post<ApiResponse<Assessment[]>>('/assessments/bulk', data);
+    if (!response.data.data) {
+      throw new Error('Failed to create assessments');
+    }
+    return response.data.data;
+  },
+
+  getStatistics: async (params: {
+    classId: string;
+    subjectId?: string;
+    termId?: string;
+  }): Promise<any> => {
+    const response = await apiClient.get(`/assessments/statistics`, { params });
+    return response.data.data;
   },
 };

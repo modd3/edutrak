@@ -1,5 +1,12 @@
-export type Role = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT' | 'SUPPORT_STAFF';
 export type SchoolType = 'PRIMARY' | 'SECONDARY' | 'TVET' | 'SPECIAL_NEEDS' | 'PRE_PRIMARY';
+export enum Role {
+  SUPER_ADMIN = 'SUPER_ADMIN',
+  ADMIN = 'ADMIN',
+  TEACHER = 'TEACHER',
+  STUDENT = 'STUDENT',
+  PARENT = 'PARENT',
+  SUPPORT_STAFF = 'SUPPORT_STAFF'
+}
 export type Curriculum = 'CBC' | 'EIGHT_FOUR_FOUR' | 'TVET' | 'IGCSE' | 'IB';
 export type Gender = 'MALE' | 'FEMALE';
 export type EnrollmentStatus = 'ACTIVE' | 'PROMOTED' | 'TRANSFERRED' | 'GRADUATED' | 'DROPPED_OUT' | 'SUSPENDED';

@@ -1,56 +1,91 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { 
-  classService,
-  ClassCreateInput,
-  StreamCreateInput,
-  ClassSubjectCreateInput
-} from '@/services/class.service';
+import { classService, ClassCreateInput, ClassUpdateInput, StreamCreateInput, StreamUpdateInput } from '@/services/class.service';
 import { toast } from 'sonner';
-
-const CLASSES_KEY = 'classes';
-const STREAMS_KEY = 'streams';
-const CLASS_SUBJECTS_KEY = 'classSubjects';
+import { Class, Stream } from '@/types';
 
 // === Class Hooks ===
 
 /**
- * Hook to fetch all classes for the active school.
- * @param schoolId - The ID of the currently active school.
+ * Hook to fetch classes for a specific school with pagination and filtering
  */
-export function useClasses(schoolId: string) {
+export function useSchoolClasses(
+  schoolId: string,
+  params?: {
+    page?: number;
+    pageSize?: number;
+    name?: string;
+  }
+) {
   return useQuery({
-    queryKey: [CLASSES_KEY, 'list', schoolId],
-    queryFn: () => classService.getAllClasses(schoolId),
+    queryKey: ['classes', schoolId, params],
+    queryFn: () => classService.getClassesBySchool(schoolId, params),
     enabled: !!schoolId,
   });
 }
 
 /**
- * Hook to fetch a single class by ID.
+ * Hook to fetch a single class by ID
  */
 export function useClass(id: string) {
   return useQuery({
-    queryKey: [CLASSES_KEY, 'detail', id],
+    queryKey: ['classes', id],
     queryFn: () => classService.getClassById(id),
     enabled: !!id,
   });
 }
 
 /**
- * Hook to create a new class.
+ * Hook to create a new class
  */
-export function useCreateClass(schoolId: string) {
+export function useCreateClass() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: ClassCreateInput) =>
-      classService.createClass({ ...data, schoolId }), // Inject schoolId
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CLASSES_KEY, 'list', schoolId] });
+    mutationFn: (data: ClassCreateInput) => classService.createClass(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['classes', variables.schoolId] });
       toast.success('Class created successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create class');
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create class');
+    },
+  });
+}
+
+/**
+ * Hook to update an existing class
+ */
+export function useUpdateClass() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: ClassUpdateInput }) =>
+      classService.updateClass(id, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['classes', data.schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['classes', data.id] });
+      toast.success('Class updated successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update class');
+    },
+  });
+}
+
+/**
+ * Hook to delete a class
+ */
+export function useDeleteClass() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => classService.deleteClass(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      toast.success('Class deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete class');
     },
   });
 }
@@ -58,81 +93,67 @@ export function useCreateClass(schoolId: string) {
 // === Stream Hooks ===
 
 /**
- * Hook to fetch all streams belonging to a class.
+ * Hook to fetch streams for a specific class
  */
-export function useStreamsByClass(classId: string) {
+export function useClassStreams(classId: string) {
   return useQuery({
-    queryKey: [STREAMS_KEY, 'list', classId],
+    queryKey: ['streams', classId],
     queryFn: () => classService.getStreamsByClass(classId),
     enabled: !!classId,
   });
 }
 
 /**
- * Hook to create a new stream.
+ * Hook to create a new stream
  */
-export function useCreateStream(classId: string, schoolId: string) {
+export function useCreateStream() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: StreamCreateInput) =>
-      classService.createStream({ ...data, classId, schoolId }), // Inject required IDs
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [STREAMS_KEY, 'list', classId] });
-      toast.success('Stream added successfully');
+    mutationFn: (data: StreamCreateInput) => classService.createStream(data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['streams', data.classId] });
+      toast.success('Stream created successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to add stream');
-    },
-  });
-}
-
-// === ClassSubject Hooks ===
-
-/**
- * Hook to fetch all subjects taught in a class.
- */
-export function useClassSubjects(classId: string) {
-  return useQuery({
-    queryKey: [CLASS_SUBJECTS_KEY, 'list', classId],
-    queryFn: () => classService.getClassSubjects(classId),
-    enabled: !!classId,
-  });
-}
-
-/**
- * Hook to add a subject to a class.
- */
-export function useAddClassSubject(classId: string) {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (data: ClassSubjectCreateInput) =>
-      classService.addClassSubject({ ...data, classId }), // Inject classId
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CLASS_SUBJECTS_KEY, 'list', classId] });
-      toast.success('Subject added to class');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to add subject');
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to create stream');
     },
   });
 }
 
 /**
- * Hook to remove a subject from a class.
+ * Hook to update an existing stream
  */
-export function useRemoveClassSubject(classId: string) {
+export function useUpdateStream() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => classService.removeClassSubject(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [CLASS_SUBJECTS_KEY, 'list', classId] });
-      toast.success('Subject removed from class');
+    mutationFn: ({ id, data }: { id: string; data: StreamUpdateInput }) =>
+      classService.updateStream(id, data),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['streams', data.classId] });
+      toast.success('Stream updated successfully');
     },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to remove subject');
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to update stream');
+    },
+  });
+}
+
+/**
+ * Hook to delete a stream
+ */
+export function useDeleteStream() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => classService.deleteStream(id),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ['streams'] });
+      toast.success('Stream deleted successfully');
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || 'Failed to delete stream');
     },
   });
 }

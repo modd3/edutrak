@@ -13,25 +13,25 @@ const navItems = [
     name: 'Dashboard', 
     path: '/', 
     icon: Home, 
-    roles: [Role.ADMIN, Role.PRINCIPAL, Role.TEACHER] 
+    roles: [Role.ADMIN, Role.TEACHER] 
   },
   { 
     name: 'Academic Setup', 
     path: '/academic/classes', 
     icon: CalendarDays, 
-    roles: [Role.ADMIN, Role.PRINCIPAL] 
+    roles: [Role.ADMIN] 
   },
   { 
     name: 'Staff Directory', 
     path: '/teachers', 
     icon: Users, 
-    roles: [Role.ADMIN, Role.PRINCIPAL] 
+    roles: [Role.ADMIN] 
   },
   { 
     name: 'Student Enrollment', 
     path: '/students', 
     icon: GraduationCap, 
-    roles: [Role.ADMIN, Role.PRINCIPAL, Role.TEACHER] 
+    roles: [Role.ADMIN, Role.TEACHER] 
   },
   { 
     name: 'Subject Grading', 
@@ -43,7 +43,7 @@ const navItems = [
     name: 'Term Reports', 
     path: '/grading/reports', 
     icon: BarChart4, 
-    roles: [Role.ADMIN, Role.PRINCIPAL] 
+    roles: [Role.ADMIN] 
   },
   { 
     name: 'Settings', 
@@ -53,7 +53,7 @@ const navItems = [
   },
 ];
 
-export function Sidebar() {
+export default function Sidebar() {
   const { user } = useAuthStore();
   const location = useLocation();
   const userRole = user?.role as Role;

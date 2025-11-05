@@ -6,7 +6,6 @@ import {
   SubjectOfferingCreateInput,
 } from '@/services/subject.service';
 import { toast } from 'sonner';
-import { Curriculum } from '@/types';
 
 const SUBJECTS_KEY = 'subjects';
 const OFFERINGS_KEY = 'subjectOfferings';
@@ -16,15 +15,18 @@ const OFFERINGS_KEY = 'subjectOfferings';
 /**
  * Hook to fetch paginated core subjects (for selection).
  */
-export function useCoreSubjects(params?: {
+export function useSubjects(params?: {
   page?: number;
   pageSize?: number;
   name?: string;
+  code?: string;
+  category?: string;
+  subjectGroup?: string;
+  curriculum?: string;
 }) {
   return useQuery({
-    queryKey: [SUBJECTS_KEY, 'core', params],
-    queryFn: () => subjectService.getAllSubjects(params),
-    staleTime: 1000 * 60 * 5, // Core subjects rarely change
+    queryKey: [SUBJECTS_KEY, params],
+    queryFn: () => subjectService.getAllSubjects(params)
   });
 }
 
@@ -32,18 +34,18 @@ export function useCoreSubjects(params?: {
  * Hook to create a new core subject.
  * Typically used by Super Admins to define a new subject globally.
  */
-export function useCreateCoreSubject() {
+export function useCreateSubject() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (data: SubjectCreateInput) =>
       subjectService.createSubject(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [SUBJECTS_KEY, 'core'] });
-      toast.success('Core Subject created successfully');
+      queryClient.invalidateQueries({ queryKey: [SUBJECTS_KEY] });
+      toast.success('Subject created successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to create core subject');
+      toast.error(error.response?.data?.message || 'Failed to create subject');
     },
   });
 }
@@ -57,7 +59,6 @@ export function useCreateCoreSubject() {
 export function useSubjectOfferings(schoolId: string, params?: {
   page?: number;
   pageSize?: number;
-  level?: CurriculumLevel;
 }) {
   return useQuery({
     queryKey: [OFFERINGS_KEY, schoolId, params],
