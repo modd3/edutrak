@@ -37,7 +37,10 @@ export default function Login() {
       toast.success('Login successful!');
       navigate('/dashboard');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Login failed');
+      // Prefer server-provided message, then thrown Error message, then default
+      const message =
+        error?.response?.data?.message || error?.message || 'Login failed';
+      toast.error(message);
     } finally {
       setIsLoading(false);
     }
@@ -62,7 +65,7 @@ export default function Login() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@school.com"
+                placeholder="example@school.com"
                 {...register('email')}
               />
               {errors.email && (
@@ -89,9 +92,8 @@ export default function Login() {
           </form>
 
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            <p>Demo credentials:</p>
-            <p>Email: admin@school.com</p>
-            <p>Password: password123</p>
+            <p>Don't have an account?</p>
+            <p>Contact Administrator.</p>
           </div>
         </CardContent>
       </Card>
