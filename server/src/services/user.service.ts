@@ -47,7 +47,6 @@ export class UserService {
         middleName: data.middleName,
         phone: data.phone,
         idNumber: data.idNumber,
-        tscNumber: data.tscNumber,
         role: data.role,
         password: hashedPassword,
         schoolId: data.schoolId,

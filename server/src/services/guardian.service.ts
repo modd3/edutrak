@@ -240,19 +240,20 @@ export class GuardianService {
                 academicYear: true,
               },
             },
-            assessments: {
-              where: {
-                marksObtained: { not: null },
-              },
+            assessmentResults: {
               include: {
-                classSubject: {
+                assessmentDef: {
                   include: {
-                    subject: true,
+                    classSubject: {
+                      include: {
+                        subject: true,
+                      },
+                    },
+                    term: true,
                   },
                 },
-                term: true,
               },
-              orderBy: { assessedDate: 'desc' },
+              orderBy: { createdAt: 'desc' },
               take: 5, // Latest 5 assessments
             },
           },
@@ -330,16 +331,16 @@ export class GuardianService {
     const notifications = guardianStudents.flatMap(relationship => {
       const student = relationship.student;
       // Filter for assessments with a date and take the latest 3
-      const recentAssessments = student.assessments
-        .filter(assessment => assessment.assessedDate !== null).slice(0, 3);
+      const recentAssessments = student.assessmentResults
+        .filter(assessment => assessment.createdAt !== null).slice(0, 3);
       
       return recentAssessments.map(assessment => ({
         type: 'ASSESSMENT_UPDATE',
-        title: `New Assessment: ${assessment.name}`,
-        message: `${student.user?.firstName} scored ${assessment.marksObtained}/${assessment.maxMarks} in ${assessment.classSubject.subject.name}`,
+        title: `New Assessment: ${assessment.assessmentDef.name}`,
+        message: `${student.user?.firstName} scored ${assessment.numericValue ? assessment.grade : assessment.competencyLevel} in ${assessment.assessmentDef.classSubject.subject.name}`,
         studentId: student.id,
         studentName: `${student.user?.firstName} ${student.user?.lastName}`,
-        date: assessment.assessedDate!, // We can use non-null assertion as we've filtered out nulls
+        date: assessment.createdAt!, // We can use non-null assertion as we've filtered out nulls
         priority: 'MEDIUM',
       }));
     });

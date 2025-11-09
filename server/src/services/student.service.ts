@@ -15,7 +15,7 @@ export class StudentService {
   async createStudent(data: {
     admissionNo: string;
     upiNumber?: string;
-    nemisUpi?: string;
+    kemisUpi?: string;
     firstName: string;
     middleName?: string;
     lastName: string;
@@ -46,7 +46,7 @@ export class StudentService {
   async createStudentWithUser(data: {
     admissionNo: string;
     upiNumber?: string;
-    nemisUpi?: string;
+    kemisUpi?: string;
     firstName: string;
     middleName?: string;
     lastName: string;
@@ -163,6 +163,7 @@ export class StudentService {
         { middleName: { contains: filters.search, mode: 'insensitive' } },
         { admissionNo: { contains: filters.search, mode: 'insensitive' } },
         { upiNumber: { contains: filters.search, mode: 'insensitive' } },
+        { kemisUpi: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -242,17 +243,21 @@ export class StudentService {
             },
           },
         },
-        assessments: {
+        assessmentResults: {
           include: {
-            classSubject: {
+            assessmentDef: {
               include: {
-                subject: true,
-                class: true,
+                classSubject: {
+                  include: {
+                    subject: true,
+                  },
+                },
+                term: true,
               },
             },
-            term: true,
           },
-          orderBy: { assessedDate: 'desc' },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
         },
       },
     });
@@ -309,11 +314,7 @@ export class StudentService {
         status: 'ACTIVE',
       },
       include: {
-        student: {
-          include: {
-            user: true,
-          },
-        },
+        student: true,
         class: true,
         stream: true,
         academicYear: true,
@@ -506,48 +507,60 @@ export class StudentService {
   }
 
   async getStudentPerformance(studentId: string, academicYearId?: string) {
-    const assessments = await this.prisma.assessment.findMany({
-      where: {
-        studentId,
-        ...(academicYearId && {
-          classSubject: {
-            academicYearId: academicYearId,
-          },
-        }),
-        marksObtained: { not: null },
-      },
-      include: {
+    const where: any = {
+      studentId,
+      numericValue: { not: null },
+    };
+
+    if (academicYearId) {
+      where.assessmentDef = {
         classSubject: {
+          academicYearId: academicYearId,
+        },
+      };
+    }
+
+    const results = await this.prisma.assessmentResult.findMany({
+      where,
+      include: {
+        assessmentDef: {
           include: {
-            subject: true,
+            classSubject: {
+              include: {
+                subject: true,
+              },
+            },
             term: true,
           },
         },
       },
     });
 
-    const performanceBySubject = assessments.reduce((acc, assessment) => {
-      const subjectName = assessment.classSubject.subject.name;
+    const performanceBySubject = results.reduce((acc, result) => {
+      const subjectName = result.assessmentDef.classSubject.subject.name;
       if (!acc[subjectName]) {
         acc[subjectName] = {
           subject: subjectName,
           totalMarks: 0,
+          totalMaxMarks: 0,
           count: 0,
-          assessments: [],
+          results: [],
         };
       }
       
-      if (assessment.marksObtained) {
-        acc[subjectName].totalMarks += assessment.marksObtained;
+      if (result.numericValue && result.assessmentDef.maxMarks) {
+        acc[subjectName].totalMarks += result.numericValue;
+        acc[subjectName].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[subjectName].count += 1;
       }
       
-      acc[subjectName].assessments.push({
-        name: assessment.name,
-        marks: assessment.marksObtained,
-        maxMarks: assessment.maxMarks,
-        grade: assessment.grade,
-        date: assessment.assessedDate,
+      acc[subjectName].results.push({
+        name: result.assessmentDef.name,
+        marks: result.numericValue,
+        maxMarks: result.assessmentDef.maxMarks,
+        grade: result.grade,
+        competencyLevel: result.competencyLevel,
+        date: result.createdAt,
       });
 
       return acc;
@@ -556,14 +569,21 @@ export class StudentService {
     // Calculate averages
     Object.keys(performanceBySubject).forEach(subject => {
       const subjectData = performanceBySubject[subject];
-      subjectData.average = subjectData.count > 0 ? subjectData.totalMarks / subjectData.count : 0;
+      subjectData.average = subjectData.count > 0 
+        ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 
+        : 0;
     });
+
+    const subjectsArray = Object.values(performanceBySubject);
+    const overallAverage = subjectsArray.length > 0
+      ? subjectsArray.reduce((total: number, subject: any) => total + subject.average, 0) / subjectsArray.length
+      : 0;
 
     return {
       studentId,
       performanceBySubject,
-      overallAverage: Object.values(performanceBySubject).reduce((total: number, subject: any) => total + subject.average, 0) / Object.keys(performanceBySubject).length,
-      totalAssessments: assessments.length,
+      overallAverage,
+      totalAssessments: results.length,
     };
   }
 

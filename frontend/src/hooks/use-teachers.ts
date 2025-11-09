@@ -4,7 +4,7 @@ import { Teacher } from '@/types';
 import { toast } from 'sonner';
 
 export function useTeachers(params?: { 
-  schoolId?: number;
+  schoolId?: string;
   employmentType?: string;
   search?: string;
 }) {
@@ -14,7 +14,7 @@ export function useTeachers(params?: {
   });
 }
 
-export function useTeacher(id: number) {
+export function useTeacher(id: string) {
   return useQuery({
     queryKey: ['teachers', id],
     queryFn: () => teacherService.getById(id),
@@ -41,7 +41,7 @@ export function useUpdateTeacher() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Teacher> }) =>
+    mutationFn: ({ id, data }: { id: string; data: Partial<Teacher> }) =>
       teacherService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
@@ -57,7 +57,7 @@ export function useAssignSubjects() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ teacherId, subjectIds }: { teacherId: number; subjectIds: number[] }) =>
+    mutationFn: ({ teacherId, subjectIds }: { teacherId: string; subjectIds: string[] }) =>
       teacherService.assignSubjects(teacherId, subjectIds),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['teachers'] });
@@ -66,5 +66,13 @@ export function useAssignSubjects() {
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to assign subjects');
     },
+  });
+}
+
+export function useTeacherWorkload(teacherId: string) {
+  return useQuery({
+    queryKey: ['teachers', teacherId, 'workload'],
+    queryFn: () => teacherService.getWorkload(teacherId),
+    enabled: !!teacherId,
   });
 }

@@ -1,16 +1,25 @@
 import { useNavigate, useParams } from 'react-router-dom';
-import { useTeacher } from '@/hooks/use-teachers';
+import { useTeacher, useTeacherWorkload } from '@/hooks/use-teachers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, PencilIcon } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 
 export default function TeacherDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: teacher, isLoading } = useTeacher(Number(id));
+  const { data: teacher, isLoading } = useTeacher(id!);
+  const { data: workload, isLoading: isLoadingWorkload } = useTeacherWorkload(id!);
 
   if (isLoading) {
     return (
@@ -137,8 +146,45 @@ export default function TeacherDetails() {
               <CardTitle>Teaching Workload</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Implement workload display here */}
-              <p>Teaching workload information will be displayed here</p>
+              {isLoadingWorkload ? (
+                <Skeleton className="h-40 w-full" />
+              ) : workload ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="rounded-lg border p-4">
+                      <p className="text-sm text-muted-foreground">Assigned Subjects</p>
+                      <p className="text-2xl font-bold">{workload.subjectCount}</p>
+                    </div>
+                    <div className="rounded-lg border p-4">
+                      <p className="text-sm text-muted-foreground">Assigned Classes</p>
+                      <p className="text-2xl font-bold">{workload.classCount}</p>
+                    </div>
+                  </div>
+                  <h4 className="font-semibold">Subject Details</h4>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Subject</TableHead>
+                        <TableHead>Class</TableHead>
+                        <TableHead>Category</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {workload.subjects.map((s: any) => (
+                        <TableRow key={s.id}>
+                          <TableCell>{s.subject.name}</TableCell>
+                          <TableCell>{s.class.name}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">{s.subjectCategory}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <p>No workload information available.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

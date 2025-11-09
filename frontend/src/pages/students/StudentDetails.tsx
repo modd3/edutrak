@@ -7,6 +7,15 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Assessment } from '@/types';
 
 export default function StudentDetails() {
   const { id } = useParams();
@@ -127,34 +136,34 @@ export default function StudentDetails() {
               <CardTitle>Current Enrollment</CardTitle>
             </CardHeader>
             <CardContent>
-              {student.enrollments ? (
+              {student.enrollments && student.enrollments.length > 0 ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
                       <p className="text-sm text-muted-foreground">Class</p>
                       <p className="text-lg font-medium">
-                        {student.enrollments.class.name}
+                        {student.enrollments[0].class.name}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Stream</p>
                       <p className="text-lg font-medium">
-                        {student.enrollments.stream?.name || 'Not Assigned'}
+                        {student.enrollments[0].stream?.name || 'Not Assigned'}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Academic Year</p>
                       <p className="text-lg font-medium">
-                        {student.enrollments.academicYear.year}
+                        {student.enrollments[0].academicYear.year}
                       </p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Status</p>
                       <Badge
-                        variant={student.enrollments.status === 'ACTIVE' ? 'success' : 'secondary'}
+                        variant={student.enrollments[0].status === 'ACTIVE' ? 'default' : 'secondary'}
                         className="mt-1"
                       >
-                        {student.enrollments.status}
+                        {student.enrollments[0].status}
                       </Badge>
                     </div>
                   </div>
@@ -209,8 +218,42 @@ export default function StudentDetails() {
               <CardTitle>Recent Assessments</CardTitle>
             </CardHeader>
             <CardContent>
-              {/* Implement assessments table */}
-              <p>Student assessments will be displayed here</p>
+              {student.assessments && student.assessments.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Assessment</TableHead>
+                      <TableHead>Subject</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Score</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {student.assessments.map((assessment) => (
+                      <TableRow key={assessment.id}>
+                        <TableCell className="font-medium">{assessment.name}</TableCell>
+                        <TableCell>{assessment.classSubject?.subject?.name || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant="secondary">{assessment.type.replace(/_/g, ' ')}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          {assessment.marksObtained !== null && assessment.maxMarks
+                            ? `${assessment.marksObtained} / ${assessment.maxMarks}`
+                            : assessment.competencyLevel?.replace(/_/g, ' ') || 'N/A'}
+                        </TableCell>
+                        <TableCell>
+                          {assessment.assessedDate
+                            ? format(new Date(assessment.assessedDate), 'dd MMM yyyy')
+                            : 'N/A'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <p>No assessments found for this student.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

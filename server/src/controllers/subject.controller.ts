@@ -30,7 +30,6 @@ export class SubjectController {
       const filters = req.query;
       const result = await subjectService.getSubjects({
         curriculum: filters.curriculum as any,
-        isCore: filters.isCore ? filters.isCore === 'true' : undefined,
         learningArea: filters.learningArea as any,
         category: filters.category as any,
         page: filters.page ? parseInt(filters.page as string) : undefined,

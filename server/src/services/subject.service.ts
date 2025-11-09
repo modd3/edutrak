@@ -14,7 +14,6 @@ export class SubjectService {
     name: string;
     code: string;
     category: SubjectCategory;
-    isCore?: boolean;
     learningArea?: LearningArea;
     subjectGroup?: SubjectGroup;
     curriculum: Curriculum[];
@@ -33,7 +32,6 @@ export class SubjectService {
 
   async getSubjects(filters?: {
     curriculum?: Curriculum;
-    isCore?: boolean;
     learningArea?: LearningArea;
     category?: SubjectCategory;
     page?: number;
@@ -43,7 +41,6 @@ export class SubjectService {
     const where: any = {};
 
     if (filters?.curriculum) where.curriculum = { has: filters.curriculum };
-    if (filters?.isCore !== undefined) where.isCore = filters.isCore;
     if (filters?.learningArea) where.learningArea = filters.learningArea;
     if (filters?.category) where.category = filters.category;
 
@@ -71,7 +68,11 @@ export class SubjectService {
           classLinks: {
             include: {
               class: true,
-              teacher: true,
+              teacherProfile: {
+                include: {
+                  user: true,
+                },
+              },
             },
           },
         },
@@ -105,16 +106,30 @@ export class SubjectService {
         classLinks: {
           include: {
             class: true,
-            teacher: true,
+            teacherProfile: {
+              include: {
+                user: true,
+              },
+            },
             assessments: {
               include: {
-                student: {
+                results: {
                   include: {
-                    user: true,
+                    student: true,
                   },
+                  take: 10,
                 },
               },
-              take: 10, // Recent assessments
+              take: 10, // Recent assessment definitions
+            },
+          },
+        },
+        strands: {
+          include: {
+            classSubjects: {
+              include: {
+                class: true,
+              },
             },
           },
         },
@@ -236,6 +251,7 @@ export class SubjectService {
             school: true,
           },
         },
+        strands: true,
       },
       orderBy: { name: 'asc' },
     });
@@ -260,33 +276,32 @@ export class SubjectService {
 
   async getSubjectPerformance(subjectId: string, academicYearId?: string) {
     const where: any = {
-      classSubject: {
-        subjectId,
+      assessmentDef: {
+        classSubject: {
+          subjectId,
+          ...(academicYearId && { academicYearId }),
+        },
       },
     };
 
-    if (academicYearId) {
-      where.classSubject.academicYearId = academicYearId;
-    }
-
-    const assessments = await this.prisma.assessment.findMany({
+    const results = await this.prisma.assessmentResult.findMany({
       where,
       include: {
-        student: {
+        student: true,
+        assessmentDef: {
           include: {
-            user: true,
-          },
-        },
-        classSubject: {
-          include: {
-            class: true,
+            classSubject: {
+              include: {
+                class: true,
+              },
+            },
           },
         },
       },
     });
 
-    const performanceByClass = assessments.reduce((acc, assessment) => {
-      const className = assessment.classSubject.class.name;
+    const performanceByClass = results.reduce((acc, result) => {
+      const className = result.assessmentDef.classSubject.class.name;
       
       if (!acc[className]) {
         acc[className] = {
@@ -298,23 +313,25 @@ export class SubjectService {
         };
       }
       
-      if (assessment.marksObtained && assessment.maxMarks) {
-        acc[className].totalMarks += assessment.marksObtained;
-        acc[className].totalMaxMarks += assessment.maxMarks;
+      if (result.numericValue && result.assessmentDef.maxMarks) {
+        acc[className].totalMarks += result.numericValue;
+        acc[className].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[className].count += 1;
 
-        const studentId = assessment.studentId;
+        const studentId = result.studentId;
+        const studentName = `${result.student.firstName} ${result.student.lastName}`;
+        
         if (!acc[className].students[studentId]) {
           acc[className].students[studentId] = {
-            studentName: `${assessment.student.user?.firstName} ${assessment.student.user?.lastName}`,
+            studentName,
             totalMarks: 0,
             totalMaxMarks: 0,
             count: 0,
           };
         }
         
-        acc[className].students[studentId].totalMarks += assessment.marksObtained;
-        acc[className].students[studentId].totalMaxMarks += assessment.maxMarks;
+        acc[className].students[studentId].totalMarks += result.numericValue;
+        acc[className].students[studentId].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[className].students[studentId].count += 1;
       }
 
@@ -332,11 +349,16 @@ export class SubjectService {
       });
     });
 
+    const performanceArray = Object.values(performanceByClass);
+    const overallAverage = performanceArray.length > 0
+      ? performanceArray.reduce((total: number, classData: any) => total + classData.average, 0) / performanceArray.length
+      : 0;
+
     return {
       subjectId,
-      performanceByClass: Object.values(performanceByClass),
-      totalAssessments: assessments.length,
-      overallAverage: Object.values(performanceByClass).reduce((total: number, classData: any) => total + classData.average, 0) / Object.keys(performanceByClass).length,
+      performanceByClass: performanceArray,
+      totalAssessments: results.length,
+      overallAverage,
     };
   }
 
@@ -351,11 +373,82 @@ export class SubjectService {
             school: true,
           },
         },
+        strands: curriculum === 'CBC' ? true : false,
       },
       orderBy: [
         { category: 'asc' },
         { name: 'asc' },
       ],
     });
+  }
+
+  // Strand management for CBC subjects
+  async createStrand(data: {
+    name: string;
+    description?: string;
+    subjectId: string;
+  }) {
+    const strand = await this.prisma.strand.create({
+      data: {
+        id: uuidv4(),
+        ...data,
+      },
+      include: {
+        subject: true,
+      },
+    });
+
+    logger.info('Strand created successfully', { 
+      strandId: strand.id, 
+      subjectId: data.subjectId 
+    });
+
+    return strand;
+  }
+
+  async getSubjectStrands(subjectId: string) {
+    return await this.prisma.strand.findMany({
+      where: { subjectId },
+      include: {
+        classSubjects: {
+          include: {
+            classSubject: {
+              include: {
+                class: true,
+              },
+            },
+          },
+        },
+        assessmentDefinitions: {
+          include: {
+            classSubject: {
+              include: {
+                class: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+  }
+
+  async updateStrand(id: string, data: { name?: string; description?: string }) {
+    const strand = await this.prisma.strand.update({
+      where: { id },
+      data,
+    });
+
+    logger.info('Strand updated successfully', { strandId: id });
+    return strand;
+  }
+
+  async deleteStrand(id: string) {
+    const strand = await this.prisma.strand.delete({
+      where: { id },
+    });
+
+    logger.info('Strand deleted successfully', { strandId: id });
+    return strand;
   }
 }

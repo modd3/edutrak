@@ -13,6 +13,7 @@ export const studentService = {
     page?: number;
     pageSize?: number;
     schoolId?: string;
+    name?: string;
     gender?: string;
     hasSpecialNeeds?: boolean;
   }): Promise<PaginatedResponse<Student>> => {

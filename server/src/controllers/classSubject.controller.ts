@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
-import prisma from '../prismaClient.ts.old';
-import { successResponse, errorResponse } from '../utils/response';
+import prisma from '../database/client';
+import { ResponseUtil } from '../utils/response';
+import { error } from 'console';
 
 export const assignClassSubject = async (req: Request, res: Response) => {
   try {
@@ -10,21 +11,21 @@ export const assignClassSubject = async (req: Request, res: Response) => {
       where: { classId, subjectId, academicYearId, termId },
     });
 
-    if (existing) return errorResponse(res, 400, 'This subject already assigned to this class and term');
+    if (existing) return ResponseUtil.error(res, 'This subject already assigned to this class and term', 400);
 
     const mapping = await prisma.classSubject.create({
       data: {
-        classId: Number(classId),
-        subjectId: Number(subjectId),
-        teacherId: Number(teacherId),
-        academicYearId: Number(academicYearId),
-        termId: Number(termId),
+        classId: String(classId),
+        subjectId: String(subjectId),
+        teacherId: String(teacherId),
+        academicYearId: String(academicYearId),
+        termId: String(termId),
       },
     });
 
-    return successResponse(res, 201, 'Subject assigned successfully', mapping);
+    return ResponseUtil.success(res, 'Subject assigned successfully', mapping);
   } catch (err) {
-    return errorResponse(res, 500, 'Error assigning class subject', err);
+    return ResponseUtil.serverError(res, 'Error assigning class subject');
   }
 };
 
@@ -32,11 +33,11 @@ export const getClassSubjects = async (req: Request, res: Response) => {
   try {
     const { classId } = req.params;
     const mappings = await prisma.classSubject.findMany({
-      where: { classId: Number(classId) },
+      where: { classId: String(classId) },
       include: { subject: true, teacher: true, term: true },
     });
-    return successResponse(res, 200, 'Class subjects fetched', mappings);
+    return ResponseUtil.success(res, 'Class subjects fetched', mappings);
   } catch (err) {
-    return errorResponse(res, 500, 'Error fetching class subjects', err);
+    return ResponseUtil.serverError(res, 'Error fetching class subjects');
   }
 };

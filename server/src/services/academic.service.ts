@@ -91,11 +91,7 @@ export class AcademicService {
         },
         studentClasses: {
           include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
+            student: true,
             class: true,
           },
           take: 10, // Recent enrollments
@@ -152,20 +148,20 @@ export class AcademicService {
           include: {
             class: true,
             subject: true,
-            teacher: true,  // ✅ Fixed: removed nested user include
-          },
-        },
-        assessments: {
-          include: {
-            student: {
+            teacherProfile: {
               include: {
                 user: true,
               },
             },
-            classSubject: {
+          },
+        },
+        AssessmentDefinitions: {
+          include: {
+            results: {
               include: {
-                subject: true,
+                student: true,
               },
+              take: 10,
             },
           },
           take: 10, // Recent assessments
@@ -181,7 +177,7 @@ export class AcademicService {
       include: {
         _count: {
           select: {
-            assessments: true,
+            AssessmentDefinitions: true,
             classSubjects: true,
           },
         },
@@ -221,29 +217,37 @@ export class AcademicService {
       include: {
         academicYear: true,
         school: true,
-        classTeacher: true,  // ✅ Fixed: removed nested user include
+        classTeacher: {
+          include: {
+            user: true,
+          },
+        },
         streams: {
           include: {
             _count: {
               select: { students: true },
             },
-            streamTeacher: true,  // ✅ Fixed: removed nested user include
-          },
-        },
-        students: {
-          where: { status: 'ACTIVE' },
-          include: {
-            student: {
+            streamTeacher: {
               include: {
                 user: true,
               },
             },
           },
         },
+        students: {
+          where: { status: 'ACTIVE' },
+          include: {
+            student: true,
+          },
+        },
         subjects: {
           include: {
             subject: true,
-            teacher: true,  // ✅ Fixed: removed nested user include
+            teacherProfile: {
+              include: {
+                user: true,
+              },
+            },
             _count: {
               select: {
                 assessments: true,
@@ -263,7 +267,11 @@ export class AcademicService {
       where,
       include: {
         academicYear: true,
-        classTeacher: true,  // ✅ Fixed: removed nested user include
+        classTeacher: {
+          include: {
+            user: true,
+          },
+        },
         _count: {
           select: {
             students: true,
@@ -321,15 +329,15 @@ export class AcademicService {
       include: {
         class: true,
         school: true,
-        streamTeacher: true,  // ✅ Fixed: removed nested user include
+        streamTeacher: {
+          include: {
+            user: true,
+          },
+        },
         students: {
           where: { status: 'ACTIVE' },
           include: {
-            student: {
-              include: {
-                user: true,
-              },
-            },
+            student: true,
           },
         },
       },
@@ -340,7 +348,11 @@ export class AcademicService {
     return await this.prisma.stream.findMany({
       where: { classId },
       include: {
-        streamTeacher: true,  // ✅ Fixed: removed nested user include
+        streamTeacher: {
+          include: {
+            user: true,
+          },
+        },
         _count: {
           select: { students: true },
         },
@@ -369,95 +381,100 @@ export class AcademicService {
   }
 
   // Academic Statistics
- // Academic Statistics
-async getAcademicStatistics(academicYearId?: string) {
-  const where = academicYearId ? { academicYearId } : {};
-  
-  // Assessment filters need to go through classSubject relation
-  const assessmentWhere = academicYearId 
-    ? { 
-        classSubject: { 
-          academicYearId: academicYearId 
+  async getAcademicStatistics(academicYearId?: string) {
+    const where = academicYearId ? { academicYearId } : {};
+    
+    // Assessment filters need to go through classSubject relation
+    const assessmentWhere = academicYearId 
+      ? { 
+          classSubject: { 
+            academicYearId: academicYearId 
+          } 
         } 
-      } 
-    : {};
+      : {};
 
-  const [
-    totalStudents,
-    totalTeachers,
-    totalClasses,
-    totalAssessments,
-    classDistribution,
-    assessmentTrends
-  ] = await Promise.all([
-    this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
-    this.prisma.teacher.count(),
-    this.prisma.class.count({ where }),
-    this.prisma.assessment.count({ where: assessmentWhere }),
-    this.prisma.class.findMany({
-      where,
-      include: {
-        _count: {
-          select: {
-            students: true,
+    const [
+      totalStudents,
+      totalTeachers,
+      totalClasses,
+      totalAssessments,
+      classDistribution,
+      assessmentTrends
+    ] = await Promise.all([
+      this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
+      this.prisma.teacher.count(),
+      this.prisma.class.count({ where }),
+      this.prisma.assessmentDefinition.count({ where: assessmentWhere }),
+      this.prisma.class.findMany({
+        where,
+        include: {
+          _count: {
+            select: {
+              students: true,
+            },
           },
         },
-      },
-    }),
-    this.prisma.assessment.groupBy({
-      by: ['type'],
-      where: assessmentWhere,
-      _count: {
-        id: true,
-      },
-    }),
-  ]);
+      }),
+      this.prisma.assessmentDefinition.groupBy({
+        by: ['type'],
+        where: assessmentWhere,
+        _count: {
+          id: true,
+        },
+      }),
+    ]);
 
-  return {
-    totalStudents,
-    totalTeachers,
-    totalClasses,
-    totalAssessments,
-    classDistribution: classDistribution.map(cls => ({
-      className: cls.name,
-      studentCount: cls._count.students,
-    })),
-    assessmentTypes: assessmentTrends.map(trend => ({
-      type: trend.type,
-      count: trend._count?.id || 0,
-    })),
-  };
-}
+    return {
+      totalStudents,
+      totalTeachers,
+      totalClasses,
+      totalAssessments,
+      classDistribution: classDistribution.map(cls => ({
+        className: cls.name,
+        studentCount: cls._count.students,
+      })),
+      assessmentTypes: assessmentTrends.map(trend => ({
+        type: trend.type,
+        count: trend._count?.id || 0,
+      })),
+    };
+  }
+
   async getClassPerformance(classId: string, termId?: string) {
     const where: any = {
-      classSubject: {
-        classId,
+      assessmentDef: {
+        classSubject: {
+          classId,
+        },
       },
     };
 
     if (termId) {
-      where.termId = termId;
+      where.assessmentDef = {
+        ...where.assessmentDef,
+        termId,
+      };
     }
 
-    const assessments = await this.prisma.assessment.findMany({
+    const assessmentResults = await this.prisma.assessmentResult.findMany({
       where,
       include: {
-        student: {
+        student: true,
+        assessmentDef: {
           include: {
-            user: true,
-          },
-        },
-        classSubject: {
-          include: {
-            subject: true,
+            classSubject: {
+              include: {
+                subject: true,
+              },
+            },
           },
         },
       },
     });
 
-    const performanceByStudent = assessments.reduce((acc, assessment) => {
-      const studentId = assessment.studentId;
-      const studentName = `${assessment.student.user?.firstName} ${assessment.student.user?.lastName}`;
+    const performanceByStudent = assessmentResults.reduce((acc, result) => {
+      const studentId = result.studentId;
+      const studentName = `${result.student.firstName} ${result.student.lastName}`;
       
       if (!acc[studentId]) {
         acc[studentId] = {
@@ -470,23 +487,39 @@ async getAcademicStatistics(academicYearId?: string) {
         };
       }
       
-      if (assessment.marksObtained && assessment.maxMarks) {
-        acc[studentId].totalMarks += assessment.marksObtained;
-        acc[studentId].totalMaxMarks += assessment.maxMarks;
+      // Handle both numeric scores (8-4-4) and competency levels (CBC)
+      if (result.numericValue !== null && result.assessmentDef.maxMarks) {
+        acc[studentId].totalMarks += result.numericValue;
+        acc[studentId].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[studentId].count += 1;
 
-        const subjectName = assessment.classSubject.subject.name;
+        const subjectName = result.assessmentDef.classSubject.subject.name;
         if (!acc[studentId].subjects[subjectName]) {
           acc[studentId].subjects[subjectName] = {
             totalMarks: 0,
             totalMaxMarks: 0,
             count: 0,
+            competencyLevels: [],
           };
         }
         
-        acc[studentId].subjects[subjectName].totalMarks += assessment.marksObtained;
-        acc[studentId].subjects[subjectName].totalMaxMarks += assessment.maxMarks;
+        acc[studentId].subjects[subjectName].totalMarks += result.numericValue;
+        acc[studentId].subjects[subjectName].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[studentId].subjects[subjectName].count += 1;
+      }
+      
+      // Track competency levels for CBC
+      if (result.competencyLevel) {
+        const subjectName = result.assessmentDef.classSubject.subject.name;
+        if (!acc[studentId].subjects[subjectName]) {
+          acc[studentId].subjects[subjectName] = {
+            totalMarks: 0,
+            totalMaxMarks: 0,
+            count: 0,
+            competencyLevels: [],
+          };
+        }
+        acc[studentId].subjects[subjectName].competencyLevels.push(result.competencyLevel);
       }
 
       return acc;
@@ -502,10 +535,15 @@ async getAcademicStatistics(academicYearId?: string) {
       });
     });
 
+    const performanceArray = Object.values(performanceByStudent);
+    const classAverage = performanceArray.length > 0
+      ? performanceArray.reduce((total: number, student: any) => total + student.average, 0) / performanceArray.length
+      : 0;
+
     return {
       classId,
-      performance: Object.values(performanceByStudent),
-      classAverage: Object.values(performanceByStudent).reduce((total: number, student: any) => total + student.average, 0) / Object.keys(performanceByStudent).length,
+      performance: performanceArray,
+      classAverage,
     };
   }
 }

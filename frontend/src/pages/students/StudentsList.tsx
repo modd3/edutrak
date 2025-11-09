@@ -32,16 +32,11 @@ const StudentsList = () => {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
 
-  const { data, isLoading, isError, error } = useQuery({
-    queryKey: ['students', user?.schoolId, page, search],
-    queryFn: () =>
-      studentService.getAll({
-        schoolId: user?.schoolId,
-        page,
-        pageSize: 10,
-        // name: search, // Assuming backend supports search by name
-      }),
-    enabled: !!user?.schoolId,
+  const { data, isLoading, isError, error } = useStudents({
+    schoolId: user?.schoolId,
+    page,
+    pageSize: 10,
+    name: search,
   });
 
   const students = data?.data || [];

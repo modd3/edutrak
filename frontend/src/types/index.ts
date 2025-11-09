@@ -81,6 +81,7 @@ export interface Student {
   userId?: string;
   user?: User;
   enrollments?: StudentClass[];
+  assessments?: Assessment[];
   createdAt: string;
   updatedAt: string;
 }

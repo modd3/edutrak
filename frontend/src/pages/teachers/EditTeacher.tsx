@@ -9,12 +9,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 export default function EditTeacher() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: teacher, isLoading } = useTeacher(Number(id));
+  const { data: teacher, isLoading } = useTeacher(id!);
   const { mutate: updateTeacher, isPending } = useUpdateTeacher();
 
   const handleSubmit = (data: any) => {
     updateTeacher(
-      { id: Number(id), data },
+      { id: id!, data },
       {
         onSuccess: () => {
           navigate(`/teachers/${id}`);

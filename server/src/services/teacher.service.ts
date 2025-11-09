@@ -1,4 +1,4 @@
-import { PrismaClient, Teacher, EmploymentType, Role } from '@prisma/client';
+import { PrismaClient, Teacher, EmploymentType, Role, SubjectCategory } from '@prisma/client';
 import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
@@ -133,12 +133,24 @@ export class TeacherService {
               },
             },
           },
-          classSubjects: {
+          teachingSubjects: {
             include: {
               class: true,
               subject: true,
               academicYear: true,
               term: true,
+            },
+          },
+          classTeacherOf: {
+            include: {
+              school: true,
+              academicYear: true,
+            },
+          },
+          streamTeacherOf: {
+            include: {
+              class: true,
+              school: true,
             },
           },
         },
@@ -169,7 +181,7 @@ export class TeacherService {
             school: true,
           },
         },
-        classSubjects: {
+        teachingSubjects: {
           include: {
             class: true,
             subject: true,
@@ -177,12 +189,34 @@ export class TeacherService {
             term: true,
             assessments: {
               include: {
-                student: {
+                results: {
                   include: {
-                    user: true,
+                    student: true,
                   },
+                  take: 5,
                 },
               },
+              take: 10,
+            },
+          },
+        },
+        classTeacherOf: {
+          include: {
+            school: true,
+            academicYear: true,
+            students: {
+              where: { status: 'ACTIVE' },
+              take: 10,
+            },
+          },
+        },
+        streamTeacherOf: {
+          include: {
+            class: true,
+            school: true,
+            students: {
+              where: { status: 'ACTIVE' },
+              take: 10,
             },
           },
         },
@@ -195,7 +229,7 @@ export class TeacherService {
       where: { userId },
       include: {
         user: true,
-        classSubjects: {
+        teachingSubjects: {
           include: {
             class: true,
             subject: true,
@@ -235,19 +269,42 @@ export class TeacherService {
     teacherId: string;
     termId: string;
     academicYearId: string;
-    strands?: string;
+    subjectCategory: SubjectCategory;
+    strandIds?: string[];
   }) {
     const assignment = await this.prisma.classSubject.create({
       data: {
         id: uuidv4(),
-        ...data,
+        classId: data.classId,
+        subjectId: data.subjectId,
+        teacherId: data.teacherId,
+        termId: data.termId,
+        academicYearId: data.academicYearId,
+        subjectCategory: data.subjectCategory,
+        ...(data.strandIds && data.strandIds.length > 0 && {
+          strands: {
+            create: data.strandIds.map(strandId => ({
+              id: uuidv4(),
+              strandId,
+            })),
+          },
+        }),
       },
       include: {
         class: true,
         subject: true,
-        teacher: true,
+        teacherProfile: {
+          include: {
+            user: true,
+          },
+        },
         term: true,
         academicYear: true,
+        strands: {
+          include: {
+            strand: true,
+          },
+        },
       },
     });
 
@@ -267,7 +324,15 @@ export class TeacherService {
     const workload = await this.prisma.classSubject.findMany({
       where,
       include: {
-        class: true,
+        class: {
+          include: {
+            _count: {
+              select: {
+                students: true,
+              },
+            },
+          },
+        },
         subject: true,
         academicYear: true,
         term: true,
@@ -282,13 +347,16 @@ export class TeacherService {
     // Calculate workload statistics
     const totalSubjects = workload.length;
     const totalAssessments = workload.reduce((sum, item) => sum + item._count.assessments, 0);
+    const totalStudents = workload.reduce((sum, item) => sum + item.class._count.students, 0);
 
     return {
       workload,
       statistics: {
         totalSubjects,
         totalAssessments,
+        totalStudents,
         averageAssessmentsPerSubject: totalSubjects > 0 ? totalAssessments / totalSubjects : 0,
+        averageStudentsPerSubject: totalSubjects > 0 ? totalStudents / totalSubjects : 0,
       },
     };
   }
@@ -305,6 +373,11 @@ export class TeacherService {
         class: true,
         subject: true,
         term: true,
+        strands: {
+          include: {
+            strand: true,
+          },
+        },
       },
       orderBy: [
         { class: { name: 'asc' } },
@@ -321,32 +394,36 @@ export class TeacherService {
   }
 
   async getTeacherPerformance(teacherId: string, academicYearId?: string) {
-    const assessments = await this.prisma.assessment.findMany({
-      where: {
+    const where: any = {
+      assessmentDef: {
         classSubject: {
           teacherId,
           ...(academicYearId && { academicYearId }),
         },
-        marksObtained: { not: null },
       },
+      numericValue: { not: null },
+    };
+
+    const results = await this.prisma.assessmentResult.findMany({
+      where,
       include: {
-        classSubject: {
+        assessmentDef: {
           include: {
-            subject: true,
-            class: true,
+            classSubject: {
+              include: {
+                subject: true,
+                class: true,
+              },
+            },
           },
         },
-        student: {
-          include: {
-            user: true,
-          },
-        },
+        student: true,
       },
     });
 
-    const performanceBySubject = assessments.reduce((acc, assessment) => {
-      const subjectName = assessment.classSubject.subject.name;
-      const className = assessment.classSubject.class.name;
+    const performanceBySubject = results.reduce((acc, result) => {
+      const subjectName = result.assessmentDef.classSubject.subject.name;
+      const className = result.assessmentDef.classSubject.class.name;
       
       const key = `${subjectName}-${className}`;
       if (!acc[key]) {
@@ -354,25 +431,85 @@ export class TeacherService {
           subject: subjectName,
           class: className,
           totalMarks: 0,
+          totalMaxMarks: 0,
           count: 0,
           average: 0,
         };
       }
       
-      if (assessment.marksObtained) {
-        acc[key].totalMarks += assessment.marksObtained;
+      if (result.numericValue && result.assessmentDef.maxMarks) {
+        acc[key].totalMarks += result.numericValue;
+        acc[key].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[key].count += 1;
-        acc[key].average = acc[key].totalMarks / acc[key].count;
+        acc[key].average = (acc[key].totalMarks / acc[key].totalMaxMarks) * 100;
       }
 
       return acc;
     }, {} as any);
 
+    const performanceArray = Object.values(performanceBySubject);
+    const averagePerformance = performanceArray.length > 0
+      ? performanceArray.reduce((total: number, subject: any) => total + subject.average, 0) / performanceArray.length
+      : 0;
+
     return {
       teacherId,
-      performanceBySubject: Object.values(performanceBySubject),
-      totalAssessments: assessments.length,
-      averagePerformance: Object.values(performanceBySubject).reduce((total: number, subject: any) => total + subject.average, 0) / Object.keys(performanceBySubject).length,
+      performanceBySubject: performanceArray,
+      totalAssessments: results.length,
+      averagePerformance,
+    };
+  }
+
+  async getTeacherClasses(teacherId: string, academicYearId?: string) {
+    const where: any = { teacherId };
+    if (academicYearId) where.academicYearId = academicYearId;
+
+    const classSubjects = await this.prisma.classSubject.findMany({
+      where,
+      include: {
+        class: {
+          include: {
+            school: true,
+            streams: true,
+            _count: {
+              select: {
+                students: true,
+              },
+            },
+          },
+        },
+        subject: true,
+        term: true,
+      },
+      orderBy: {
+        class: {
+          name: 'asc',
+        },
+      },
+    });
+
+    // Group by class
+    const classesByClass = classSubjects.reduce((acc, cs) => {
+      const classId = cs.classId;
+      if (!acc[classId]) {
+        acc[classId] = {
+          class: cs.class,
+          subjects: [],
+        };
+      }
+      acc[classId].subjects.push({
+        subject: cs.subject,
+        term: cs.term,
+        classSubjectId: cs.id,
+      });
+      return acc;
+    }, {} as any);
+
+    return {
+      teacherId,
+      classes: Object.values(classesByClass),
+      totalClasses: Object.keys(classesByClass).length,
+      totalSubjects: classSubjects.length,
     };
   }
 }

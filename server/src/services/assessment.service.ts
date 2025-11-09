@@ -1,4 +1,4 @@
-import { PrismaClient, Assessment, AssessmentType, CompetencyLevel, Student, User, Class, Stream, AcademicYear, ClassSubject, Subject, Term } from '@prisma/client';
+import { PrismaClient, AssessmentDefinition, AssessmentResult, AssessmentType, CompetencyLevel } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
@@ -10,168 +10,333 @@ export class AssessmentService {
     this.prisma = prisma;
   }
 
-  async createAssessment(data: {
+  // Assessment Definition methods
+  async createAssessmentDefinition(data: {
     name: string;
     type: AssessmentType;
-    studentId: string;
-    classSubjectId: string;
+    maxMarks?: number;
     termId: string;
-    marksObtained?: number;
-    maxMarks: number;
-    competencyLevel?: CompetencyLevel;
-    grade?: string;
-    remarks?: string;
-    assessedBy?: string;
-    assessedDate?: Date;
-  }): Promise<Assessment> {
-    // Calculate grade if not provided and marks are available
-    let grade = data.grade;
-    if (!grade && data.marksObtained && data.maxMarks) {
-      grade = this.calculateGrade(data.marksObtained, data.maxMarks, data.type);
-    }
-
-    const assessment = await this.prisma.assessment.create({
+    classSubjectId: string;
+    strandId?: string;
+  }): Promise<AssessmentDefinition> {
+    const assessmentDef = await this.prisma.assessmentDefinition.create({
       data: {
         id: uuidv4(),
         ...data,
-        grade,
+      },
+      include: {
+        term: true,
+        classSubject: {
+          include: {
+            subject: true,
+            class: true,
+          },
+        },
+        strand: true,
       },
     });
 
-    logger.info('Assessment created successfully', { 
-      assessmentId: assessment.id, 
-      studentId: data.studentId,
-      type: data.type 
+    logger.info('Assessment definition created successfully', { 
+      assessmentDefId: assessmentDef.id, 
+      name: assessmentDef.name,
+      type: assessmentDef.type 
     });
 
-    return assessment;
+    return assessmentDef;
   }
 
-  async createBulkAssessments(assessments: {
-    name: string;
-    type: AssessmentType;
+  async getAssessmentDefinitionById(id: string): Promise<AssessmentDefinition | null> {
+    return await this.prisma.assessmentDefinition.findUnique({
+      where: { id },
+      include: {
+        term: true,
+        classSubject: {
+          include: {
+            subject: true,
+            class: true,
+            teacherProfile: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+        strand: true,
+        results: {
+          include: {
+            student: true,
+          },
+        },
+      },
+    });
+  }
+
+  async getClassSubjectAssessmentDefinitions(classSubjectId: string) {
+    return await this.prisma.assessmentDefinition.findMany({
+      where: { classSubjectId },
+      include: {
+        term: true,
+        strand: true,
+        _count: {
+          select: {
+            results: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  // Assessment Result methods
+  async createAssessmentResult(data: {
     studentId: string;
-    classSubjectId: string;
-    termId: string;
-    marksObtained?: number;
-    maxMarks: number;
-    competencyLevel?: CompetencyLevel;
+    assessmentDefId: string;
+    numericValue?: number;
     grade?: string;
-    remarks?: string;
-    assessedBy?: string;
-    assessedDate?: Date;
-  }[]) {
-    const assessmentsWithGrades = assessments.map(assessment => {
-      let grade = assessment.grade;
-      if (!grade && assessment.marksObtained && assessment.maxMarks) {
-        grade = this.calculateGrade(assessment.marksObtained, assessment.maxMarks, assessment.type);
+    competencyLevel?: CompetencyLevel;
+    comment?: string;
+    assessedById: string;
+  }): Promise<AssessmentResult> {
+    // Get assessment definition to determine grading system
+    const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
+      where: { id: data.assessmentDefId },
+    });
+
+    if (!assessmentDef) {
+      throw new Error('Assessment definition not found');
+    }
+
+    // Calculate grade if not provided and numeric value is available
+    let grade = data.grade;
+    let competencyLevel = data.competencyLevel;
+
+    if (assessmentDef.type === 'COMPETENCY_BASED') {
+      if (!competencyLevel && data.numericValue && assessmentDef.maxMarks) {
+        competencyLevel = this.calculateCompetencyLevel(data.numericValue, assessmentDef.maxMarks);
       }
+    } else {
+      if (!grade && data.numericValue && assessmentDef.maxMarks) {
+        grade = this.calculateGrade(data.numericValue, assessmentDef.maxMarks);
+      }
+    }
 
-      return {
+    const result = await this.prisma.assessmentResult.create({
+      data: {
         id: uuidv4(),
-        ...assessment,
+        studentId: data.studentId,
+        assessmentDefId: data.assessmentDefId,
+        numericValue: data.numericValue,
         grade,
-      };
+        competencyLevel,
+        comment: data.comment,
+        assessedById: data.assessedById,
+      },
+      include: {
+        student: true,
+        assessmentDef: {
+          include: {
+            classSubject: {
+              include: {
+                subject: true,
+              },
+            },
+          },
+        },
+      },
     });
 
-    const result = await this.prisma.assessment.createMany({
-      data: assessmentsWithGrades,
-    });
-
-    logger.info('Bulk assessments created successfully', { 
-      count: result.count,
-      classSubjectId: assessments[0]?.classSubjectId 
+    logger.info('Assessment result created successfully', { 
+      resultId: result.id, 
+      studentId: data.studentId,
+      assessmentDefId: data.assessmentDefId 
     });
 
     return result;
   }
 
-  async getAssessmentById(id: string): Promise<Assessment | null> {
-    return await this.prisma.assessment.findUnique({
+  async createBulkAssessmentResults(results: {
+    studentId: string;
+    assessmentDefId: string;
+    numericValue?: number;
+    grade?: string;
+    competencyLevel?: CompetencyLevel;
+    comment?: string;
+    assessedById: string;
+  }[]) {
+    // Get assessment definition once
+    const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
+      where: { id: results[0]?.assessmentDefId },
+    });
+
+    if (!assessmentDef) {
+      throw new Error('Assessment definition not found');
+    }
+
+    const resultsWithGrades = results.map(result => {
+      let grade = result.grade;
+      let competencyLevel = result.competencyLevel;
+
+      if (assessmentDef.type === 'COMPETENCY_BASED') {
+        if (!competencyLevel && result.numericValue && assessmentDef.maxMarks) {
+          competencyLevel = this.calculateCompetencyLevel(result.numericValue, assessmentDef.maxMarks);
+        }
+      } else {
+        if (!grade && result.numericValue && assessmentDef.maxMarks) {
+          grade = this.calculateGrade(result.numericValue, assessmentDef.maxMarks);
+        }
+      }
+
+      return {
+        id: uuidv4(),
+        ...result,
+        grade,
+        competencyLevel,
+      };
+    });
+
+    const created = await this.prisma.assessmentResult.createMany({
+      data: resultsWithGrades,
+    });
+
+    logger.info('Bulk assessment results created successfully', { 
+      count: created.count,
+      assessmentDefId: results[0]?.assessmentDefId 
+    });
+
+    return created;
+  }
+
+  async getAssessmentResultById(id: string): Promise<AssessmentResult | null> {
+    return await this.prisma.assessmentResult.findUnique({
       where: { id },
       include: {
-        student: {
+        student: true,
+        assessmentDef: {
           include: {
-            user: true,
+            classSubject: {
+              include: {
+                subject: true,
+                class: true,
+              },
+            },
+            term: true,
+            strand: true,
           },
         },
-        classSubject: {
-          include: {
-            subject: true,
-            class: true,
-            teacher: true,
+        assessedBy: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
-        term: true,
       },
     });
   }
 
-  async updateAssessment(id: string, data: Partial<Assessment>): Promise<Assessment> {
-    // Recalculate grade if marks are updated
-    if (data.marksObtained != null && data.maxMarks != null && !data.grade) {
-      const assessment = await this.prisma.assessment.findUnique({ where: { id } });
-      if (assessment) {
-        data.grade = this.calculateGrade(data.marksObtained as number, data.maxMarks, assessment.type);
+  async updateAssessmentResult(id: string, data: {
+    numericValue?: number;
+    grade?: string;
+    competencyLevel?: CompetencyLevel;
+    comment?: string;
+  }): Promise<AssessmentResult> {
+    // Get the result and its assessment definition
+    const existing = await this.prisma.assessmentResult.findUnique({
+      where: { id },
+      include: {
+        assessmentDef: true,
+      },
+    });
+
+    if (!existing) {
+      throw new Error('Assessment result not found');
+    }
+
+    // Recalculate grade/competency if marks are updated
+    let grade = data.grade;
+    let competencyLevel = data.competencyLevel;
+
+    if (data.numericValue !== undefined && existing.assessmentDef.maxMarks) {
+      if (existing.assessmentDef.type === 'COMPETENCY_BASED') {
+        if (!competencyLevel) {
+          competencyLevel = this.calculateCompetencyLevel(data.numericValue, existing.assessmentDef.maxMarks);
+        }
+      } else {
+        if (!grade) {
+          grade = this.calculateGrade(data.numericValue, existing.assessmentDef.maxMarks);
+        }
       }
     }
 
-    const assessment = await this.prisma.assessment.update({
+    const result = await this.prisma.assessmentResult.update({
       where: { id },
-      data,
+      data: {
+        ...(data.numericValue !== undefined && { numericValue: data.numericValue }),
+        ...(grade !== undefined && { grade }),
+        ...(competencyLevel !== undefined && { competencyLevel }),
+        ...(data.comment !== undefined && { comment: data.comment }),
+      },
     });
 
-    logger.info('Assessment updated successfully', { assessmentId: id });
-    return assessment;
+    logger.info('Assessment result updated successfully', { resultId: id });
+    return result;
   }
 
-  async deleteAssessment(id: string): Promise<Assessment> {
-    const assessment = await this.prisma.assessment.delete({
+  async deleteAssessmentResult(id: string): Promise<AssessmentResult> {
+    const result = await this.prisma.assessmentResult.delete({
       where: { id },
     });
 
-    logger.info('Assessment deleted successfully', { assessmentId: id });
-    return assessment;
+    logger.info('Assessment result deleted successfully', { resultId: id });
+    return result;
   }
 
-  async getStudentAssessments(studentId: string, filters?: {
+  async getStudentAssessmentResults(studentId: string, filters?: {
     termId?: string;
     classSubjectId?: string;
-    type?: AssessmentType;
+    assessmentType?: AssessmentType;
     page?: number;
     limit?: number;
   }) {
     const where: any = { studentId };
     
-    if (filters?.termId) where.termId = filters.termId;
-    if (filters?.classSubjectId) where.classSubjectId = filters.classSubjectId;
-    if (filters?.type) where.type = filters.type;
+    if (filters?.termId || filters?.classSubjectId || filters?.assessmentType) {
+      where.assessmentDef = {};
+      if (filters.termId) where.assessmentDef.termId = filters.termId;
+      if (filters.classSubjectId) where.assessmentDef.classSubjectId = filters.classSubjectId;
+      if (filters.assessmentType) where.assessmentDef.type = filters.assessmentType;
+    }
 
     const page = filters?.page || 1;
     const limit = filters?.limit || 10;
     const skip = (page - 1) * limit;
 
-    const [assessments, total] = await Promise.all([
-      this.prisma.assessment.findMany({
+    const [results, total] = await Promise.all([
+      this.prisma.assessmentResult.findMany({
         where,
         include: {
-          classSubject: {
+          assessmentDef: {
             include: {
-              subject: true,
-              class: true,
+              classSubject: {
+                include: {
+                  subject: true,
+                  class: true,
+                },
+              },
+              term: true,
             },
           },
-          term: true,
         },
         skip,
         take: limit,
-        orderBy: { assessedDate: 'desc' },
+        orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.assessment.count({ where })
+      this.prisma.assessmentResult.count({ where })
     ]);
 
     return {
-      assessments,
+      results,
       pagination: {
         page,
         limit,
@@ -181,72 +346,88 @@ export class AssessmentService {
     };
   }
 
-  async getClassSubjectAssessments(classSubjectId: string) {
-    return await this.prisma.assessment.findMany({
-      where: { classSubjectId },
+  async getAssessmentDefinitionResults(assessmentDefId: string) {
+    return await this.prisma.assessmentResult.findMany({
+      where: { assessmentDefId },
       include: {
+        student: true,
+      },
+      orderBy: { 
         student: {
-          include: {
-            user: true,
-          },
+          firstName: 'asc',
         },
       },
-      orderBy: { assessedDate: 'desc' },
     });
   }
 
   async calculateStudentTermAverage(studentId: string, termId: string) {
-    const assessments = await this.prisma.assessment.findMany({
+    const results = await this.prisma.assessmentResult.findMany({
       where: {
         studentId,
-        termId,
-        marksObtained: { not: null },
+        assessmentDef: {
+          termId,
+        },
+        numericValue: { not: null },
       },
       include: {
-        classSubject: {
+        assessmentDef: {
           include: {
-            subject: true,
+            classSubject: {
+              include: {
+                subject: true,
+              },
+            },
           },
         },
       },
     });
 
-    const validAssessments = assessments.filter(a => a.marksObtained !== null && a.maxMarks > 0);
+    const validResults = results.filter(r => r.numericValue !== null && r.assessmentDef.maxMarks && r.assessmentDef.maxMarks > 0);
     
-    if (validAssessments.length === 0) {
+    if (validResults.length === 0) {
       return { 
         average: 0, 
         totalSubjects: 0,
         grade: 'N/A',
-        assessments: [] 
+        results: [] 
       };
     }
 
-    const totalPercentage = validAssessments.reduce((sum, assessment) => {
-      return sum + (assessment.marksObtained! / assessment.maxMarks) * 100;
+    const totalPercentage = validResults.reduce((sum, result) => {
+      return sum + (result.numericValue! / result.assessmentDef.maxMarks!) * 100;
     }, 0);
 
-    const average = totalPercentage / validAssessments.length;
+    const average = totalPercentage / validResults.length;
     const grade = this.calculateGradeFromPercentage(average);
 
     return {
       average,
-      totalSubjects: validAssessments.length,
+      totalSubjects: validResults.length,
       grade,
-      assessments: validAssessments,
+      results: validResults,
     };
   }
 
-  async getClassSubjectStatistics(classSubjectId: string) {
-    const assessments = await this.prisma.assessment.findMany({
-      where: { classSubjectId },
+  async getClassSubjectStatistics(classSubjectId: string, termId?: string) {
+    const where: any = {
+      assessmentDef: {
+        classSubjectId,
+        ...(termId && { termId }),
+      },
+    };
+
+    const results = await this.prisma.assessmentResult.findMany({
+      where,
+      include: {
+        assessmentDef: true,
+      },
     });
 
-    const validAssessments = assessments.filter(a => a.marksObtained !== null);
+    const validResults = results.filter(r => r.numericValue !== null);
     
-    if (validAssessments.length === 0) {
+    if (validResults.length === 0) {
       return {
-        totalStudents: assessments.length,
+        totalStudents: results.length,
         average: 0,
         highest: 0,
         lowest: 0,
@@ -254,39 +435,33 @@ export class AssessmentService {
       };
     }
 
-    const marks = validAssessments.map(a => a.marksObtained!);
+    const marks = validResults.map(r => r.numericValue!);
     const average = marks.reduce((a, b) => a + b, 0) / marks.length;
     const highest = Math.max(...marks);
     const lowest = Math.min(...marks);
 
-    const gradeDistribution = validAssessments.reduce((acc, assessment) => {
-      const grade = assessment.grade || 'Ungraded';
+    const gradeDistribution = validResults.reduce((acc, result) => {
+      const grade = result.grade || result.competencyLevel || 'Ungraded';
       acc[grade] = (acc[grade] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
     return {
-      totalStudents: assessments.length,
+      totalStudents: results.length,
       average,
       highest,
       lowest,
       gradeDistribution,
-      passRate: (validAssessments.filter(a => (a.marksObtained! / a.maxMarks) >= 0.5).length / validAssessments.length) * 100,
+      passRate: validResults.filter(r => {
+        const assessmentDef = r.assessmentDef;
+        return assessmentDef.maxMarks && (r.numericValue! / assessmentDef.maxMarks) >= 0.5;
+      }).length / validResults.length * 100,
     };
   }
 
-  calculateGrade(marks: number, maxMarks: number, type: AssessmentType): string {
+  calculateGrade(marks: number, maxMarks: number): string {
     const percentage = (marks / maxMarks) * 100;
-
-    if (type === 'COMPETENCY_BASED') {
-      if (percentage >= 85) return 'EXCEEDING_EXPECTATIONS';
-      if (percentage >= 70) return 'MEETING_EXPECTATIONS';
-      if (percentage >= 50) return 'APPROACHING_EXPECTATIONS';
-      return 'BELOW_EXPECTATIONS';
-    } else {
-      // 8-4-4 grading system
-      return this.calculateGradeFromPercentage(percentage);
-    }
+    return this.calculateGradeFromPercentage(percentage);
   }
 
   calculateGradeFromPercentage(percentage: number): string {
@@ -304,24 +479,19 @@ export class AssessmentService {
     return 'E';
   }
 
-  async convertMarksToGrade(marks: number, maxMarks: number, curriculum: string) {
+  calculateCompetencyLevel(marks: number, maxMarks: number): CompetencyLevel {
     const percentage = (marks / maxMarks) * 100;
-
-    if (curriculum === 'CBC') {
-      if (percentage >= 85) return 'EXCEEDING_EXPECTATIONS';
-      if (percentage >= 70) return 'MEETING_EXPECTATIONS';
-      if (percentage >= 50) return 'APPROACHING_EXPECTATIONS';
-      return 'BELOW_EXPECTATIONS';
-    } else {
-      return this.calculateGradeFromPercentage(percentage);
-    }
+    
+    if (percentage >= 85) return 'EXCEEDING_EXPECTATIONS';
+    if (percentage >= 70) return 'MEETING_EXPECTATIONS';
+    if (percentage >= 50) return 'APPROACHING_EXPECTATIONS';
+    return 'BELOW_EXPECTATIONS';
   }
 
   async generateStudentTermReport(studentId: string, termId: string) {
     const student = await this.prisma.student.findUnique({
       where: { id: studentId },
       include: {
-        user: true,
         enrollments: {
           where: { status: 'ACTIVE' },
           include: {
@@ -337,35 +507,36 @@ export class AssessmentService {
       throw new Error('Student not found');
     }
 
-    const assessments = await this.getStudentAssessments(studentId, { termId });
+    const assessmentResults = await this.getStudentAssessmentResults(studentId, { termId });
     const average = await this.calculateStudentTermAverage(studentId, termId);
 
     // Calculate subject-wise performance
-    const subjectPerformance = assessments.assessments.reduce((acc, assessment) => {
-      const subjectName = assessment.classSubject.subject.name;
+    const subjectPerformance = assessmentResults.results.reduce((acc, result) => {
+      const subjectName = result.assessmentDef.classSubject.subject.name;
       if (!acc[subjectName]) {
         acc[subjectName] = {
           subject: subjectName,
           totalMarks: 0,
           totalMaxMarks: 0,
           count: 0,
-          assessments: [],
+          results: [],
         };
       }
       
-      if (assessment.marksObtained) {
-        acc[subjectName].totalMarks += assessment.marksObtained;
-        acc[subjectName].totalMaxMarks += assessment.maxMarks;
+      if (result.numericValue && result.assessmentDef.maxMarks) {
+        acc[subjectName].totalMarks += result.numericValue;
+        acc[subjectName].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[subjectName].count += 1;
       }
       
-      acc[subjectName].assessments.push({
-        name: assessment.name,
-        type: assessment.type,
-        marks: assessment.marksObtained,
-        maxMarks: assessment.maxMarks,
-        grade: assessment.grade,
-        date: assessment.assessedDate,
+      acc[subjectName].results.push({
+        name: result.assessmentDef.name,
+        type: result.assessmentDef.type,
+        marks: result.numericValue,
+        maxMarks: result.assessmentDef.maxMarks,
+        grade: result.grade,
+        competencyLevel: result.competencyLevel,
+        date: result.createdAt,
       });
 
       return acc;
@@ -380,17 +551,16 @@ export class AssessmentService {
 
     return {
       student,
-      termAssessments: assessments.assessments,
+      termResults: assessmentResults.results,
       termAverage: average,
       subjectPerformance: Object.values(subjectPerformance),
       summary: {
         totalSubjects: Object.keys(subjectPerformance).length,
-        completedAssessments: assessments.assessments.length,
+        completedAssessments: assessmentResults.results.length,
         overallGrade: average.grade,
         attendance: '95%', // This would come from attendance module
         behavior: 'Good', // This would come from behavior tracking
       },
     };
   }
-
 }

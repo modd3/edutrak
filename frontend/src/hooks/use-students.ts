@@ -3,14 +3,20 @@ import { studentService } from '@/services/student.service';
 import { Student } from '@/types';
 import { toast } from 'sonner';
 
-export function useStudents(params?: { schoolId?: number }) {
+export function useStudents(params?: { 
+  schoolId?: string;
+  name?: string;
+  page?: number;
+  pageSize?: number;
+}) {
   return useQuery({
     queryKey: ['students', params],
     queryFn: () => studentService.getAll(params),
+    enabled: !!params?.schoolId,
   });
 }
 
-export function useStudent(id: number) {
+export function useStudent(id: string) {
   return useQuery({
     queryKey: ['students', id],
     queryFn: () => studentService.getById(id),
@@ -37,7 +43,7 @@ export function useUpdateStudent() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: Partial<Student> }) =>
+    mutationFn: ({ id, data }: { id: string; data: Partial<Student> }) =>
       studentService.update(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
