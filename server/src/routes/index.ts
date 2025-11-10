@@ -7,10 +7,12 @@ import guardianRoutes from './guardian.routes';
 import academicRoutes from './academic.routes';
 import subjectRoutes from './subject.routes';
 import assessmentRoutes from './assessment.routes';
+import authRoutes from './auth.routes'
 
 const router = Router();
 
 router.use('/users', userRoutes);
+router.use('/auth', authRoutes)
 router.use('/schools', schoolRoutes);
 router.use('/students', studentRoutes);
 router.use('/teachers', teacherRoutes);

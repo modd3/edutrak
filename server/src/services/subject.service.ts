@@ -128,7 +128,11 @@ export class SubjectService {
           include: {
             classSubjects: {
               include: {
-                class: true,
+                classSubject: {
+                  include: {
+                    class: true
+                  }
+                }
               },
             },
           },

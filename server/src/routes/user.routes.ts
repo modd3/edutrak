@@ -1,43 +1,33 @@
 import { Router } from 'express';
-import { UserController } from '../controllers/user.controller';
+import * as  UserController from '../controllers/user.controller' ;
 import { 
-  authenticateToken, 
-  requireAdmin, 
-  requireSuperAdmin,
-  canAccessProfile 
+  authenticate, 
+  authorize,
+  checkOwnershipOrAdmin,
+  checkSchoolAccess,
+  optionalAuth,
+  rateLimit
 } from '../middleware/auth.middleware';
-import {
-  validateLogin,
-  validateCreateUser,
-  validateUpdateUser,
-  validateChangePassword,
-  validateUUIDParam,
-  validatePagination
-} from '../middleware/validation';
 
 const router = Router();
-const userController = new UserController();
 
-// Public routes
-router.post('/login', validateLogin, userController.login);
 
 // Protected routes
-router.use(authenticateToken);
+router.use(authenticate);
 
 // User management (Admin only)
-router.post('/', requireAdmin, validateCreateUser, userController.createUser);
-router.get('/', requireAdmin, validatePagination, userController.getUsers);
-router.get('/stats', requireAdmin, userController.getUserStats);
+router.get('/', authorize('ADMIN'), UserController.getUsers);
+router.get('/stats', authorize('ADMIN'), UserController.getUserStatistics);
 
 
 // User profile and management
-router.get('/profile', userController.getProfile);
-router.get('/:id', validateUUIDParam, canAccessProfile, userController.getUserById);
-router.put('/:id', validateUUIDParam, canAccessProfile, validateUpdateUser, userController.updateUser);
-router.put('/:id/password', validateUUIDParam, canAccessProfile, validateChangePassword, userController.updatePassword);
+router.get('/profile', UserController.getUserProfile);
+router.get('/:id', UserController.getUserById);
+router.put('/:id', UserController.updateUser);
+
 
 // User activation (Admin only)
-router.patch('/:id/activate', requireAdmin, validateUUIDParam, userController.activateUser);
-router.patch('/:id/deactivate', requireAdmin, validateUUIDParam, userController.deactivateUser);
+router.patch('/:id/activate', authorize('ADMIN'), UserController.activateUser);
+router.patch('/:id/deactivate', authorize('ADMIN'), UserController.deactivateUser);
 
 export default router;

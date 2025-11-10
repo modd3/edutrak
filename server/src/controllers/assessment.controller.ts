@@ -103,7 +103,7 @@ export const getClassSubjectAssessmentDefinitions = async (req: Request, res: Re
     return ResponseUtil.serverError(res, err.message);
   }
 };
-
+/// TODO: Add Update Assessment Def & Delete to the Service file
 /**
  * Update assessment definition
  */
@@ -125,7 +125,7 @@ export const updateAssessmentDefinition = async (req: Request, res: Response) =>
       strandId,
     });
 
-    logger.info('Assessment definition updated', { assessmentDefId: id, updatedBy: req.user?.id });
+    logger.info('Assessment definition updated', { assessmentDefId: id, updatedBy: req.user?.userId });
 
     return ResponseUtil.success(res, 'Assessment definition updated successfully', updated);
   } catch (err: any) {
@@ -135,8 +135,8 @@ export const updateAssessmentDefinition = async (req: Request, res: Response) =>
     });
     return ResponseUtil.serverError(res, err.message);
   }
-}; */
-
+}; 
+*/
 /**
  * Delete assessment definition
  */
@@ -146,12 +146,13 @@ export const deleteAssessmentDefinition = async (req: Request, res: Response) =>
     const { id } = req.params;
 
     const existing = await assessmentService.getAssessmentDefinitionById(id);
+    const existingResult = await assessmentService.getAssessmentDefinitionResults(id);
     if (!existing) {
       return ResponseUtil.notFound(res, 'Assessment definition');
     }
 
     // Check if there are any results
-    if (existing.results && existing.results.length > 0) {
+    if (existingResult && existingResult.length > 0) {
       return ResponseUtil.validationError(
         res,
         'Cannot delete assessment definition with existing results. Please delete results first.'

@@ -229,7 +229,11 @@ export class AcademicService {
             },
             streamTeacher: {
               include: {
-                user: true,
+                user: {
+                  include: {
+                    teacher: true
+                  }
+                },
               },
             },
           },

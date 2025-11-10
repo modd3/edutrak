@@ -92,8 +92,6 @@ model User {
   teacher   Teacher?
   guardian  Guardian?
   
-  // Assessment relations
-  assessmentsGraded AssessmentResult[] @relation("AssessedBy")
 
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
@@ -205,6 +203,9 @@ model Teacher {
   classTeacherOf Class[]       @relation("ClassTeacher")
   streamTeacherOf Stream[]     @relation("StreamTeacher")
   teachingSubjects ClassSubject[] @relation("TeacherClassSubjects")
+
+  // Assessment relations
+  assessmentsGraded AssessmentResult[] @relation("AssessedBy")
   
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -563,8 +564,8 @@ model AssessmentResult {
   
   comment         String?  // Teacher's remarks
   
-  assessedById    String   // The User ID of the teacher
-  assessedBy      User     @relation("AssessedBy", fields: [assessedById], references: [id])
+  assessedById    String   // The Teacher ID of the teacher
+  assessedBy      Teacher     @relation("AssessedBy", fields: [assessedById], references: [id])
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt

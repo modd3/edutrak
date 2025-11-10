@@ -1,24 +1,8 @@
-import { PrismaClient, User, Role } from '@prisma/client';
-import { hashPassword, comparePasswords, validatePasswordStrength } from '../utils/hash';
-import { generateToken } from '../utils/jwt';
+import { PrismaClient, User, Role, Teacher, Student } from '@prisma/client';
+import { hashPassword, comparePasswords } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
-import emailService from '../utils/email';
-
-// Define a DTO for user creation to improve type safety and clarity
-type UserCreationData = {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  phone?: string;
-  idNumber?: string;
-  tscNumber?: string;
-  role: Role;
-  schoolId?: string;
-};
 
 export class UserService {
   private prisma: PrismaClient;
@@ -26,102 +10,132 @@ export class UserService {
   constructor() {
     this.prisma = prisma;
   }
-  
-  async createUser(data: UserCreationData, createdBy: { userId: string; role: Role }): Promise<{ user: User; token: string }> {
-    
-    this.validateUserCreation(data.role, createdBy.role);
 
-    if (!validatePasswordStrength(data.password)) {
-      throw new Error('Password does not meet strength requirements');
-    }
-
+  async createUser(data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+    middleName?: string;
+    phone?: string;
+    idNumber?: string;
+    role: Role;
+    schoolId?: string;
+  }): Promise<User> {
     const hashedPassword = await hashPassword(data.password);
 
-    // Avoid spreading untrusted input. Explicitly map properties.
     const user = await this.prisma.user.create({
       data: {
         id: uuidv4(),
-        email: data.email,
-        firstName: data.firstName,
-        lastName: data.lastName,
-        middleName: data.middleName,
-        phone: data.phone,
-        idNumber: data.idNumber,
-        role: data.role,
+        ...data,
         password: hashedPassword,
-        schoolId: data.schoolId,
       },
     });
 
-    const token = generateToken({
-      userId: user.id,
-      role: user.role,
-      schoolId: user.schoolId || undefined // Convert null to undefined
+    logger.info('User created successfully', { userId: user.id, email: user.email, role: user.role });
+    return user;
+  }
+
+  async getUserById(id: string): Promise<User | null> {
+    return await this.prisma.user.findUnique({
+      where: { id },
+      include: {
+        school: true,
+        student: {
+          include: {
+            enrollments: {
+              where: { status: 'ACTIVE' },
+              include: {
+                class: true,
+                stream: true,
+                academicYear: true,
+              },
+            },
+            guardians: {
+              include: {
+                guardian: {
+                  include: {
+                    user: {
+                      select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+        teacher: {
+          include: {
+            teachingSubjects: {
+              include: {
+                class: true,
+                subject: true,
+                term: true,
+              },
+            },
+            classTeacherOf: {
+              include: {
+                school: true,
+                academicYear: true,
+              },
+            },
+            streamTeacherOf: {
+              include: {
+                class: true,
+                school: true,
+              },
+            },
+          },
+        },
+        guardian: {
+          include: {
+            students: {
+              include: {
+                student: {
+                  include: {
+                    school: true,
+                    enrollments: {
+                      where: { status: 'ACTIVE' },
+                      include: {
+                        class: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     });
-
-    // Send welcome email
-    try {
-      await emailService.sendWelcomeEmail(user.email, `${user.firstName} ${user.lastName}`);
-    } catch (error) {
-      logger.warn('Failed to send welcome email', { userId: user.id, error });
-    }
-
-    logger.info('User created successfully', { userId: user.id, role: user.role, createdBy: createdBy.userId });
-
-    return { user, token };
   }
 
-  private validateUserCreation(targetRole: Role, creatorRole: Role): void {
-    const creationRules = {
-      SUPER_ADMIN: ['SUPER_ADMIN'],
-      ADMIN: ['SUPER_ADMIN'],
-      TEACHER: ['SUPER_ADMIN', 'ADMIN'],
-      STUDENT: ['SUPER_ADMIN', 'ADMIN'],
-      PARENT: ['SUPER_ADMIN', 'ADMIN'],
-      SUPPORT_STAFF: ['SUPER_ADMIN', 'ADMIN'],
-    };
-
-    const allowedCreators = creationRules[targetRole];
-    if (!allowedCreators || !allowedCreators.includes(creatorRole)) {
-      throw new Error(`Insufficient permissions to create user with role: ${targetRole}`);
-    }
-  }
-
-  async login(email: string, password: string): Promise<{ user: any; token: string }> {
-    const user = await this.prisma.user.findUnique({
+  async getUserByEmail(email: string): Promise<User | null> {
+    return await this.prisma.user.findUnique({
       where: { email },
       include: {
         school: true,
-        // Defer loading heavy relations until after password check
+        student: true,
+        teacher: true,
+        guardian: true,
       },
     });
-
-    if (!user || !user.isActive) {
-      // Use a generic error message to prevent user enumeration
-      throw new Error('Invalid credentials');
-    }
-
-    const isValidPassword = await comparePasswords(password, user.password);
-    if (!isValidPassword) {
-      // Use the same generic error message
-      throw new Error('Invalid credentials');
-    }
-
-    // Now that the user is authenticated, fetch their full profile
-    const completeProfile = await this.getCompleteUserProfile(user.id);
-
-    const token = generateToken({
-      userId: user.id,
-      role: user.role,
-      schoolId: user.schoolId || undefined // Convert null to undefined
-    });
-
-    logger.info('User logged in successfully', { userId: user.id, role: user.role });
-
-    return { user: completeProfile, token };
   }
 
-  // ... rest of your existing methods remain the same
+  async getUserByIdNumber(idNumber: string): Promise<User | null> {
+    return await this.prisma.user.findUnique({
+      where: { idNumber },
+      include: {
+        school: true,
+      },
+    });
+  }
+
   async getUsers(filters?: {
     role?: Role;
     schoolId?: string;
@@ -130,18 +144,19 @@ export class UserService {
     limit?: number;
     search?: string;
   }) {
-    const where: any = {
-      ...(filters?.role && { role: filters.role }),
-      ...(filters?.schoolId && { schoolId: filters.schoolId }),
-      ...(filters?.isActive !== undefined && { isActive: filters.isActive }),
-    };
+    const where: any = {};
 
-    // Add search functionality
+    if (filters?.role) where.role = filters.role;
+    if (filters?.schoolId) where.schoolId = filters.schoolId;
+    if (filters?.isActive !== undefined) where.isActive = filters.isActive;
+
     if (filters?.search) {
       where.OR = [
         { firstName: { contains: filters.search, mode: 'insensitive' } },
         { lastName: { contains: filters.search, mode: 'insensitive' } },
         { email: { contains: filters.search, mode: 'insensitive' } },
+        { phone: { contains: filters.search, mode: 'insensitive' } },
+        { idNumber: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
 
@@ -152,13 +167,24 @@ export class UserService {
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
-        include: {
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          middleName: true,
+          phone: true,
+          idNumber: true,
+          role: true,
+          isActive: true,
+          createdAt: true,
+          updatedAt: true,
           school: {
-            select: { name: true },
+            select: {
+              id: true,
+              name: true,
+            },
           },
-          student: true,
-          teacher: true,
-          guardian: true,
         },
         skip,
         take: limit,
@@ -178,111 +204,106 @@ export class UserService {
     };
   }
 
-  async getUserById(id: string): Promise<User | null> {
-    return await this.prisma.user.findUnique({
-      where: { id },
-      include: {
-        school: true,
-        student: {
-          include: {
-            enrollments: {
-              include: {
-                class: true,
-                stream: true,
-                academicYear: true,
-              },
-            },
-          },
-        },
-        teacher: {
-          include: {
-            classSubjects: {
-              include: {
-                class: true,
-                subject: true,
-                academicYear: true,
-                term: true,
-              },
-            },
-          },
-        },
-        guardian: {
-          include: {
-            students: {
-              include: {
-                student: true,
-              },
-            },
-          },
-        },
-      },
-    });
-  }
-
-  async updateUser(id: string, data: Partial<User>): Promise<User> {
-    if (data.password) {
-      if (!validatePasswordStrength(data.password)) {
-        throw new Error('Password does not meet strength requirements');
-      }
-      data.password = await hashPassword(data.password);
-    }
-
+  async updateUser(id: string, data: {
+    email?: string;
+    firstName?: string;
+    lastName?: string;
+    middleName?: string;
+    phone?: string;
+    idNumber?: string;
+    isActive?: boolean;
+  }): Promise<User> {
     const user = await this.prisma.user.update({
       where: { id },
       data,
     });
 
     logger.info('User updated successfully', { userId: id });
-
     return user;
   }
 
-  async updatePassword(id: string, currentPassword: string, newPassword: string): Promise<User> {
-    const user = await this.prisma.user.findUnique({ where: { id } });
+  async updateUserPassword(id: string, newPassword: string): Promise<User> {
+    const hashedPassword = await hashPassword(newPassword);
+
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { password: hashedPassword },
+    });
+
+    logger.info('User password updated successfully', { userId: id });
+    return user;
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
     if (!user) {
       throw new Error('User not found');
     }
 
-    const isValidPassword = await comparePasswords(currentPassword, user.password);
-    if (!isValidPassword) {
+    const isPasswordValid = await comparePasswords(currentPassword, user.password);
+
+    if (!isPasswordValid) {
       throw new Error('Current password is incorrect');
     }
 
-    if (!validatePasswordStrength(newPassword)) {
-      throw new Error('New password does not meet strength requirements');
-    }
+    const hashedPassword = await hashPassword(newPassword);
 
-    const hashedNewPassword = await hashPassword(newPassword);
-
-    const updatedUser = await this.prisma.user.update({
-      where: { id },
-      data: { password: hashedNewPassword },
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
     });
 
-    logger.info('Password updated successfully', { userId: id });
-
-    return updatedUser;
+    logger.info('Password changed successfully', { userId });
+    return true;
   }
 
-  async setUserActiveStatus(id: string, isActive: boolean): Promise<User> {
+  async deactivateUser(id: string): Promise<User> {
     const user = await this.prisma.user.update({
       where: { id },
-      data: { isActive },
+      data: { isActive: false },
     });
 
-    logger.info('User status updated', { userId: id, isActive });
-
+    logger.info('User deactivated', { userId: id });
     return user;
   }
 
-  async getCompleteUserProfile(userId: string) {
-    return await this.prisma.user.findUnique({
+  async activateUser(id: string): Promise<User> {
+    const user = await this.prisma.user.update({
+      where: { id },
+      data: { isActive: true },
+    });
+
+    logger.info('User activated', { userId: id });
+    return user;
+  }
+
+  async deleteUser(id: string): Promise<User> {
+    // This should be used carefully - consider soft delete instead
+    const user = await this.prisma.user.delete({
+      where: { id },
+    });
+
+    logger.info('User deleted', { userId: id });
+    return user;
+  }
+
+  async getUserProfile(userId: string) {
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       include: {
         school: true,
         student: {
           include: {
+            school: true,
             enrollments: {
+              where: { status: 'ACTIVE' },
               include: {
                 class: true,
                 stream: true,
@@ -293,21 +314,66 @@ export class UserService {
               include: {
                 guardian: {
                   include: {
-                    user: true,
+                    user: {
+                      select: {
+                        firstName: true,
+                        lastName: true,
+                        email: true,
+                        phone: true,
+                      },
+                    },
                   },
                 },
               },
+            },
+            assessmentResults: {
+              include: {
+                assessmentDef: {
+                  include: {
+                    classSubject: {
+                      include: {
+                        subject: true,
+                      },
+                    },
+                    term: true,
+                  },
+                },
+              },
+              orderBy: { createdAt: 'desc' },
+              take: 10,
             },
           },
         },
         teacher: {
           include: {
-            classSubjects: {
+            teachingSubjects: {
               include: {
                 class: true,
                 subject: true,
-                academicYear: true,
                 term: true,
+                academicYear: true,
+              },
+            },
+            classTeacherOf: {
+              include: {
+                school: true,
+                academicYear: true,
+                _count: {
+                  select: {
+                    students: true,
+                  },
+                },
+              },
+            },
+            streamTeacherOf: {
+              include: {
+                class: true,
+                school: true,
+                _count: {
+                  select: {
+                    students: true,
+                  },
+                },
               },
             },
           },
@@ -318,9 +384,13 @@ export class UserService {
               include: {
                 student: {
                   include: {
+                    school: true,
                     enrollments: {
+                      where: { status: 'ACTIVE' },
                       include: {
                         class: true,
+                        stream: true,
+                        academicYear: true,
                       },
                     },
                   },
@@ -329,32 +399,190 @@ export class UserService {
             },
           },
         },
-        classTeacherOf: true,
-        streamTeacherOf: true,
-        teachingSubjects: true,
       },
     });
+
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    // Remove password from response
+    const { password, ...userWithoutPassword } = user;
+
+    return userWithoutPassword;
   }
 
-  async getUserStats(schoolId?: string) {
-    const where = schoolId ? { schoolId } : {};
+  async getUsersBySchool(schoolId: string, role?: Role) {
+    const where: any = { schoolId };
+    if (role) where.role = role;
 
-    const stats = await this.prisma.user.groupBy({
-      by: ['role'],
+    const users = await this.prisma.user.findMany({
       where,
-      _count: {
+      select: {
         id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        middleName: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        student: {
+          select: {
+            id: true,
+            admissionNo: true,
+          },
+        },
+        teacher: {
+          select: {
+            id: true,
+            tscNumber: true,
+            employmentType: true,
+          },
+        },
       },
+      orderBy: [
+        { role: 'asc' },
+        { lastName: 'asc' },
+        { firstName: 'asc' },
+      ],
     });
 
-    const total = await this.prisma.user.count({ where });
+    return users;
+  }
+
+  async getUserStatistics(schoolId?: string) {
+    const where = schoolId ? { schoolId } : {};
+
+    const [
+      totalUsers,
+      activeUsers,
+      usersByRole,
+      recentUsers
+    ] = await Promise.all([
+      this.prisma.user.count({ where }),
+      this.prisma.user.count({ where: { ...where, isActive: true } }),
+      this.prisma.user.groupBy({
+        by: ['role'],
+        where,
+        _count: {
+          id: true,
+        },
+      }),
+      this.prisma.user.findMany({
+        where,
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          role: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+      }),
+    ]);
 
     return {
-      total,
-      byRole: stats.reduce((acc, stat) => {
-        acc[stat.role] = stat._count.id;
-        return acc;
-      }, {} as Record<string, number>),
+      totalUsers,
+      activeUsers,
+      inactiveUsers: totalUsers - activeUsers,
+      usersByRole: usersByRole.map(item => ({
+        role: item.role,
+        count: item._count.id,
+      })),
+      recentUsers,
     };
+  }
+
+  async verifyUserCredentials(email: string, password: string): Promise<User | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    const isPasswordValid = await comparePasswords(password, user.password);
+
+    if (!isPasswordValid) {
+      return null;
+    }
+
+    if (!user.isActive) {
+      throw new Error('User account is deactivated');
+    }
+
+    logger.info('User credentials verified', { userId: user.id, email: user.email });
+    return user;
+  }
+
+  async resetUserPassword(userId: string, newPassword: string): Promise<User> {
+    const hashedPassword = await hashPassword(newPassword);
+
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { password: hashedPassword },
+    });
+
+    logger.info('User password reset', { userId });
+    return user;
+  }
+
+  async bulkCreateUsers(users: any[], createdBy: string) {
+    const results = {
+      successful: [] as any[],
+      failed: [] as any[],
+    };
+
+    for (const userData of users) {
+      try {
+        const hashedPassword = await hashPassword(userData.password || 'TempPass123!');
+        
+        const user = await this.prisma.user.create({
+          data: {
+            id: uuidv4(),
+            ...userData,
+            password: hashedPassword,
+          },
+        });
+        
+        results.successful.push(user);
+      } catch (error: any) {
+        results.failed.push({
+          data: userData,
+          error: error.message,
+        });
+      }
+    }
+
+    logger.info('Bulk user creation completed', {
+      successful: results.successful.length,
+      failed: results.failed.length,
+      createdBy,
+    });
+
+    return results;
+  }
+
+  async checkEmailExists(email: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+      select: { id: true },
+    });
+
+    return !!user;
+  }
+
+  async checkIdNumberExists(idNumber: string): Promise<boolean> {
+    const user = await this.prisma.user.findUnique({
+      where: { idNumber },
+      select: { id: true },
+    });
+
+    return !!user;
   }
 }
