@@ -21,6 +21,11 @@ export const teacherService = {
     return response.data.data!;
   },
 
+  create_user: async (data: Partial<Teacher>): Promise<Teacher> => {
+    const response = await apiClient.post<ApiResponse<Teacher>>('/teachers/with-user', data);
+    return response.data.data!;
+  },
+
   update: async (id: string, data: Partial<Teacher>): Promise<Teacher> => {
     const response = await apiClient.put<ApiResponse<Teacher>>(`/teachers/${id}`, data);
     return response.data.data!;

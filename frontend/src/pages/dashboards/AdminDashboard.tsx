@@ -1,170 +1,127 @@
-import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, FilePlus, Presentation, School } from 'lucide-react';
-import apiClient from '@/lib/api-client';
+import { Users, GraduationCap, BookOpen, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { useStudents } from '@/hooks/use-students';
-import { useTeachers } from '@/hooks/use-teachers';
-import { useMemo } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { Link } from 'react-router-dom';
-import { Skeleton } from '@/components/ui/skeleton';
 
-interface SchoolStats {
-  totalStudents: number;
-  totalTeachers: number;
-  totalClasses: number;
-  activeEnrollments: number;
-}
-
-export default function AdminDashboard() {
+export function AdminDashboard() {
   const { user } = useAuthStore();
 
-  const { data: stats, isLoading: isLoadingStats } = useQuery<SchoolStats>({
-    queryKey: ['school-stats', user?.schoolId],
-    queryFn: async () => {
-      if (!user?.schoolId) return {
-        totalStudents: 0,
-        totalTeachers: 0,
-        totalClasses: 0,
-        activeEnrollments: 0,
-      };
-      const response = await apiClient.get(`/schools/${user.schoolId}/statistics`);
-      return response.data.data;
-    },
-    enabled: !!user?.schoolId,
-  });
-
-  const { data: studentsData, isLoading: isLoadingStudents } = useStudents({ schoolId: user?.schoolId, pageSize: 5 });
-  const { data: teachersData, isLoading: isLoadingTeachers } = useTeachers({ schoolId: user?.schoolId, pageSize: 5 });
-
-  const recentActivities = useMemo(() => {
-    const students = studentsData?.data.map(s => ({ ...s, type: 'student', createdAt: new Date(s.createdAt) })) || [];
-    const teachers = teachersData?.data.map(t => ({ ...t, type: 'teacher', createdAt: new Date(t.createdAt) })) || [];
-    
-    return [...students, ...teachers]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .slice(0, 5);
-  }, [studentsData, teachersData]);
-
-  const statCards = [
+  const stats = [
     {
       title: 'Total Students',
-      value: stats?.totalStudents || 0,
+      value: '1,234',
+      change: '+12%',
       icon: GraduationCap,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'bg-blue-500',
     },
     {
-      title: 'Total Teachers',
-      value: stats?.totalTeachers || 0,
+      title: 'Teachers',
+      value: '89',
+      change: '+5%',
       icon: Users,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'bg-green-500',
     },
     {
-      title: 'Total Classes',
-      value: stats?.totalClasses || 0,
+      title: 'Classes',
+      value: '45',
+      change: '+3',
       icon: BookOpen,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'bg-purple-500',
     },
     {
-      title: 'Active Enrollments',
-      value: stats?.activeEnrollments || 0,
+      title: 'Avg. Performance',
+      value: '78%',
+      change: '+4%',
       icon: TrendingUp,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      color: 'bg-orange-500',
     },
   ];
 
-  const quickActions = [
-    { label: 'Add New Student', href: '/students/new', icon: UserPlus },
-    { label: 'Create Assessment', href: '/assessments/new', icon: FilePlus },
-    { label: 'Manage Classes', href: '/classes', icon: School },
-    { label: 'Academic Years', href: '/academic-years', icon: Presentation },
+  const recentActivities = [
+    { action: 'New student enrolled', name: 'John Doe', time: '2 hours ago' },
+    { action: 'Assessment completed', name: 'Form 3 Math', time: '4 hours ago' },
+    { action: 'Teacher assigned', name: 'Jane Smith to Grade 7', time: '1 day ago' },
   ];
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Admin Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back, {user?.firstName}! Here's what's happening in your school.
+      {/* Welcome Section */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">
+          Welcome back, {user?.firstName}!
+        </h1>
+        <p className="text-blue-100">
+          Here's what's happening in {user?.school?.name || 'your school'} today
         </p>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {statCards.map((stat) => (
-          <Card key={stat.title}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">{stat.title}</CardTitle>
-              <div className={`rounded-full p-2 ${stat.bgColor}`}>
-                <stat.icon className={`h-4 w-4 ${stat.color}`} />
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, index) => (
+          <div key={index} className="bg-white rounded-lg shadow p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">{stat.title}</p>
+                <p className="text-3xl font-bold text-gray-900">{stat.value}</p>
+                <p className="text-sm text-green-600 mt-1">{stat.change}</p>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {isLoadingStats ? <Skeleton className="h-8 w-20" /> : stat.value.toLocaleString()}
+              <div className={`${stat.color} p-3 rounded-lg`}>
+                <stat.icon className="text-white" size={24} />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>Recent Activities</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {(isLoadingStudents || isLoadingTeachers) && (
+            </div>
+          </div>
+          ))}
+          </div>
+    
+          {/* Charts and Recent Activity */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Performance Chart */}
+            <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">Performance Overview</h2>
+              <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
+                <p className="text-gray-500">Chart placeholder - integrate Recharts here</p>
+              </div>
+            </div>
+    
+            {/* Recent Activities */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h2 className="text-lg font-semibold mb-4">Recent Activities</h2>
               <div className="space-y-4">
-                {[...Array(5)].map((_, i) => <Skeleton key={i} className="h-12 w-full" />)}
+                {recentActivities.map((activity, index) => (
+                  <div key={index} className="flex items-start space-x-3">
+                    <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-gray-900">
+                        {activity.action}
+                      </p>
+                      <p className="text-sm text-gray-600">{activity.name}</p>
+                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            )}
-            <div className="space-y-4">
-              {recentActivities.map((activity) => (
-                <div key={`${activity.type}-${activity.id}`} className="flex items-center gap-4">
-                  <div className={`rounded-full p-2 ${activity.type === 'student' ? 'bg-blue-100' : 'bg-green-100'}`}>
-                    {activity.type === 'student' ? <GraduationCap className="h-5 w-5 text-blue-600" /> : <Users className="h-5 w-5 text-green-600" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">
-                      {activity.type === 'student' ? `New student added: ${activity.firstName} ${activity.lastName}` : `New teacher added: ${activity.user.firstName} ${activity.user.lastName}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {formatDistanceToNow(activity.createdAt, { addSuffix: true })}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {!isLoadingStudents && !isLoadingTeachers && recentActivities.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-4">No recent activities.</p>
-              )}
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {quickActions.map((action) => (
-                <Link
-                  key={action.label}
-                  to={action.href}
-                  className="flex items-center w-full rounded-lg border p-3 text-sm hover:bg-accent"
-                >
-                  <action.icon className="h-4 w-4 mr-3 text-muted-foreground" />
-                  {action.label}
-                </Link>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+    
+          {/* Quick Actions */}
+          <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <GraduationCap className="mx-auto mb-2 text-blue-600" size={24} />
+            <p className="text-sm font-medium">Add Student</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Users className="mx-auto mb-2 text-green-600" size={24} />
+            <p className="text-sm font-medium">Add Teacher</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <BookOpen className="mx-auto mb-2 text-purple-600" size={24} />
+            <p className="text-sm font-medium">Create Class</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
+            <p className="text-sm font-medium">View Reports</p>
+          </button>
+        </div>
       </div>
     </div>
   );

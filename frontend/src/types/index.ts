@@ -29,7 +29,6 @@ export interface User {
   middleName?: string;
   phone?: string;
   idNumber?: string;
-  tscNumber?: string;
   role: Role;
   schoolId?: string;
   school?: School;
@@ -47,7 +46,7 @@ export interface School {
   subCounty?: string;
   ward?: string;
   knecCode?: string;
-  nemisCode?: string;
+  kemisCode?: string;
   phone?: string;
   email?: string;
   address?: string;
@@ -62,7 +61,7 @@ export interface Student {
   id: string;
   admissionNo: string;
   upiNumber?: string;
-  nemisUpi?: string;
+  kemisUpi?: string;
   firstName: string;
   middleName?: string;
   lastName: string;
@@ -81,7 +80,7 @@ export interface Student {
   userId?: string;
   user?: User;
   enrollments?: StudentClass[];
-  assessments?: Assessment[];
+  assessments?: AssessmentResult[];
   createdAt: string;
   updatedAt: string;
 }
@@ -177,23 +176,53 @@ export interface Subject {
   updatedAt: string;
 }
 
-export interface Assessment {
+export interface Strand {
+  id: string;
+  name: string;
+  description: string;
+  subjectId: string;
+  subject: string;
+  classSubjects: ClassSubjectStrand[];
+  createdAt: string;
+  updateAt: string;
+}
+
+export interface ClassSubjectStrand {
+  id: string;
+  classSubjectId: string;
+  strandId: string;
+  classSubject: ClassSubject;
+  strand: Strand;
+}
+
+export interface AssessmentDefinition {
   id: string;
   name: string;
   type: AssessmentType;
-  studentId: string;
-  classSubjectId: string;
-  termId: string;
-  marksObtained?: number;
   maxMarks: number;
-  competencyLevel?: CompetencyLevel;
-  grade?: string;
-  remarks?: string;
-  assessedBy?: string;
-  assessedDate?: string;
-  student?: Student;
+  termId: string;
   term?: Term;
+  classSubjectId: string;
   classSubject?: ClassSubject;
+  strandId: string;
+  strand: Strand;
+  results: AssessmentResult;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssessmentResult {
+  id: string;
+  studentId: string;
+  student: Student;
+  assessmentDefId: string;
+  assessmentDef: AssessmentDefinition;
+  numericValue: number;
+  grade: string;
+  competencyLevel: CompetencyLevel;
+  comment: string;
+  assessedById: string;
+  assessedBy: Teacher;
   createdAt: string;
   updatedAt: string;
 }

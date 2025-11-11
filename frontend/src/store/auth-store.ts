@@ -1,15 +1,43 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { User } from '@/types';
-import apiClient from '@/lib/api-client';
+
+export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT' | 'SUPPORT_STAFF';
+
+export interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  role: UserRole;
+  schoolId?: string;
+  school?: {
+    id: string;
+    name: string;
+    type: string;
+  };
+  student?: {
+    id: string;
+    admissionNo: string;
+  };
+  teacher?: {
+    id: string;
+    tscNumber: string;
+  };
+}
 
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
-  login: (email: string, password: string) => Promise<void>;
+
+  // Actions
+  setAuth: (user: User, token: string, refreshToken?: string) => void;
   logout: () => void;
-  setUser: (user: User) => void;
+  updateUser: (user: Partial<User>) => void;
+  hasRole: (roles: UserRole | UserRole[]) => boolean;
+  hasPermission: (permission: string) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -17,71 +45,84 @@ export const useAuthStore = create<AuthState>()(
     (set, get) => ({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
 
-      login: async (email: string, password: string) => {
-        try {
-          const response = await apiClient.post('/users/login', {
-            email,
-            password,
-          });
-
-          // Accept common response shapes:
-          // 1) { success, data: { user, token } }
-          // 2) { success, data: user, token }
-          // 3) { token, user }
-          // 4) { data: { ... } } etc.
-          const payload = response.data ?? {};
-          // token may be at payload.token, payload.data.token, payload.data?.token, payload.data?.user?.token
-          const token =
-            (payload && (payload.token || payload.data?.token || payload.data?.user?.token)) ??
-            null;
-
-          // user may be at payload.data (object) or payload.user or payload.data.user
-          const user =
-            (payload && (payload.data?.user || payload.user || payload.data)) ?? null;
-
-          if (!token) {
-            // If no token, try to use jwt from headers or other fields (optional)
-            // Throw an error so caller shows an informative toast
-            throw new Error(payload.message || 'Login failed: missing token in response');
-          }
-
-          // persist token in localStorage and configure apiClient for future requests
-          localStorage.setItem('auth_token', token);
-          apiClient.defaults.headers.Authorization = `Bearer ${token}`;
-
-          set({
-            user,
-            token,
-            isAuthenticated: true,
-          });
-        } catch (error: any) {
-          // Normalize axios errors to throw a friendly Error
-          if (error?.response?.data?.message) {
-            throw new Error(error.response.data.message);
-          }
-          throw new Error(error?.message || 'Login failed');
-        }
-      },
-
-      logout: () => {
-        localStorage.removeItem('auth_token');
-        // remove header if set
-        try {
-          delete apiClient.defaults.headers.Authorization;
-        } catch {
-          /* ignore */
-        }
+      setAuth: (user, token, refreshToken) => {
         set({
-          user: null,
-          token: null,
-          isAuthenticated: false,
+          user,
+          token,
+          refreshToken,
+          isAuthenticated: true,
         });
       },
 
-      setUser: (user: User) => {
-        set({ user });
+      logout: () => {
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
+      },
+      updateUser: (userData) => {
+        const currentUser = get().user;
+        if (currentUser) {
+          set({
+            user: { ...currentUser, ...userData },
+          });
+        }
+      },
+
+      hasRole: (roles) => {
+        const user = get().user;
+        if (!user) return false;
+
+        if (Array.isArray(roles)) {
+          return roles.includes(user.role);
+        }
+        return user.role === roles;
+      },
+
+      hasPermission: (permission) => {
+        const user = get().user;
+        if (!user) return false;
+
+        // Define permissions based on roles
+        const permissions: Record<UserRole, string[]> = {
+          SUPER_ADMIN: ['*'], // All permissions
+          ADMIN: [
+            'manage_users',
+            'manage_students',
+            'manage_teachers',
+            'manage_classes',
+            'view_reports',
+            'manage_assessments',
+          ],
+          TEACHER: [
+            'view_students',
+            'manage_assessments',
+            'view_classes',
+            'grade_students',
+          ],
+          STUDENT: [
+            'view_own_grades',
+            'view_own_schedule',
+            'view_own_profile',
+          ],
+          PARENT: [
+            'view_child_grades',
+            'view_child_schedule',
+            'view_child_profile',
+          ],
+          SUPPORT_STAFF: [
+            'view_students',
+            'view_teachers',
+          ],
+        };
+
+        const userPermissions = permissions[user.role] || [];
+        return userPermissions.includes('*') || userPermissions.includes(permission);
       },
     }),
     {

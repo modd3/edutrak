@@ -197,7 +197,7 @@ model Teacher {
   qualification  String?  // Diploma, Degree, Masters, etc.
   specialization String?  // Subject specialization
   
-  dateJoined     DateTime?
+  dateJoined     DateTime?    @default(now())
   
   // Relations
   classTeacherOf Class[]       @relation("ClassTeacher")
