@@ -54,8 +54,8 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
     onSubmit({
       ...data,
       schoolId: user?.schoolId!,
-      classTeacherId: data.classTeacherId ? Number(data.classTeacherId) : undefined,
-      academicYearId: Number(data.academicYearId),
+      classTeacherId: data.classTeacherId ? data.classTeacherId : undefined,
+      academicYearId: data.academicYearId,
     });
   };
 
@@ -67,7 +67,6 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
           <Input
             id="name"
             {...register('name')}
-            error={errors.name?.message}
           />
         </div>
 
@@ -76,7 +75,6 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
           <Input
             id="level"
             {...register('level')}
-            error={errors.level?.message}
           />
         </div>
 
@@ -117,7 +115,7 @@ export function ClassForm({ initialData, onSubmit, isLoading }: ClassFormProps) 
               <SelectItem value="">Not Assigned</SelectItem>
               {teachers?.data.map((teacher) => (
                 <SelectItem key={teacher.id} value={teacher.id.toString()}>
-                  {teacher.user.firstName} {teacher.user.lastName}
+                  {teacher.firstName} {teacher.lastName}
                 </SelectItem>
               ))}
             </SelectContent>

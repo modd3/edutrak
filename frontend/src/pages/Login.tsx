@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
-import axios from 'axios';
+import { authApi } from '@/services/api.service';
 
 // Validation schema
 const loginSchema = z.object({
@@ -35,13 +35,16 @@ export function Login() {
 
     try {
       // Make API call to login endpoint
+      /*
       const response = await axios.post(
         `${import.meta.env.VITE_API_URL || 'http://localhost:4000/api'}/auth/login`,
         {
           email: data.email,
           password: data.password,
         }
-      );
+      ); */
+
+      const response = await authApi.login(data.email, data.password);
 
       if (response.data.success) {
         const { user, token, refreshToken } = response.data.data;

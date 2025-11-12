@@ -45,12 +45,13 @@ export function AdminDashboard() {
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
-        <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.firstName}!
-        </h1>
-        <p className="text-blue-100">
-          Here's what's happening in {user?.school?.name || 'your school'} today
-        </p>
+         {user?.role === 'ADMIN' ? <h1 className="text-3xl font-bold mb-2">
+          Welcome back, {user?.firstName}!</h1> : <h1 className="text-3xl font-bold mb-2">
+          Welcome back, Super Admin!</h1>}
+        
+         {user?.role === 'ADMIN' ? <p className="text-blue-100">Here's what's happening in {user?.school?.name || 'your school'} today </p>
+         : <p> Manage EduTrak systems here </p> } 
+        
       </div>
 
       {/* Stats Grid */}

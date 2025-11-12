@@ -9,6 +9,10 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 // Pages
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import ClassesList from '@/pages/classes/ClassesList';
+import CreateClass from './pages/classes/CreateClass';
+import SchoolsList from './pages/schools/SchoolsList';
+import CreateSchool from './pages/schools/CreateSchool';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -69,16 +73,41 @@ function App() {
             }
           />
           {/* Add more protected routes here */}
+
+          <Route
+            path="/schools"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <SchoolsList />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/schools/new"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <CreateSchool />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
           <Route
             path="/students"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <div>Students Page</div>
+                  <div className='border border-rounded hover:shadow'>Students Page</div>
                 </DashboardLayout>
               </ProtectedRoute>
             }
           />
+
+
 
           <Route
             path="/teachers"
@@ -92,11 +121,22 @@ function App() {
           />
 
           <Route
+            path="/classes/new"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < CreateClass />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
             path="/classes"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <div>Classes Page</div>
+                  < ClassesList />
                 </DashboardLayout>
               </ProtectedRoute>
             }

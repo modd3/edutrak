@@ -1,5 +1,5 @@
-import apiClient from '@/lib/api-client';
 import { Student, ApiResponse, PaginatedResponse } from '@/types';
+import { studentsApi } from './api.service';
 
 // --- Student Types ---
 export type StudentCreateInput = Omit<Student, 'id' | 'createdAt' | 'updatedAt' | 'enrollments'>;
@@ -17,15 +17,15 @@ export const studentService = {
     gender?: string;
     hasSpecialNeeds?: boolean;
   }): Promise<PaginatedResponse<Student>> => {
-    const response = await apiClient.get('/students', { params });
+    const response = await studentsApi.getAll({ params });
     return response.data;
   },
 
   /**
    * Fetches a single student by their ID.
    */
-  getById: async (id: string): Promise<Student> => {
-    const response = await apiClient.get<ApiResponse<Student>>(`/students/${id}`);
+  getById: async (id: string): Promise<ApiResponse<Student>> => {
+    const response = await studentsApi.getById(id);
     if (!response.data.data) {
       throw new Error('Student not found');
     }
@@ -35,8 +35,8 @@ export const studentService = {
   /**
    * Creates a new student.
    */
-  create: async (data: StudentCreateInput): Promise<Student> => {
-    const response = await apiClient.post<ApiResponse<Student>>('/students', data);
+  create: async (data: StudentCreateInput): Promise<ApiResponse<Student>> => {
+    const response = await studentsApi.create(data);
     if (!response.data.data) {
       throw new Error('Failed to create student');
     }
@@ -46,8 +46,8 @@ export const studentService = {
   /**
    * Updates an existing student by their ID.
    */
-  update: async (id: string, data: StudentUpdateInput): Promise<Student> => {
-    const response = await apiClient.put<ApiResponse<Student>>(`/students/${id}`, data);
+  update: async (id: string, data: StudentUpdateInput): Promise<ApiResponse<Student>> => {
+    const response = await studentsApi.update(id, data);
     if (!response.data.data) {
       throw new Error('Failed to update student');
     }
@@ -58,6 +58,6 @@ export const studentService = {
    * Deletes a student by their ID.
    */
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/students/${id}`);
+    await studentsApi.delete(id);
   },
 };

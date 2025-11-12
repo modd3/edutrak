@@ -132,6 +132,11 @@ export class SchoolService {
           },
         },
         students: {
+          select: {
+            firstName: true,
+            lastName: true,
+            admissionNo: true,
+          },
           include: {
             enrollments: {
               include: {
@@ -157,6 +162,12 @@ export class SchoolService {
     });
   }
 
+  async getSchoolByRegistrationNo(registrationNo: string): Promise<School | null> {
+    return await this.prisma.school.findUnique({
+      where: { registrationNo },
+    });
+  }
+
   async updateSchool(id: string, data: Partial<School>): Promise<School> {
     const school = await this.prisma.school.update({
       where: { id },
@@ -169,14 +180,35 @@ export class SchoolService {
   }
 
   async deleteSchool(id: string): Promise<School> {
-    const school = await this.prisma.school.delete({
+    // Check if school has users or students
+    const school = await this.prisma.school.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            users: true,
+            students: true,
+            classes: true,
+          },
+        },
+      },
+    });
+    if (!school) {
+      throw new Error('School not found');
+    }
+
+    if (school._count.users > 0 || school._count.students > 0 || school._count.classes > 0) {
+      throw new Error('Cannot delete school with existing users, students, or classes');
+    }
+
+    const deleted = await this.prisma.school.delete({
       where: { id },
     });
 
     logger.info('School deleted successfully', { schoolId: id });
-
-    return school;
+    return deleted;
   }
+
 
   async getSchoolStatistics(id: string) {
     const school = await this.prisma.school.findUnique({
@@ -244,6 +276,79 @@ export class SchoolService {
       classStatistics: classStats,
     };
   }
+
+  async getSchoolsByCounty(county: string) {
+    const schools = await this.prisma.school.findMany({
+      where: { county },
+      include: {
+        _count: {
+          select: {
+            students: true,
+            users: true,
+          },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return schools;
+  }
+
+  async checkRegistrationNoExists(registrationNo: string): Promise<boolean> {
+    const school = await this.prisma.school.findUnique({
+      where: { registrationNo },
+      select: { id: true },
+    });
+
+    return !!school;
+  }
+
+  async checkKnecCodeExists(knecCode: string): Promise<boolean> {
+    const school = await this.prisma.school.findUnique({
+      where: { knecCode },
+      select: { id: true },
+    });
+
+    return !!school;
+  }
+
+  async checkKemisCodeExists(kemisCode: string): Promise<boolean> {
+    const school = await this.prisma.school.findUnique({
+      where: { kemisCode },
+      select: { id: true },
+    });
+
+    return !!school;
+  }
+
+  async bulkCreateSchools(schools: any[], createdBy: {userId:string; role: Role}) {
+    const results = {
+      successful: [] as any[],
+      failed: [] as any[],
+    };
+
+    for (const schoolData of schools) {
+      try {
+        const school = await this.createSchool({
+          ...schoolData,
+        }, createdBy);
+        results.successful.push(school);
+      } catch (error: any) {
+        results.failed.push({
+          data: schoolData,
+          error: error.message,
+        });
+      }
+    }
+
+    logger.info('Bulk school creation completed', {
+      successful: results.successful.length,
+      failed: results.failed.length,
+      createdBy,
+    });
+    return results;
+  }
+
 
   async getSchoolPerformance(id: string, academicYearId?: string) {
     // This would include performance metrics, average scores, etc.

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { HomeIcon } from 'lucide-react'
 import { useSchoolClasses } from '@/hooks/use-classes';
 import { useAuthStore } from '@/store/auth-store';
 import { DataTable } from '@/components/shared/DataTable';
@@ -38,7 +39,7 @@ export default function ClassesList() {
       header: 'Class Teacher',
       cell: ({ row }) => {
         const teacher = row.original.classTeacher;
-        return teacher ? `${teacher.user.firstName} ${teacher.user.lastName}` : 'Not Assigned';
+        return teacher ? `${teacher.firstName} ${teacher.lastName}` : 'Not Assigned';
       },
     },
     {
@@ -58,7 +59,7 @@ export default function ClassesList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Classes</h1>
+        <h1 className="text-3xl font-bold ">< HomeIcon /> Classes</h1>
           <p className="text-muted-foreground">
             Manage your school's classes and streams
           </p>

@@ -136,7 +136,7 @@ export default function SchoolsList() {
       <DataTable
         columns={columns}
         data={schoolsData?.data || []}
-        searchKey="name"
+        pageSize={20}
       />
 
       {/* Pagination controls would go here, linked to setPage */}

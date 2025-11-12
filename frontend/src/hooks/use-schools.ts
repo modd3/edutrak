@@ -20,7 +20,7 @@ export function useSchools(params?: {
 }) {
   return useQuery({
     queryKey: [SCHOOLS_QUERY_KEY, params],
-    queryFn: () => schoolService.getAll(params),
+    queryFn: () => schoolService.getAll(),
   });
 }
 
@@ -68,7 +68,7 @@ export function useUpdateSchool() {
       queryClient.invalidateQueries({ queryKey: [SCHOOLS_QUERY_KEY] });
       // Also update the specific school's cache if it exists
       queryClient.setQueryData(
-        [SCHOOLS_QUERY_KEY, updatedSchool.id],
+        [SCHOOLS_QUERY_KEY, updatedSchool.data.data.id],
         updatedSchool
       );
       toast.success('School updated successfully');

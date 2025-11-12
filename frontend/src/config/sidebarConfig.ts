@@ -38,6 +38,26 @@ import {
         href: '/schools',
         icon: School,
         roles: ['SUPER_ADMIN'],
+        children: [
+          {
+            title: 'All Schools',
+            href: '/schools',
+            icon: School,
+            roles: ['SUPER_ADMIN'],
+          },
+          {
+            title: 'Enrollments',
+            href: '/students/enrollments',
+            icon: BookOpen,
+            roles: ['SUPER_ADMIN'],
+          },
+          {
+            title: 'Promotions',
+            href: '/students/promotions',
+            icon: Trophy,
+            roles: ['SUPER_ADMIN'],
+          },
+        ]
       },
       {
         title: 'Students',

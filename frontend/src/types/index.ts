@@ -1,4 +1,10 @@
-export type SchoolType = 'PRIMARY' | 'SECONDARY' | 'TVET' | 'SPECIAL_NEEDS' | 'PRE_PRIMARY';
+export enum SchoolType {
+  PRE_PRIMARY = 'PRE_PRIMARY',
+  PRIMARY = 'PRIMARY',
+  SECONDARY = 'SECONDARY',
+  TVET = 'TVET',
+  SPECIAL_NEEDS = 'SPECIAL_NEEDS',
+}
 export enum Role {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
@@ -7,19 +13,89 @@ export enum Role {
   PARENT = 'PARENT',
   SUPPORT_STAFF = 'SUPPORT_STAFF'
 }
-export type Curriculum = 'CBC' | 'EIGHT_FOUR_FOUR' | 'TVET' | 'IGCSE' | 'IB';
-export type Gender = 'MALE' | 'FEMALE';
-export type EnrollmentStatus = 'ACTIVE' | 'PROMOTED' | 'TRANSFERRED' | 'GRADUATED' | 'DROPPED_OUT' | 'SUSPENDED';
-export type AssessmentType = 'CAT' | 'MIDTERM' | 'END_OF_TERM' | 'MOCK' | 'NATIONAL_EXAM' | 'COMPETENCY_BASED';
-export type CompetencyLevel = 'EXCEEDING_EXPECTATIONS' | 'MEETING_EXPECTATIONS' | 'APPROACHING_EXPECTATIONS' | 'BELOW_EXPECTATIONS';
-export type Ownership = 'PUBLIC' | 'PRIVATE' | 'FAITH_BASED' | 'NGO';
-export type BoardingStatus = 'DAY' | 'BOARDING' | 'BOTH';
-export type SchoolGender = 'BOYS' | 'GIRLS' | 'MIXED';
-export type EmploymentType = 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'BOM' | 'PTA';
-export type SubjectCategory = 'CORE' | 'ELECTIVE' | 'OPTIONAL' | 'TECHNICAL' | 'APPLIED';
-export type LearningArea = 'LANGUAGES' | 'MATHEMATICS' | 'SCIENCE_TECHNOLOGY' | 'SOCIAL_STUDIES' | 'RELIGIOUS_EDUCATION' | 'CREATIVE_ARTS' | 'PHYSICAL_HEALTH_EDUCATION' | 'PRE_TECHNICAL_STUDIES';
-export type Pathway = 'STEM' | 'ARTS_SPORTS' | 'SOCIAL_SCIENCES';
-export type TermName = 'TERM_1' | 'TERM_2' | 'TERM_3';
+export enum Curriculum {
+  CBC = 'CBC',
+  EIGHT_FOUR_FOUR = 'EIGHT_FOUR_FOUR',
+  TVET = 'TVET',
+  IGCSE = 'IGCSE',
+  IB = 'IB'
+};
+export enum Gender {
+  MALE = 'MALE',
+  FEMALE = 'FEMALE'
+};
+export enum EnrollmentStatus {
+  ACTIVE = 'ACTIVE',
+  PROMOTED = 'PROMOTED',
+  TRANSFERRED = 'TRANSFERRED',
+  GRADUATED = 'GRADUATED',
+  DROPPED_OUT = 'DROPPED_OUT',
+  SUSPENDED = 'SUSPENDED'
+};
+export enum AssessmentType  {
+  CAT = 'CAT',
+  MIDTERM = 'MIDTERM',
+  END_OF_TERM = 'END_OF_TERM',
+  MOCK = 'MOCK',
+  NATIONAL_EXAM = 'NATIONAL_EXAM',
+  COMPETENCY_BASED = 'COMPETENCY_BASED'
+};
+export enum CompetencyLevel {
+  EXCEEDING_EXPECTATIONS = 'EXCEEDING_EXPECTATIONS',
+  MEETING_EXPECTATIONS = 'MEETING_EXPECTATIONS',
+  APPROACHING_EXPECTATIONS = 'APPROACHING_EXPECTATIONS',
+  BELOW_EXPECTATIONS = 'BELOW_EXPECTATIONS'
+};
+export enum Ownership {
+  PUBLIC = 'PUBLIC',
+  PRIVATE = 'PRIVATE',
+  FAITH_BASED = 'FAITH_BASED',
+  NGO = 'NGO',
+}
+export enum BoardingStatus {
+  DAY = 'DAY',
+  BOARDING = 'BOARDING',
+  BOTH = 'BOTH',
+}
+export enum SchoolGender {
+  BOYS = 'BOYS',
+  GIRLS = 'GIRLS',
+  MIXED = 'MIXED',
+}
+export enum EmploymentType {
+  PERMANENT = 'PERMANENT',
+  CONTRACT = 'CONTRACT',
+  TEMPORARY = 'TEMPORARY',
+  BOM = 'BOM',
+  PTA = 'PTA'
+};
+export enum SubjectCategory {
+  CORE = 'CORE',
+  ELECTIVE = 'ELECTIVE',
+  OPTIONAL = 'OPTIONAL',
+  TECHNICAL = 'TECHNICAL',
+  APPLIED = 'APPLIED'
+};
+export enum LearningArea {
+  LANGUAGES = 'LANGUAGES',
+  MATHEMATICS = 'MATHEMATICS',
+  SCIENCE_TECHNOLOGY = 'SCIENCE_TECHNOLOGY',
+  SOCIAL_STUDIES = 'SOCIAL_STUDIES',
+  RELIGIOUS_EDUCATION = 'RELIGIOUS_EDUCATION',
+  CREATIVE_ARTS = 'CREATIVE_ARTS',
+  PHYSICAL_HEALTH_EDUCATION = 'PHYSICAL_HEALTH_EDUCATION',
+  PRE_TECHNICAL_STUDIES = 'PRE_TECHNICAL_STUDIES'
+};
+export enum Pathway {
+  STEM = 'STEM',
+  ARTS_SPORTS = 'ARTS_SPORTS',
+  SOCIAL_SCIENCES = 'SOCIAL_SCIENCES'
+};
+export enum TermName {
+  TERM_1 = 'TERM_1',
+  TERM_2 = 'TERM_2',
+  TERM_3 = 'TERM_3'
+};
 
 export interface User {
   id: string;
@@ -55,6 +131,12 @@ export interface School {
   gender: SchoolGender;
   createdAt: string;
   updatedAt: string;
+  _count?: {
+    users: number;
+    students: number;
+    teachers: number;
+    classes: number;
+  }
 }
 
 export interface Student {
