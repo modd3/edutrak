@@ -5,6 +5,7 @@ import {
   getPaginationRowModel,
   getSortedRowModel,
   useReactTable,
+  type ColumnDef,
   type SortingState,
 } from '@tanstack/react-table';
 import {
@@ -19,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
 
 interface DataTableProps<TData> {
-  columns: any[];
+  columns: ColumnDef<TData>[];
   data: TData[];
   pageSize?: number;
 }

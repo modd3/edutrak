@@ -111,7 +111,7 @@ export const StudentForm = ({ onSubmit, initialData, isLoading, isEditMode = fal
           {/* Special Needs & Medical */}
           <div className="space-y-2 md:col-span-2 lg:col-span-3 grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="flex items-center space-x-2 pt-6">
-              <Checkbox id="hasSpecialNeeds" checked={hasSpecialNeeds} onCheckedChange={(checked) => control.setValue('hasSpecialNeeds', !!checked)} />
+              <Checkbox id="hasSpecialNeeds" checked={hasSpecialNeeds} onCheckedChange={(checked: any) => control.setValue('hasSpecialNeeds', !!checked)} />
               <Label htmlFor="hasSpecialNeeds">Has Special Needs?</Label>
             </div>
             {hasSpecialNeeds && (

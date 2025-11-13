@@ -1,22 +1,22 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, PlusCircle } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Edit, Trash, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from '@/components/ui/dialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,28 +24,52 @@ import { Badge } from '@/components/ui/badge';
 import { useSchools, useDeleteSchool } from '@/hooks/use-schools';
 import { School } from '@/types';
 import { SCHOOL_TYPES } from '@/lib/constants';
+import { SchoolFormModal } from '@/components/schools/SchoolFormModal';
+import { toast } from 'sonner';
+import { SchoolDetailsModal } from '@/components/schools/SchoolDetailsModal'
 
 export default function SchoolsList() {
-  const navigate = useNavigate();
   const [page, setPage] = useState(1);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   // Fetch schools
-  const { data: schoolsData, isLoading, isError } = useSchools({ page, pageSize: 10 });
+  const { data: response, isLoading, isError } = useSchools({ page, limit: 10 });
   const { mutate: deleteSchool, isPending: isDeleting } = useDeleteSchool();
+  
+  // Extract schools array from response
+  const schools = response?.data?.data || [];
+  const pagination = response?.data?.pagination;
 
   const handleDeleteClick = (school: School) => {
     setSelectedSchool(school);
     setShowDeleteDialog(true);
   };
 
+  const handleEditClick = (school: School) => {
+    setSelectedSchool(school);
+    setShowEditModal(true);
+  };
+
+  const handleSchoolNameClick = (school: School) => {
+    setSelectedSchool(school);
+    setShowDetailsModal(true);
+  };
+
+
   const confirmDelete = () => {
     if (selectedSchool) {
       deleteSchool(selectedSchool.id, {
         onSuccess: () => {
+          toast.success('School deleted successfully');
           setShowDeleteDialog(false);
           setSelectedSchool(null);
+        },
+        onError: (error: any) => {
+          toast.error(error?.response?.data?.message || 'Failed to delete school');
         },
       });
     }
@@ -55,6 +79,18 @@ export default function SchoolsList() {
     {
       accessorKey: 'name',
       header: 'Name',
+      cell: ({ row }) => {
+        const school = row.original;
+        return (
+          <Button
+            variant="ghost"
+            className="p-0 h-auto text-wrap justify-start hover:bg-blue-100 hover:from-accent/20 hover:to-accent/10 transition-all hover:shadow-md font-medium text-left duration-200"
+            onClick={() => handleSchoolNameClick(school)}
+          >
+            {school.name}
+          </Button>
+        );
+      },
     },
     {
       accessorKey: 'type',
@@ -69,15 +105,42 @@ export default function SchoolsList() {
       header: 'County',
     },
     {
+      accessorKey: 'ownership',
+      header: 'Ownership',
+      cell: ({ row }) => {
+        const ownership = row.getValue('ownership') as string;
+        return (
+          <Badge variant="outline">
+            {ownership.replace('_', ' ')}
+          </Badge>
+        );
+      },
+    },
+    {
       accessorKey: 'phone',
       header: 'Phone',
+      cell: ({ row }) => {
+        return row.getValue('phone') || '-';
+      },
     },
     {
       accessorKey: 'email',
       header: 'Email',
+      cell: ({ row }) => {
+        return row.getValue('email') || '-';
+      },
+    },
+    {
+      accessorKey: '_count',
+      header: 'Students',
+      cell: ({ row }) => {
+        const count = row.original._count;
+        return count?.students || 0;
+      },
     },
     {
       id: 'actions',
+      header: 'Actions',
       cell: ({ row }) => {
         const school = row.original;
         return (
@@ -90,17 +153,21 @@ export default function SchoolsList() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuItem onClick={() => navigate(`/schools/${school.id}`)}>
-                View Details
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleSchoolNameClick(school)}>
+              <Eye className="mr-2 h-4 w-4" />
+               Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate(`/schools/${school.id}/edit`)}>
-                Edit School
+              <DropdownMenuItem onClick={() => handleEditClick(school)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => handleDeleteClick(school)}
               >
-                Delete School
+                <Trash className="mr-2 h-4 w-4" />
+                Delete
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -120,39 +187,73 @@ export default function SchoolsList() {
   }
 
   if (isError) {
-    return <div className="text-center text-destructive">Failed to load schools.</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-destructive text-lg mb-2">Failed to load schools</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
+      </div>
+    );
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">Manage Schools</h1>
-        <Button onClick={() => navigate('/schools/new')}>
+        <div>
+          <h1 className="text-3xl font-bold">Schools</h1>
+          <p className="text-muted-foreground">
+            Manage schools in the system
+          </p>
+        </div>
+        <Button onClick={() => setShowCreateModal(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Create School
+          Add School
         </Button>
       </div>
 
       <DataTable
         columns={columns}
-        data={schoolsData?.data || []}
-        pageSize={20}
+        data={schools}
+        pageSize={10}
       />
 
-      {/* Pagination controls would go here, linked to setPage */}
-      {/* This example uses the DataTable's internal pagination for the view */}
+      {/* Create School Modal */}
+      <SchoolFormModal
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        mode="create"
+      />
+
+      {/* Edit School Modal */}
+      {selectedSchool && (
+        <SchoolFormModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
+          mode="edit"
+          school={selectedSchool}
+        />
+      )}
+
+      {/* School Details Modal */}
+      {selectedSchool && (
+        <SchoolDetailsModal
+          open={showDetailsModal}
+          onOpenChange={setShowDetailsModal}
+          school={selectedSchool}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Are you sure?</DialogTitle>
+            <DialogTitle>Delete School</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete the school
-              "{selectedSchool?.name}".
+              Are you sure you want to delete "{selectedSchool?.name}"? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end space-x-2">
+          <DialogFooter>
             <Button
               variant="outline"
               onClick={() => setShowDeleteDialog(false)}
@@ -167,7 +268,7 @@ export default function SchoolsList() {
             >
               {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

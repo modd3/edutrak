@@ -49,7 +49,7 @@ export default function SchoolDetails() {
     return <div className="text-center text-destructive">School not found.</div>;
   }
 
-  const schoolTypeLabel = SCHOOL_TYPES[school.type as keyof typeof SCHOOL_TYPES] || school.type;
+  const schoolTypeLabel = SCHOOL_TYPES[school.data.data.type as keyof typeof SCHOOL_TYPES] || school.data.data.type;
 
   return (
     <div className="space-y-6">
@@ -65,13 +65,13 @@ export default function SchoolDetails() {
       </div>
 
       <div className="space-y-2">
-        <h1 className="text-3xl font-bold">{school.name}</h1>
+        <h1 className="text-3xl font-bold">{school.data.data.name}</h1>
         <div className="flex flex-wrap gap-2">
           <Badge>{schoolTypeLabel}</Badge>
-          <Badge variant="secondary">{school.county}</Badge>
-          <Badge variant="secondary">{school.ownership}</Badge>
-          <Badge variant="secondary">{school.gender}</Badge>
-          <Badge variant="secondary">{school.boardingStatus}</Badge>
+          <Badge variant="secondary">{school.data.data.county}</Badge>
+          <Badge variant="secondary">{school.data.data.ownership}</Badge>
+          <Badge variant="secondary">{school.data.data.gender}</Badge>
+          <Badge variant="secondary">{school.data.data.boardingStatus}</Badge>
         </div>
       </div>
 
@@ -81,9 +81,9 @@ export default function SchoolDetails() {
             <CardTitle>Contact Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <DetailItem icon={Mail} label="Email" value={school.email} />
-            <DetailItem icon={Phone} label="Phone" value={school.phone} />
-            <DetailItem icon={MapPin} label="Address" value={school.address} />
+            <DetailItem icon={Mail} label="Email" value={school.data.data.email} />
+            <DetailItem icon={Phone} label="Phone" value={school.data.data.phone} />
+            <DetailItem icon={MapPin} label="Address" value={school.data.data.address} />
           </CardContent>
         </Card>
 
@@ -92,9 +92,9 @@ export default function SchoolDetails() {
             <CardTitle>Official Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <DetailItem icon={Building} label="Reg. No" value={school.registrationNo} />
-            <DetailItem icon={Building} label="KNEC Code" value={school.knecCode} />
-            <DetailItem icon={Building} label="NEMIS Code" value={save={school.nemisCode} />
+            <DetailItem icon={Building} label="Reg. No" value={school.data.data.registrationNo} />
+            <DetailItem icon={Building} label="KNEC Code" value={school.data.data.knecCode} />
+            <DetailItem icon={Building} label="KEMIS Code" value={school.data.data.kemisCode} />
           </CardContent>
         </Card>
         
@@ -103,9 +103,9 @@ export default function SchoolDetails() {
             <CardTitle>Location</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <DetailItem icon={MapPin} label="County" value={school.county} />
-            <DetailItem icon={MapPin} label="Sub-County" value={school.subCounty} />
-            <DetailItem icon={MapPin} label="Ward" value={school.ward} />
+            <DetailItem icon={MapPin} label="County" value={school.data.data.county} />
+            <DetailItem icon={MapPin} label="Sub-County" value={school.data.data.subCounty} />
+            <DetailItem icon={MapPin} label="Ward" value={school.data.data.ward} />
           </CardContent>
         </Card>
       </div>

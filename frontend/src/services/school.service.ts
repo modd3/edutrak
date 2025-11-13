@@ -2,8 +2,8 @@ import api from './api.service';
 import { School } from '@/types';
 
 // Define the shape for creating/updating a school based on your schema
-type CreateSchoolDto = Omit<School, 'id' | 'createdAt' | 'updatedAt'>;
-type UpdateSchoolDto  = Partial<CreateSchoolDto>;
+export type CreateSchoolDto = Omit<School, 'id' | 'createdAt' | 'updatedAt'>;
+export type UpdateSchoolDto  = Partial<CreateSchoolDto>;
 
 
 

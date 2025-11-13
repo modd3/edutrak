@@ -108,6 +108,9 @@ export interface User {
   role: Role;
   schoolId?: string;
   school?: School;
+  student?: Student;
+  teacher?: Teacher;
+  guardian?: Guardian;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -161,6 +164,7 @@ export interface Student {
   school?: School;
   userId?: string;
   user?: User;
+  guardians?: StudentGuardian[];
   enrollments?: StudentClass[];
   assessments?: AssessmentResult[];
   createdAt: string;
@@ -174,6 +178,10 @@ export interface Teacher {
   employmentType: EmploymentType;
   qualification?: string;
   specialization?: string;
+  classTeacherOf?: Class[];
+  streamTeacherOf?: Stream[];
+  teachingSubjects?: ClassSubject[];
+
   dateJoined?: string;
   user?: User;
   createdAt: string;
@@ -188,8 +196,21 @@ export interface Guardian {
   employer?: string;
   workPhone?: string;
   user?: User;
+  students?: StudentGuardian[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface StudentGuardian {
+  id: string;
+  studentId: string;
+  guardianId: string;
+  relationship: string;
+  isPrimary: boolean;
+  createdAt: string;
+
+  student: Student;
+  guardian: Guardian;
 }
 
 export interface AcademicYear {
