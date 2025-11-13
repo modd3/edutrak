@@ -14,6 +14,7 @@ import {
     Home,
     Trophy,
     type LucideIcon,
+    Lock,
   } from 'lucide-react';
   import { UserRole } from '../store/auth-store';
   
@@ -200,6 +201,26 @@ import {
     href: '/users',
     icon: Users,
     roles: ['SUPER_ADMIN', 'ADMIN'],
+    children: [
+      {
+        title: 'Users List',
+        href: '/users',
+        icon: Users,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Bulk Create Users',
+        href: '/users/bulk-create',
+        icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN',],
+      },
+      {
+        title: 'Change Password',
+        href: '/users/change-password',
+        icon: Lock,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+    ],
   },
   {
     title: 'Notifications',

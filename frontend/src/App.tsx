@@ -13,6 +13,7 @@ import ClassesList from '@/pages/classes/ClassesList';
 import CreateClass from './pages/classes/CreateClass';
 import SchoolsList from './pages/schools/SchoolsList';
 import CreateSchool from './pages/schools/CreateSchool';
+import UsersList from './pages/users/UsersList';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -95,6 +96,19 @@ function App() {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/users"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <UsersList />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          
 
           <Route
             path="/students"
