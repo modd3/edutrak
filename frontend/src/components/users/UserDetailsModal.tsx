@@ -65,19 +65,21 @@ export function UserDetailsModal({ open, onOpenChange, user }: UserDetailsModalP
   ];
 
   // Check if user has any role-specific profile
-  const hasProfile = !!(user.student || user.teacher || user.guardian);
+  const hasProfile = !!(user.role === 'STUDENT' || user.role === 'TEACHER' || user.role === 'PARENT');
 
   // Determine which profile tab to show
   const getProfileContent = () => {
-    if (user.student) {
+    if (user.role === 'STUDENT') {
       return <StudentProfileTab user={user} />;
     }
-    if (user.teacher) {
+    if (user.role === 'TEACHER') {
       return <TeacherProfileTab user={user} />;
     }
-    if (user.guardian) {
+    if (user.role === 'PARENT') {
       return <GuardianProfileTab user={user} />;
     }
+    console.log(hasProfile);
+    console.log(user);
     return <NoProfileTab user={user} />;
   };
 
@@ -216,6 +218,7 @@ export function UserDetailsModal({ open, onOpenChange, user }: UserDetailsModalP
 // Student Profile Tab Component
 function StudentProfileTab({ user }: { user: User }) {
   const student = user.student;
+  console.log("Student: ", student);
   if (!student) return null;
 
   return (
@@ -353,6 +356,8 @@ function StudentProfileTab({ user }: { user: User }) {
 // Teacher Profile Tab Component
 function TeacherProfileTab({ user }: { user: User }) {
   const teacher = user.teacher;
+  console.log("Teacher: ", teacher);
+  console.log("User: ", user);
   if (!teacher) return null;
 
   return (
@@ -436,6 +441,7 @@ function TeacherProfileTab({ user }: { user: User }) {
 // Guardian Profile Tab Component
 function GuardianProfileTab({ user }: { user: User }) {
   const guardian = user.guardian;
+  console.log("Guardian: ", guardian);
   if (!guardian) return null;
 
   return (

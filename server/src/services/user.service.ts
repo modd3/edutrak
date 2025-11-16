@@ -37,7 +37,7 @@ export class UserService {
   }
 
   async getUserById(id: string): Promise<User | null> {
-    return await this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       include: {
         school: true,
@@ -113,6 +113,13 @@ export class UserService {
         },
       },
     });
+
+    console.log('User ID:', id);
+    console.log('User role:', user?.role);
+    console.log('Teacher profile:', user?.teacher);
+    console.log('Teacher user ID:', user?.teacher?.userId);
+
+    return user;
   }
 
   async getUserByEmail(email: string): Promise<User | null> {
