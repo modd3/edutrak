@@ -10,6 +10,7 @@ import {
   import { School } from '@/types';
   import { SCHOOL_TYPES } from '@/lib/constants';
   import { MapPin, Phone, Mail, Globe, Building, Users, Home } from 'lucide-react';
+import { SchoolFormModal } from './SchoolFormModal';
   
   interface SchoolDetailsModalProps {
     open: boolean;
@@ -165,7 +166,13 @@ import {
           </Button>
           <Button
             onClick={() => {
-              onOpenChange(false);
+              
+              <SchoolFormModal
+                open={true}
+                onOpenChange={onOpenChange}
+                mode="edit"
+                school={school}
+              />
               // You can navigate to edit page here if needed
             }}
           >

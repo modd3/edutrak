@@ -41,7 +41,9 @@ export function useUsers(filters?: UsersFilters) {
       if (filters?.isActive !== undefined)
         params.append('isActive', filters.isActive.toString());
 
-      const response = await api.get(`/users?${params.toString()}`);
+      const response = await api.get('/users', { 
+        params: filters  // Let axios handle the URL encoding
+      });
       return response.data;
     },
   });
@@ -60,44 +62,52 @@ export function useUser(id: string, options?: { enabled?: boolean }) {
 }
 
 // Create user
-export function useCreateUser() {
+export function useCreateUserWithProfile() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: Partial<User>) => {
+    mutationFn: async (data: { user: Partial<User>; profile?: any }) => {
       const response = await api.post('/users', data);
       return response.data;
     },
     onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ['users'] });
-        toast.success('User created successfully');
-      },
-      onError: (error: any) => {
-        toast.error(error.response?.data?.message || 'Failed to create user');
-      },
-    });
-  }
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      toast.success('User and profile created successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.message || 'Failed to create user';
+      toast.error(message);
+      console.error('User creation error:', error);
+    },
+  });
+}
   
   // Update user
-  export function useUpdateUser() {
+  export function useUpdateUserWithProfile() {
     const queryClient = useQueryClient();
   
     return useMutation({
-      mutationFn: async ({ id, data }: { id: string; data: Partial<User> }) => {
+      mutationFn: async ({ 
+        id, 
+        data 
+      }: { 
+        id: string; 
+        data: { user: Partial<User>; profile?: any } 
+      }) => {
         const response = await api.put(`/users/${id}`, data);
         return response.data;
       },
       onSuccess: (_, variables) => {
         queryClient.invalidateQueries({ queryKey: ['users'] });
         queryClient.invalidateQueries({ queryKey: ['users', variables.id] });
-        toast.success('User updated successfully');
+        toast.success('User and profile updated successfully');
       },
       onError: (error: any) => {
         toast.error(error.response?.data?.message || 'Failed to update user');
       },
     });
   }
-  
+
   // Delete user
   export function useDeleteUser() {
     const queryClient = useQueryClient();
@@ -201,18 +211,21 @@ export function useChangePassword() {
   }
   
   // Bulk create users
-  export function useBulkCreateUsers() {
-    const queryClient = useQueryClient();
-  
-    return useMutation({
-      mutationFn: async (users: any[]) => {
-        const response = await api.post('/users/bulk', { users });
-        return response.data as BulkCreateResult;
+// Add this to hooks/use-users.ts
+
+// Bulk create users with profiles
+export function useBulkCreateUsersWithProfiles() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (users: Array<{ user: any; profile?: any }>) => {
+      const response = await api.post('/users/bulk', { users });
+      return response.data as BulkCreateResult;
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
       if (data.successful.length > 0) {
-        toast.success(`Successfully created ${data.successful.length} user(s)`);
+        toast.success(`Successfully created ${data.successful.length} user(s) with profiles`);
       }
       if (data.failed.length > 0) {
         toast.error(`Failed to create ${data.failed.length} user(s)`);
@@ -223,7 +236,6 @@ export function useChangePassword() {
     },
   });
 }
-
 // Get user profile (current user)
 export function useUserProfile() {
   return useQuery<User>({

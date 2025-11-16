@@ -132,6 +132,10 @@ export interface School {
   ownership: Ownership;
   boardingStatus: BoardingStatus;
   gender: SchoolGender;
+  classes: Class[]
+  students: Student[]
+  streams: Stream[]
+  subjectOfferings: SubjectOffering[]
   createdAt: string;
   updatedAt: string;
   _count?: {
@@ -277,6 +281,15 @@ export interface Subject {
   description?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface SubjectOffering {
+  id: String;   
+  schoolId: String;
+  subjectId: String;
+  school: School;
+  subject: Subject;
+  isActive: Boolean;  
 }
 
 export interface Strand {

@@ -1,5 +1,5 @@
 import apiClient from '@/lib/api-client';
-import { Subject, SubjectOffering, ApiResponse, PaginatedResponse, CurriculumLevel } from '@/types';
+import { Subject, SubjectOffering, ApiResponse, PaginatedResponse } from '@/types';
 
 // --- Subject Types ---
 export type SubjectCreateInput = Omit<Subject, 'id' | 'createdAt' | 'updatedAt' | 'offerings'>;

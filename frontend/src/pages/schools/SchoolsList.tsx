@@ -21,25 +21,40 @@ import {
 import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useSchools, useDeleteSchool } from '@/hooks/use-schools';
-import { School } from '@/types';
+import { School, SchoolType } from '@/types';
 import { SCHOOL_TYPES } from '@/lib/constants';
 import { SchoolFormModal } from '@/components/schools/SchoolFormModal';
+import { SchoolDetailsModal } from '@/components/schools/SchoolDetailsModal';
 import { toast } from 'sonner';
-import { SchoolDetailsModal } from '@/components/schools/SchoolDetailsModal'
 
 export default function SchoolsList() {
   const [page, setPage] = useState(1);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
-  // Fetch schools
-  const { data: response, isLoading, isError } = useSchools({ page, limit: 10 });
+  // Fetch schools with filters
+  const { data: response, isLoading, isError } = useSchools({
+    page,
+    limit: 20,
+    search,
+    type: typeFilter === 'all' ? undefined : typeFilter as SchoolType,
+  });
   const { mutate: deleteSchool, isPending: isDeleting } = useDeleteSchool();
-  
+
   // Extract schools array from response
   const schools = response?.data?.data || [];
   const pagination = response?.data?.pagination;
@@ -58,7 +73,6 @@ export default function SchoolsList() {
     setSelectedSchool(school);
     setShowDetailsModal(true);
   };
-
 
   const confirmDelete = () => {
     if (selectedSchool) {
@@ -84,7 +98,7 @@ export default function SchoolsList() {
         return (
           <Button
             variant="ghost"
-            className="p-0 h-auto text-wrap justify-start hover:bg-blue-100 hover:from-accent/20 hover:to-accent/10 transition-all hover:shadow-md font-medium text-left duration-200"
+            className="p-0 h-auto font-medium text-wrap hover:shadow hover:bg-green-50  text-left justify-start"
             onClick={() => handleSchoolNameClick(school)}
           >
             {school.name}
@@ -109,25 +123,21 @@ export default function SchoolsList() {
       header: 'Ownership',
       cell: ({ row }) => {
         const ownership = row.getValue('ownership') as string;
-        return (
-          <Badge variant="outline">
-            {ownership.replace('_', ' ')}
-          </Badge>
-        );
+        return <Badge variant="outline">{ownership.replace('_', ' ')}</Badge>;
       },
     },
     {
       accessorKey: 'phone',
       header: 'Phone',
       cell: ({ row }) => {
-        return row.getValue('phone') || '-';
+        return row.getValue('phone') || 'N/A';
       },
     },
     {
       accessorKey: 'email',
       header: 'Email',
       cell: ({ row }) => {
-        return row.getValue('email') || '-';
+        return row.getValue('email') || 'N/A';
       },
     },
     {
@@ -155,19 +165,20 @@ export default function SchoolsList() {
               <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => handleSchoolNameClick(school)}>
-              <Eye className="mr-2 h-4 w-4" />
-               Details
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleEditClick(school)}>
                 <Edit className="mr-2 h-4 w-4" />
-                Edit
+                Edit School
               </DropdownMenuItem>
+              <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive"
                 onClick={() => handleDeleteClick(school)}
               >
                 <Trash className="mr-2 h-4 w-4" />
-                Delete
+                Delete School
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -180,6 +191,7 @@ export default function SchoolsList() {
     return (
       <div className="space-y-4">
         <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-64 w-full" />
       </div>
@@ -201,10 +213,8 @@ export default function SchoolsList() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Schools</h1>
-          <p className="text-muted-foreground">
-            Manage schools in the system
-          </p>
+          <h1 className="text-3xl font-bold">Manage Schools</h1>
+          <p className="text-muted-foreground">View and manage schools in the system</p>
         </div>
         <Button onClick={() => setShowCreateModal(true)}>
           <PlusCircle className="mr-2 h-4 w-4" />
@@ -212,18 +222,42 @@ export default function SchoolsList() {
         </Button>
       </div>
 
-      <DataTable
-        columns={columns}
-        data={schools}
-        pageSize={10}
-      />
+      {/* Filters */}
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex-1">
+          <Input
+            placeholder="Search by name, county, or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-md"
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-[180px]">
+            <SelectValue placeholder="Filter by type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            {Object.entries(SCHOOL_TYPES).map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <DataTable columns={columns} data={schools} pageSize={20} />
+
+      {/* Pagination Info */}
+      {pagination && (
+        <div className="text-sm text-muted-foreground text-center">
+          Showing {schools.length} of {pagination.total} schools
+        </div>
+      )}
 
       {/* Create School Modal */}
-      <SchoolFormModal
-        open={showCreateModal}
-        onOpenChange={setShowCreateModal}
-        mode="create"
-      />
+      <SchoolFormModal open={showCreateModal} onOpenChange={setShowCreateModal} mode="create" />
 
       {/* Edit School Modal */}
       {selectedSchool && (
@@ -250,7 +284,8 @@ export default function SchoolsList() {
           <DialogHeader>
             <DialogTitle>Delete School</DialogTitle>
             <DialogDescription>
-              Are you sure you want to delete "{selectedSchool?.name}"? This action cannot be undone.
+              Are you sure you want to delete "{selectedSchool?.name}"? This action cannot
+              be undone and will remove all associated data.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -261,11 +296,7 @@ export default function SchoolsList() {
             >
               Cancel
             </Button>
-            <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={isDeleting}
-            >
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
               {isDeleting ? 'Deleting...' : 'Delete'}
             </Button>
           </DialogFooter>
