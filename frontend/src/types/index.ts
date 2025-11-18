@@ -180,6 +180,7 @@ export interface Teacher {
   userId: string;
   tscNumber: string;
   employmentType: EmploymentType;
+  employeeNumber?: string;
   qualification?: string;
   specialization?: string;
   classTeacherOf?: Class[];

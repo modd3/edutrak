@@ -123,6 +123,7 @@ export const getUserById = async (req: Request, res: Response) => {
     const { id } = req.params;
 
     const user = await userService.getUserById(id);
+    console.log(user);
 
     if (!user) {
       return ResponseUtil.notFound(res, 'User');

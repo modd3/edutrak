@@ -4,6 +4,7 @@ import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
+import { sequenceGenerator, SequenceType } from './sequence-generator.service';
 
 interface BaseUserData {
   email: string;
@@ -36,6 +37,7 @@ interface StudentProfileData {
 interface TeacherProfileData {
   tscNumber: string;
   employmentType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'BOM' | 'PTA';
+  employeeNumber?: string;
   qualification?: string;
   specialization?: string;
   dateJoined?: Date;
@@ -89,7 +91,7 @@ export class UserCreationService {
       // 2. Create role-specific profile based on user role
       switch (userData.role) {
         case 'STUDENT':
-          await this.createStudentProfile(tx, user.id, profileData as StudentProfileData, userData.schoolId);
+          await this.createStudentProfile(tx, user.id, profileData as StudentProfileData, userData.schoolId, userData);
           break;
 
         case 'TEACHER':
@@ -139,7 +141,7 @@ export class UserCreationService {
     profileData?: StudentProfileData | TeacherProfileData | GuardianProfileData
   ) {
     if (role === 'STUDENT') {
-      if (!profileData || !('admissionNo' in profileData)) {
+      if (!profileData /*|| !('admissionNo' in profileData)*/) {
         throw new Error('Student profile data with admissionNo is required');
       }
       if (!('gender' in profileData)) {
@@ -170,15 +172,37 @@ export class UserCreationService {
     tx: any,
     userId: string,
     profileData: StudentProfileData,
-    schoolId?: string
+    schoolId?: string,
+    userData?: BaseUserData
   ) {
-    // Check if admission number already exists
-    const existing = await tx.student.findUnique({
-      where: { admissionNo: profileData.admissionNo },
-    });
+    // Auto-generate admission number if not provided
+    let admissionNo = profileData.admissionNo;
+    
+    if (!admissionNo) {
+      admissionNo = await sequenceGenerator.generateAdmissionNumber(schoolId);
+      logger.info(`Auto-generated admission number: ${admissionNo}`, { admissionNo, schoolId });
+    } else {
+      // Validate uniqueness if manually provided
+      const existing = await tx.student.findUnique({
+        where: { admissionNo },
+      });
+      
+      if (existing) {
+        throw new Error(`Student with admission number ${admissionNo} already exists`);
+      }
+    }
 
-    if (existing) {
-      throw new Error(`Student with admission number ${profileData.admissionNo} already exists`);
+    // Auto-generate UPI if not provided
+    let upiNumber = profileData.upiNumber;
+    if (!upiNumber) {
+      // Format: COUNTRY-SCHOOL-YEAR-SEQUENCE
+      const year = new Date().getFullYear();
+      const schoolCode = schoolId?.substring(0, 4).toUpperCase() || 'XXXX';
+      const sequence = await sequenceGenerator.generateNext(
+        SequenceType.ADMISSION_NUMBER,
+        schoolId
+      );
+      upiNumber = `KE-${schoolCode}-${year}-${sequence}`;
     }
 
     return await tx.student.create({
@@ -186,12 +210,12 @@ export class UserCreationService {
         id: uuidv4(),
         userId,
         schoolId,
-        admissionNo: profileData.admissionNo,
-        upiNumber: profileData.upiNumber,
+        admissionNo,
+        upiNumber,
         kemisUpi: profileData.kemisUpi,
-        firstName: '', // Will be copied from user
-        middleName: '', // Will be copied from user
-        lastName: '', // Will be copied from user
+        firstName: userData?.firstName || '',
+        lastName: userData?.lastName || '',
+        middleName: userData?.middleName || '',
         gender: profileData.gender,
         dob: profileData.dob,
         birthCertNo: profileData.birthCertNo,
@@ -206,28 +230,36 @@ export class UserCreationService {
     });
   }
 
+
   /**
    * Create teacher profile
    */
   private async createTeacherProfile(
     tx: any,
     userId: string,
-    profileData: TeacherProfileData
+    profileData: TeacherProfileData,
+    schoolId?: string
   ) {
-    // Check if TSC number already exists
-    const existing = await tx.teacher.findUnique({
-      where: { tscNumber: profileData.tscNumber },
-    });
+    // Validate TSC number uniqueness
+    if (profileData.tscNumber) {
+      const existing = await tx.teacher.findUnique({
+        where: { tscNumber: profileData.tscNumber },
+      });
 
-    if (existing) {
-      throw new Error(`Teacher with TSC number ${profileData.tscNumber} already exists`);
+      if (existing) {
+        throw new Error(`Teacher with TSC number ${profileData.tscNumber} already exists`);
+      }
     }
+
+    // Auto-generate employee number for internal tracking
+    const employeeNumber = await sequenceGenerator.generateEmployeeNumber(schoolId);
 
     return await tx.teacher.create({
       data: {
         id: uuidv4(),
         userId,
         tscNumber: profileData.tscNumber,
+        employeeNumber, // Store for internal reference
         employmentType: profileData.employmentType,
         qualification: profileData.qualification,
         specialization: profileData.specialization,
@@ -330,7 +362,11 @@ export class UserCreationService {
           case 'STUDENT':
             await tx.student.update({
               where: { userId },
-              data: profileData as Partial<StudentProfileData>,
+              data: {...profileData as Partial<StudentProfileData>,
+                ...(userData.firstName && { firstName: userData.firstName }),
+                ...(userData.lastName && { lastName: userData.lastName}),
+                ...(userData.middleName && { middleName: userData.middleName}),
+              },
             });
             break;
 
@@ -348,6 +384,18 @@ export class UserCreationService {
             });
             break;
         }
+      } else if (
+        currentUser.role === 'STUDENT' &&
+        userData.firstName || userData.lastName || userData.middleName !== undefined
+      ) {
+        await tx.student.update ({
+          where: {userId},
+          data: {
+            ...(userData.firstName && { firstName: userData.firstName}),
+            ...(userData.lastName && { lastName: userData.lastName}),
+            ...(userData.middleName && { middleName: userData.middleName}),
+          }
+        });
       }
 
       // Return complete user

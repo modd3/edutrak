@@ -11,6 +11,7 @@ import {
   import { SCHOOL_TYPES } from '@/lib/constants';
   import { MapPin, Phone, Mail, Globe, Building, Users, Home } from 'lucide-react';
 import { SchoolFormModal } from './SchoolFormModal';
+import { formatDate } from '@/lib/utils';
   
   interface SchoolDetailsModalProps {
     open: boolean;
@@ -146,13 +147,13 @@ import { SchoolFormModal } from './SchoolFormModal';
                 {school.createdAt && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Created:</span>
-                    <span>{new Date(school.createdAt).toLocaleDateString()}</span>
+                    <span>{formatDate(school.createdAt)}</span>
                   </div>
                 )}
                 {school.updatedAt && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Last Updated:</span>
-                    <span>{new Date(school.updatedAt).toLocaleDateString()}</span>
+                    <span>{formatDate(school.updatedAt)}</span>
                   </div>
                 )}
               </div>

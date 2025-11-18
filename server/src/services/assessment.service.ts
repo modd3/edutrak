@@ -226,9 +226,13 @@ export class AssessmentService {
         assessedBy: {
           select: {
             id: true,
-            firstName: true,
-            lastName: true,
-            email: true,
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+                email: true,
+              },
+            },
           },
         },
       },

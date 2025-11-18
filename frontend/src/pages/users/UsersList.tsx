@@ -82,7 +82,6 @@ export default function UsersList() {
 
   const users = usersData?.data || [];
   
-
   const handleDeleteClick = (user: User) => {
     setSelectedUser(user);
     setShowDeleteDialog(true);
@@ -90,7 +89,7 @@ export default function UsersList() {
 
   const handleEditClick = (user: User) => {
     setSelectedUser(user);
-    setShowEditModal(true);
+    setShowCreateModal(true);
   };
 
   const handleUserClick = (user: User) => {
@@ -327,8 +326,8 @@ export default function UsersList() {
       {/* Edit User Modal */}
       {selectedUser && (
         <UserFormModal
-          open={showEditModal}
-          onOpenChange={setShowEditModal}
+          open={showCreateModal}
+          onOpenChange={setShowCreateModal}
           mode="edit"
           user={selectedUser}
         />

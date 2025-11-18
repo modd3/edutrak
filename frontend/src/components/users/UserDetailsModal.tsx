@@ -28,6 +28,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { useState } from 'react';
+import { UserFormModal } from './UserFormModal';
 
 interface UserDetailsModalProps {
   open: boolean;
@@ -53,6 +55,7 @@ const formatDate = (date: string | Date) => {
 };
 
 export function UserDetailsModal({ open, onOpenChange, user }: UserDetailsModalProps) {
+  const [showEditModal, setShowEditModal] = useState(false);
   const fullName = `${user.firstName} ${user.middleName || ''} ${user.lastName}`.trim();
 
   const basicInfo = [
@@ -78,147 +81,156 @@ export function UserDetailsModal({ open, onOpenChange, user }: UserDetailsModalP
     if (user.role === 'PARENT') {
       return <GuardianProfileTab user={user} />;
     }
-    console.log(hasProfile);
-    console.log(user);
     return <NoProfileTab user={user} />;
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <UserIcon className="h-5 w-5" />
-            {fullName}
-          </DialogTitle>
-          <DialogDescription>
-            Complete user profile and activity information
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserIcon className="h-5 w-5" />
+              {fullName}
+            </DialogTitle>
+            <DialogDescription>
+              Complete user profile and activity information
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="max-h-[70vh] overflow-y-auto pr-4">
-          {/* User Header */}
-          <div className="bg-muted/50 rounded-lg p-4 mb-6">
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <Badge variant={user.isActive ? 'default' : 'secondary'}>
-                {user.isActive ? 'Active' : 'Inactive'}
-              </Badge>
-              <Badge variant="outline">
-                {ROLE_LABELS[user.role as keyof typeof ROLE_LABELS]}
-              </Badge>
-              {user.school && (
-                <Badge variant="outline">{user.school.name}</Badge>
-              )}
+          <div className="max-h-[70vh] overflow-y-auto pr-4">
+            {/* User Header */}
+            <div className="bg-muted/50 rounded-lg p-4 mb-6">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <Badge variant={user.isActive ? 'default' : 'secondary'}>
+                  {user.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+                <Badge variant="outline">
+                  {ROLE_LABELS[user.role as keyof typeof ROLE_LABELS]}
+                </Badge>
+                {user.school && (
+                  <Badge variant="outline">{user.school.name}</Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">{user.email}</p>
             </div>
-            <p className="text-sm text-muted-foreground">{user.email}</p>
+
+            <Tabs defaultValue="basic" className="space-y-4">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="basic">Basic Info</TabsTrigger>
+                <TabsTrigger value="profile">
+                  {hasProfile ? 'Profile Details' : 'User Profile'}
+                </TabsTrigger>
+                <TabsTrigger value="activity">Activity</TabsTrigger>
+                <TabsTrigger value="system">System</TabsTrigger>
+              </TabsList>
+
+              {/* Basic Information Tab */}
+              <TabsContent value="basic" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {basicInfo.map((item, index) => (
+                    <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
+                      <item.icon className="h-5 w-5 text-muted-foreground mt-0.5" />
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-muted-foreground">
+                          {item.label}
+                        </p>
+                        <p className="text-sm font-semibold">{item.value}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </TabsContent>
+
+              {/* Profile Tab - Always Active */}
+              <TabsContent value="profile" className="space-y-4">
+                {getProfileContent()}
+              </TabsContent>
+
+              {/* Activity Tab */}
+              <TabsContent value="activity" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Recent Activity</CardTitle>
+                    <CardDescription>User activity and logs</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Activity tracking coming soon...
+                    </p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* System Information Tab */}
+              <TabsContent value="system" className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Account Created
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{formatDate(user.createdAt)}</p>
+                      <p className="text-sm">{new Date(user.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Last Updated
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-sm">{formatDate(user.updatedAt)}</p>
+                      <p className="text-sm">{new Date(user.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>User ID</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <code className="text-xs bg-muted p-2 rounded block break-all">
+                      {user.id}
+                    </code>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
 
-          <Tabs defaultValue="basic" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="basic">Basic Info</TabsTrigger>
-              <TabsTrigger value="profile">
-                {hasProfile ? 'Profile Details' : 'User Profile'}
-              </TabsTrigger>
-              <TabsTrigger value="activity">Activity</TabsTrigger>
-              <TabsTrigger value="system">System</TabsTrigger>
-            </TabsList>
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            <Button onClick={() => setShowEditModal(true)}>
+              Edit User
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
-            {/* Basic Information Tab */}
-            <TabsContent value="basic" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {basicInfo.map((item, index) => (
-                  <div key={index} className="flex items-start gap-3 p-3 rounded-lg border">
-                    <item.icon className="h-5 w-5 text-muted-foreground mt-0.5" />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {item.label}
-                      </p>
-                      <p className="text-sm font-semibold">{item.value}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </TabsContent>
-
-            {/* Profile Tab - Always Active */}
-            <TabsContent value="profile" className="space-y-4">
-              {getProfileContent()}
-            </TabsContent>
-
-            {/* Activity Tab */}
-            <TabsContent value="activity" className="space-y-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Activity</CardTitle>
-                  <CardDescription>User activity and logs</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-muted-foreground">
-                    Activity tracking coming soon...
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* System Information Tab */}
-            <TabsContent value="system" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Account Created
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{formatDate(user.createdAt)}</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Calendar className="h-4 w-4" />
-                      Last Updated
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm">{formatDate(user.updatedAt)}</p>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>User ID</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <code className="text-xs bg-muted p-2 rounded block break-all">
-                    {user.id}
-                  </code>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-4 border-t">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button onClick={() => onOpenChange(false)}>
-            Edit User
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
+      {/* Edit User Modal */}
+      <UserFormModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        mode="edit"
+        user={user}
+      />
+    </>
   );
 }
 
 // Student Profile Tab Component
 function StudentProfileTab({ user }: { user: User }) {
   const student = user.student;
-  console.log("Student: ", student);
   if (!student) return null;
 
   return (
@@ -356,8 +368,6 @@ function StudentProfileTab({ user }: { user: User }) {
 // Teacher Profile Tab Component
 function TeacherProfileTab({ user }: { user: User }) {
   const teacher = user.teacher;
-  console.log("Teacher: ", teacher);
-  console.log("User: ", user);
   if (!teacher) return null;
 
   return (
@@ -376,6 +386,10 @@ function TeacherProfileTab({ user }: { user: User }) {
             <InfoItem 
               label="Employment Type" 
               value={teacher.employmentType.replace('_', ' ')} 
+            />
+            <InfoItem 
+              label="Employee Number" 
+              value={teacher.employeeNumber || 'Not specified'} 
             />
             <InfoItem label="Qualification" value={teacher.qualification || 'Not specified'} />
             <InfoItem label="Specialization" value={teacher.specialization || 'Not specified'} />
@@ -441,7 +455,6 @@ function TeacherProfileTab({ user }: { user: User }) {
 // Guardian Profile Tab Component
 function GuardianProfileTab({ user }: { user: User }) {
   const guardian = user.guardian;
-  console.log("Guardian: ", guardian);
   if (!guardian) return null;
 
   return (

@@ -133,7 +133,7 @@ export function useCreateUserWithProfile() {
       
         return useMutation({
           mutationFn: async (id: string) => {
-            const response = await api.post(`/users/${id}/deactivate`);
+            const response = await api.patch(`/users/${id}/deactivate`);
             return response.data;
           },
           onSuccess: () => {
@@ -152,7 +152,7 @@ export function useCreateUserWithProfile() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      const response = await api.post(`/users/${id}/activate`);
+      const response = await api.patch(`/users/${id}/activate`);
       return response.data;
     },
     onSuccess: () => {

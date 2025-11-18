@@ -1,7 +1,7 @@
 // Enhanced UserFormModal with conditional profile fields
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { date, z } from 'zod';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,12 +14,14 @@ import { User, Role } from '@/types';
 import { useCreateUserWithProfile, useUpdateUserWithProfile } from '@/hooks/use-users';
 import { useSchools } from '@/hooks/use-schools';
 import { toast } from 'sonner';
-import { UserIcon, Eye, EyeOff, GraduationCap, BookOpen, Users } from 'lucide-react';
+import { UserIcon, Eye, EyeOff, GraduationCap, BookOpen, Users, Sparkles, RefreshCw } from 'lucide-react';
+import { Checkbox } from '../ui/checkbox';
+import { usePreviewSequence } from '@/hooks/use-sequences';
 
 // Base user schema
 const baseUserSchema = z.object({
   email: z.string().email('Invalid email address'),
-  password: z.string().min(8, 'Password must be at least 8 characters').optional(),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
@@ -33,10 +35,11 @@ const baseUserSchema = z.object({
 const studentProfileSchema = z.object({
   admissionNo: z.string().min(1, 'Admission number is required'),
   gender: z.enum(['MALE', 'FEMALE']),
-  dob: z.string().optional(),
+  dob: z.string().optional().or(z.date().optional()),
   upiNumber: z.string().optional(),
   kemisUpi: z.string().optional(),
   birthCertNo: z.string().optional(),
+  nationality: z.string().optional().default('Kenyan'),
   county: z.string().optional(),
   subCounty: z.string().optional(),
   hasSpecialNeeds: z.boolean().default(false),
@@ -51,7 +54,7 @@ const teacherProfileSchema = z.object({
   employmentType: z.enum(['PERMANENT', 'CONTRACT', 'TEMPORARY', 'BOM', 'PTA']),
   qualification: z.string().optional(),
   specialization: z.string().optional(),
-  dateJoined: z.string().optional(),
+  dateJoined: z.string().optional().or(z.date().optional()),
 });
 
 // Guardian profile schema
@@ -92,8 +95,10 @@ const EMPLOYMENT_TYPES = [
 ];
 
 export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalProps) {
+  const [autoGenerateAdmission, setAutoGenerateAdmission] = useState(mode === 'create');
+  const [autoGenerateUPI, setAutoGenerateUPI] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<Role>('STUDENT');
+  const [selectedRole, setSelectedRole] = useState<Role>(user?.role as Role || 'STUDENT');
 
   const { mutate: createUser, isPending: isCreating } = useCreateUserWithProfile();
   const { mutate: updateUser, isPending: isUpdating } = useUpdateUserWithProfile();
@@ -103,23 +108,33 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   // Base user form
   const userForm = useForm<BaseUserFormData>({
     resolver: zodResolver(baseUserSchema),
-    defaultValues: user ? {
-      email: user.email,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      middleName: user.middleName || '',
-      phone: user.phone || '',
-      idNumber: user.idNumber || '',
-      role: user.role as Role,
-      schoolId: user.schoolId || '',
-    } : {
+    defaultValues: {
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      phone: '',
+      idNumber: '',
       role: 'STUDENT',
+      schoolId: '',
     },
   });
+
+  const { data: previewAdmission, refetch: refreshPreview } = usePreviewSequence(
+    'ADMISSION_NUMBER',
+    userForm.watch('schoolId'),
+    { enabled: autoGenerateAdmission && mode === 'create' }
+  );
 
   // Student profile form
   const studentForm = useForm<StudentProfileFormData>({
     resolver: zodResolver(studentProfileSchema),
+    defaultValues: {
+      gender: 'MALE',
+      nationality: 'Kenyan',
+      hasSpecialNeeds: false,
+    },
   });
 
   // Teacher profile form
@@ -139,6 +154,63 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     setSelectedRole(watchedRole as Role);
   }, [watchedRole]);
 
+  // Populate forms when user data changes (edit mode)
+  useEffect(() => {
+    if (mode === 'edit' && user && open) {
+      // Reset all forms with user data
+      userForm.reset({
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        middleName: user.middleName || '',
+        phone: user.phone || '',
+        idNumber: user.idNumber || '',
+        role: user.role as Role,
+        schoolId: user.schoolId || '',
+        password: '', // Empty password for edit mode
+      });
+
+      // Populate role-specific forms
+      if (user.role === 'STUDENT' && user.student) {
+        studentForm.reset({
+          admissionNo: user.student.admissionNo,
+          gender: user.student.gender,
+          dob: user.student.dob ? new Date(user.student.dob).toISOString().split('T')[0] : '',
+          upiNumber: user.student.upiNumber || '',
+          kemisUpi: user.student.kemisUpi || '',
+          birthCertNo: user.student.birthCertNo || '',
+          nationality: user.student.nationality || 'Kenyan',
+          county: user.student.county || '',
+          subCounty: user.student.subCounty || '',
+          hasSpecialNeeds: user.student.hasSpecialNeeds || false,
+          specialNeedsType: user.student.specialNeedsType || '',
+          medicalCondition: user.student.medicalCondition || '',
+          allergies: user.student.allergies || '',
+        });
+        setAutoGenerateAdmission(false); // Disable auto-generation in edit mode
+      }
+
+      if (user.role === 'TEACHER' && user.teacher) {
+        teacherForm.reset({
+          tscNumber: user.teacher.tscNumber,
+          employmentType: user.teacher.employmentType,
+          qualification: user.teacher.qualification || '',
+          specialization: user.teacher.specialization || '',
+          dateJoined: user.teacher.dateJoined ? new Date(user.teacher.dateJoined).toISOString().split('T')[0] : '',
+        });
+      }
+
+      if (user.role === 'PARENT' && user.guardian) {
+        guardianForm.reset({
+          relationship: user.guardian.relationship,
+          occupation: user.guardian.occupation || '',
+          employer: user.guardian.employer || '',
+          workPhone: user.guardian.workPhone || '',
+        });
+      }
+    }
+  }, [mode, user, open, userForm, studentForm, teacherForm, guardianForm]);
+
   const onSubmit = async () => {
     // Validate base user form
     const isUserValid = await userForm.trigger();
@@ -150,6 +222,11 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     const userData = userForm.getValues();
     let profileData: any = null;
 
+    // For edit mode, remove password if it's empty
+    if (mode === 'edit' && !userData.password) {
+      delete userData.password;
+    }
+
     // Validate and get profile data based on role
     if (selectedRole === 'STUDENT') {
       const isProfileValid = await studentForm.trigger();
@@ -158,6 +235,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         return;
       }
       profileData = studentForm.getValues();
+      // Handle auto-generated admission number
+      if (autoGenerateAdmission && mode === 'create' && previewAdmission?.preview) {
+        profileData.admissionNo = previewAdmission.preview;
+      }
+      if (profileData.dob) {
+        profileData.dob = new Date(profileData.dob);
+      }
     } else if (selectedRole === 'TEACHER') {
       const isProfileValid = await teacherForm.trigger();
       if (!isProfileValid) {
@@ -165,6 +249,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         return;
       }
       profileData = teacherForm.getValues();
+      if (profileData.dateJoined) {
+        profileData.dateJoined = new Date(profileData.dateJoined);
+      }
     } else if (selectedRole === 'PARENT') {
       const isProfileValid = await guardianForm.trigger();
       if (!isProfileValid) {
@@ -187,6 +274,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
           onOpenChange(false);
           resetAllForms();
         },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to create user');
+        },
       });
     } else if (user) {
       updateUser({ id: user.id, data: requestBody }, {
@@ -194,16 +284,26 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
           toast.success('User updated successfully');
           onOpenChange(false);
         },
+        onError: (error) => {
+          toast.error(error.message || 'Failed to update user');
+        },
       });
     }
   };
 
   const resetAllForms = () => {
     userForm.reset();
-    studentForm.reset();
+    studentForm.reset({
+      gender: 'MALE',
+      nationality: 'Kenyan',
+      hasSpecialNeeds: false,
+    });
     teacherForm.reset();
     guardianForm.reset();
     setShowPassword(false);
+    setAutoGenerateAdmission(mode === 'create');
+    setAutoGenerateUPI(true);
+    setSelectedRole('STUDENT');
   };
 
   useEffect(() => {
@@ -338,6 +438,34 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                         {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </Button>
                     </div>
+                    {userForm.formState.errors.password && (
+                      <p className="text-sm text-destructive">{userForm.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {mode === 'edit' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Update Password (Optional)</Label>
+                    <div className="relative">
+                      <Input
+                        {...userForm.register('password')}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Leave blank to keep current password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {userForm.formState.errors.password && (
+                      <p className="text-sm text-destructive">{userForm.formState.errors.password.message}</p>
+                    )}
                   </div>
                 )}
               </div>
@@ -353,13 +481,74 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     Student Profile
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Admission Number *</Label>
-                      <Input {...studentForm.register('admissionNo')} placeholder="STU2024001" />
-                      {studentForm.formState.errors.admissionNo && (
-                        <p className="text-sm text-destructive">{studentForm.formState.errors.admissionNo.message}</p>
-                      )}
-                    </div>
+                    {mode === 'edit' ? (
+                      <div className="space-y-2">
+                        <Label>Admission Number</Label>
+                        <Input
+                          {...studentForm.register('admissionNo')}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Admission number cannot be changed in edit mode
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <Label>Admission Number *</Label>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="autoAdmission"
+                              checked={autoGenerateAdmission}
+                              onChange={(e) => setAutoGenerateAdmission(e.currentTarget.checked)}
+                            />
+                            <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
+                              Auto-generate
+                            </Label>
+                          </div>
+                        </div>
+
+                        {autoGenerateAdmission ? (
+                          <div className="relative">
+                            <Input
+                              value={previewAdmission?.preview || 'Will be auto-generated...'}
+                              disabled
+                              className="bg-muted"
+                            />
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => refreshPreview()}
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <Input
+                            {...studentForm.register('admissionNo')}
+                            placeholder="Enter admission number manually"
+                          />
+                        )}
+                        
+                        {previewAdmission && autoGenerateAdmission && (
+                          <p className="text-xs text-muted-foreground">
+                            Next available: {previewAdmission.preview}
+                          </p>
+                        )}
+                        
+                        {studentForm.formState.errors.admissionNo && !autoGenerateAdmission && (
+                          <p className="text-sm text-destructive">
+                            {studentForm.formState.errors.admissionNo.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label>Gender *</Label>
@@ -391,14 +580,59 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     </div>
 
                     <div className="space-y-2">
+                      <Label>Nationality</Label>
+                      <Input {...studentForm.register('nationality')} placeholder="Kenyan" />
+                    </div>
+
+                    <div className="space-y-2">
                       <Label>UPI Number</Label>
                       <Input {...studentForm.register('upiNumber')} placeholder="UPI Number" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>KEMIS UPI</Label>
+                      <Input {...studentForm.register('kemisUpi')} placeholder="KEMIS UPI" />
                     </div>
 
                     <div className="space-y-2">
                       <Label>County</Label>
                       <Input {...studentForm.register('county')} placeholder="Nairobi" />
                     </div>
+
+                    <div className="space-y-2">
+                      <Label>Sub County</Label>
+                      <Input {...studentForm.register('subCounty')} placeholder="Kilimani" />
+                    </div>
+                    
+                    <div className="space-y-2 flex items-center gap-2">
+                      <Controller
+                        name="hasSpecialNeeds"
+                        control={studentForm.control}
+                        render={({ field }) => (
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        )}
+                      />
+                      <Label>Has Special Needs?</Label>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Special Needs Type</Label>
+                      <Input {...studentForm.register('specialNeedsType')} placeholder="eg. Visual" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Medical Conditions</Label>
+                      <Input {...studentForm.register('medicalCondition')} placeholder="eg. Asthmatic" />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Allergies</Label>
+                      <Input {...studentForm.register('allergies')} placeholder="eg. Peanuts" />
+                    </div>
+
                   </div>
                 </div>
               </>
@@ -413,13 +647,27 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     Teacher Profile
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>TSC Number *</Label>
-                      <Input {...teacherForm.register('tscNumber')} placeholder="TSC123456" />
-                      {teacherForm.formState.errors.tscNumber && (
-                        <p className="text-sm text-destructive">{teacherForm.formState.errors.tscNumber.message}</p>
-                      )}
-                    </div>
+                    {mode === 'edit' ? (
+                      <div className="space-y-2">
+                        <Label>TSC Number</Label>
+                        <Input
+                          {...teacherForm.register('tscNumber')}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          TSC number cannot be changed in edit mode
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>TSC Number *</Label>
+                        <Input {...teacherForm.register('tscNumber')} placeholder="TSC123456" />
+                        {teacherForm.formState.errors.tscNumber && (
+                          <p className="text-sm text-destructive">{teacherForm.formState.errors.tscNumber.message}</p>
+                        )}
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label>Employment Type *</Label>

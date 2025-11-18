@@ -193,6 +193,7 @@ model Teacher {
   user           User     @relation(fields: [userId], references: [id])
   
   tscNumber      String   @unique
+  employeeNumber String   @unique
   employmentType EmploymentType
   qualification  String?  // Diploma, Degree, Masters, etc.
   specialization String?  // Subject specialization
@@ -217,6 +218,28 @@ enum EmploymentType {
   TEMPORARY
   BOM          // Board of Management
   PTA          // Parents Teachers Association
+}
+
+// ===== SEQUENCE GENERATOR =====
+
+model Sequence {
+  id        String   @id @default(uuid())
+  key       String   @unique  // Composite key: TYPE_SCHOOL_YEAR
+  type      String              // ADMISSION_NUMBER, EMPLOYEE_NUMBER, etc.
+  schoolId  String?             // Optional: for school-specific sequences
+  year      Int?                // Optional: for annually resetting sequences
+  
+  currentValue Int    @default(0)  // Current counter value
+  prefix       String?              // Prefix for formatting (e.g., "STU", "EMP")
+  
+  lastGeneratedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([type])
+  @@index([schoolId])
+  @@index([year])
+  @@index([type, schoolId, year])
 }
 
 // ===== ACADEMIC STRUCTURE =====

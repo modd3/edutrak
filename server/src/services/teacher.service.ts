@@ -4,6 +4,7 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
+import { sequenceGenerator } from './sequence-generator.service';
 
 export class TeacherService {
   private prisma: PrismaClient;
@@ -20,10 +21,15 @@ export class TeacherService {
     specialization?: string;
     dateJoined?: Date;
   }): Promise<Teacher> {
+    const { userId, ...rest } = data;
+    const employeeNumber = await sequenceGenerator.generateEmployeeNumber();
+
     const teacher = await this.prisma.teacher.create({
       data: {
         id: uuidv4(),
-        ...data,
+        employeeNumber,
+        ...rest,
+        user: { connect: { id: userId } },
       },
     });
 
@@ -47,7 +53,7 @@ export class TeacherService {
     schoolId?: string;
   }, createdBy: { userId: string; role: Role }) {
     
-    const { email, password, firstName, lastName, middleName, phone, idNumber, ...teacherData } = data;
+    const { email, password, firstName, lastName, middleName, phone, idNumber, schoolId, ...teacherData } = data;
 
     return await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -61,15 +67,17 @@ export class TeacherService {
           phone,
           idNumber,
           role: 'TEACHER',
-          schoolId: data.schoolId,
+          schoolId,
         },
       });
 
+      const employeeNumber = await sequenceGenerator.generateEmployeeNumber(schoolId);
       const teacher = await tx.teacher.create({
         data: {
           id: uuidv4(),
-          userId: user.id,
+          employeeNumber,
           ...teacherData,
+          user: { connect: { id: user.id } },
         },
         include: {
           user: true,
