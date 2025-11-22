@@ -1,4 +1,6 @@
-import { Request, Response } from 'express';
+// src/controllers/user.controller.ts
+import { Response } from 'express';
+import { RequestWithUser } from '../middleware/school-context';
 import { UserService } from '../services/user.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
@@ -7,106 +9,44 @@ import { Role } from '@prisma/client';
 const userService = new UserService();
 
 /**
- * Create a new user
+ * Get all users with school-based filtering
+ * Super admins see all users, others see only their school's users
  */
-export const createUser = async (req: Request, res: Response) => {
+export const getUsers = async (req: RequestWithUser, res: Response) => {
   try {
-    const { 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      middleName, 
-      phone, 
-      idNumber, 
-      role, 
-      schoolId 
-    } = req.body;
-
-    // Validate required fields
-    if (!email || !password || !firstName || !lastName || !role) {
-      return ResponseUtil.validationError(
-        res,
-        'email, password, firstName, lastName, and role are required'
-      );
-    }
-
-    // Validate role
-    if (!Object.values(Role).includes(role)) {
-      return ResponseUtil.validationError(
-        res,
-        `Invalid role. Must be one of: ${Object.values(Role).join(', ')}`
-      );
-    }
-
-    // Check if email already exists
-    const emailExists = await userService.checkEmailExists(email);
-    if (emailExists) {
-      return ResponseUtil.conflict(res, 'User with this email already exists');
-    }
-
-    // Check if ID number already exists (if provided)
-    if (idNumber) {
-      const idExists = await userService.checkIdNumberExists(idNumber);
-      if (idExists) {
-        return ResponseUtil.conflict(res, 'User with this ID number already exists');
-      }
-    }
-
-    const user = await userService.createUser({
-      email,
-      password,
-      firstName,
-      lastName,
-      middleName,
-      phone,
-      idNumber,
-      role,
-      schoolId,
-    });
-
-    logger.info('User created', { userId: user.id, createdBy: req.user?.userId });
-
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-
-    return ResponseUtil.created(res, 'User created successfully', userWithoutPassword);
-  } catch (err: any) {
-    logger.error('Error creating user', { error: err.message });
-    
-    if (err.code === 'P2002') {
-      return ResponseUtil.conflict(res, 'User with this email or ID number already exists');
-    }
-    
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get all users with filters
- */
-export const getUsers = async (req: Request, res: Response) => {
-  try {
-    const { role, schoolId, isActive, page, limit, search } = req.query;
+    const { role, isActive, page, limit, search } = req.query;
 
     // Validate role if provided
     const roleEnum = role && Object.values(Role).includes(role as Role) 
       ? (role as Role) 
       : undefined;
 
+    // Get school context from middleware
+    const schoolId = req.schoolId;
+    const requestingUserRole = req.user?.role;
+    const isSuperAdmin = req.isSuperAdmin || false;
+
     const result = await userService.getUsers({
+      schoolId, // Automatically filtered by school
       role: roleEnum,
-      schoolId: schoolId as string,
       isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
+      page: page ? parseInt(page as string) : 1,
+      limit: limit ? parseInt(limit as string) : 20,
       search: search as string,
+      requestingUserRole,
+    });
+
+    logger.info('Users fetched', {
+      userId: req.user?.userId,
+      schoolId,
+      isSuperAdmin,
+      count: result.data.length,
     });
 
     return ResponseUtil.paginated(
       res,
       'Users fetched successfully',
-      result.users,
+      result.data,
       result.pagination
     );
   } catch (err: any) {
@@ -116,18 +56,25 @@ export const getUsers = async (req: Request, res: Response) => {
 };
 
 /**
- * Get user by ID
+ * Get user by ID with school validation
  */
-export const getUserById = async (req: Request, res: Response) => {
+export const getUserById = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const user = await userService.getUserById(id);
-    console.log(user);
+    const user = await userService.getUserById(id, schoolId, isSuperAdmin);
 
     if (!user) {
       return ResponseUtil.notFound(res, 'User');
     }
+
+    logger.info('User fetched by ID', {
+      userId: req.user?.userId,
+      targetUserId: id,
+      schoolId,
+    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
@@ -140,86 +87,48 @@ export const getUserById = async (req: Request, res: Response) => {
 };
 
 /**
- * Get user by email
+ * Get user by email with school context
  */
-export const getUserByEmail = async (req: Request, res: Response) => {
+export const getUserByEmail = async (req: RequestWithUser, res: Response) => {
   try {
     const { email } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const user = await userService.getUserByEmail(email);
+    const user = await userService.getUserByEmail(email, schoolId, isSuperAdmin);
 
     if (!user) {
       return ResponseUtil.notFound(res, 'User');
     }
+
+    logger.info('User fetched by email', {
+      userId: req.user?.userId,
+      targetEmail: email,
+      schoolId,
+    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
     return ResponseUtil.success(res, 'User fetched successfully', userWithoutPassword);
   } catch (err: any) {
-    logger.error('Error fetching user by email', { error: err.message, email: req.params.email });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Update user
- */
-export const updateUser = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { email, firstName, lastName, middleName, phone, idNumber, isActive } = req.body;
-
-    const existing = await userService.getUserById(id);
-    if (!existing) {
-      return ResponseUtil.notFound(res, 'User');
-    }
-
-    // Check if email is being changed and if it already exists
-    if (email && email !== existing.email) {
-      const emailExists = await userService.checkEmailExists(email);
-      if (emailExists) {
-        return ResponseUtil.conflict(res, 'User with this email already exists');
-      }
-    }
-
-    // Check if ID number is being changed and if it already exists
-    if (idNumber && idNumber !== existing.idNumber) {
-      const idExists = await userService.checkIdNumberExists(idNumber);
-      if (idExists) {
-        return ResponseUtil.conflict(res, 'User with this ID number already exists');
-      }
-    }
-
-    const user = await userService.updateUser(id, {
-      email,
-      firstName,
-      lastName,
-      middleName,
-      phone,
-      idNumber,
-      isActive,
+    logger.error('Error fetching user by email', { 
+      error: err.message, 
+      email: req.params.email 
     });
-
-    logger.info('User updated', { userId: id, updatedBy: req.user?.userId });
-
-    // Remove password from response
-    const { password: _, ...userWithoutPassword } = user;
-
-    return ResponseUtil.success(res, 'User updated successfully', userWithoutPassword);
-  } catch (err: any) {
-    logger.error('Error updating user', { error: err.message, id: req.params.id });
     return ResponseUtil.serverError(res, err.message);
   }
 };
 
 /**
- * Change user password
+ * Change password with school validation
  */
-export const changePassword = async (req: Request, res: Response) => {
+export const changePassword = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
     const { currentPassword, newPassword } = req.body;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
     // Validate required fields
     if (!currentPassword || !newPassword) {
@@ -237,14 +146,27 @@ export const changePassword = async (req: Request, res: Response) => {
       );
     }
 
+    // Verify user belongs to same school (or is super admin)
+    const targetUser = await userService.getUserById(id, schoolId, isSuperAdmin);
+    if (!targetUser) {
+      return ResponseUtil.notFound(res, 'User');
+    }
+
     // Check if user is changing their own password or has admin rights
-    if (req.user?.userId !== id && req.user?.role !== 'SUPER_ADMIN' && req.user?.role !== 'ADMIN') {
+    const isSelf = req.user?.userId === id;
+    const isAdmin = req.user?.role === 'SUPER_ADMIN' || req.user?.role === 'ADMIN';
+
+    if (!isSelf && !isAdmin) {
       return ResponseUtil.forbidden(res, 'You can only change your own password');
     }
 
     await userService.changePassword(id, currentPassword, newPassword);
 
-    logger.info('Password changed', { userId: id, changedBy: req.user?.userId });
+    logger.info('Password changed', { 
+      userId: id, 
+      changedBy: req.user?.userId,
+      schoolId,
+    });
 
     return ResponseUtil.success(res, 'Password changed successfully');
   } catch (err: any) {
@@ -263,12 +185,14 @@ export const changePassword = async (req: Request, res: Response) => {
 };
 
 /**
- * Reset user password (admin only)
+ * Reset user password (admin only) with school validation
  */
-export const resetUserPassword = async (req: Request, res: Response) => {
+export const resetUserPassword = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
     const { newPassword } = req.body;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
     // Validate required field
     if (!newPassword) {
@@ -283,9 +207,19 @@ export const resetUserPassword = async (req: Request, res: Response) => {
       );
     }
 
-    const user = await userService.resetUserPassword(id, newPassword);
+    // Verify user belongs to same school
+    const targetUser = await userService.getUserById(id, schoolId, isSuperAdmin);
+    if (!targetUser) {
+      return ResponseUtil.notFound(res, 'User');
+    }
 
-    logger.info('User password reset', { userId: id, resetBy: req.user?.userId });
+    await userService.resetUserPassword(id, newPassword);
+
+    logger.info('User password reset', { 
+      userId: id, 
+      resetBy: req.user?.userId,
+      schoolId,
+    });
 
     return ResponseUtil.success(res, 'Password reset successfully');
   } catch (err: any) {
@@ -295,13 +229,16 @@ export const resetUserPassword = async (req: Request, res: Response) => {
 };
 
 /**
- * Activate user
+ * Activate user with school validation
  */
-export const activateUser = async (req: Request, res: Response) => {
+export const activateUser = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const existing = await userService.getUserById(id);
+    // Verify user belongs to same school
+    const existing = await userService.getUserById(id, schoolId, isSuperAdmin);
     if (!existing) {
       return ResponseUtil.notFound(res, 'User');
     }
@@ -312,7 +249,11 @@ export const activateUser = async (req: Request, res: Response) => {
 
     const user = await userService.activateUser(id);
 
-    logger.info('User activated', { userId: id, activatedBy: req.user?.userId });
+    logger.info('User activated', { 
+      userId: id, 
+      activatedBy: req.user?.userId,
+      schoolId,
+    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
@@ -325,13 +266,16 @@ export const activateUser = async (req: Request, res: Response) => {
 };
 
 /**
- * Deactivate user
+ * Deactivate user with school validation
  */
-export const deactivateUser = async (req: Request, res: Response) => {
+export const deactivateUser = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const existing = await userService.getUserById(id);
+    // Verify user belongs to same school
+    const existing = await userService.getUserById(id, schoolId, isSuperAdmin);
     if (!existing) {
       return ResponseUtil.notFound(res, 'User');
     }
@@ -347,7 +291,11 @@ export const deactivateUser = async (req: Request, res: Response) => {
 
     const user = await userService.deactivateUser(id);
 
-    logger.info('User deactivated', { userId: id, deactivatedBy: req.user?.userId });
+    logger.info('User deactivated', { 
+      userId: id, 
+      deactivatedBy: req.user?.userId,
+      schoolId,
+    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
@@ -360,13 +308,16 @@ export const deactivateUser = async (req: Request, res: Response) => {
 };
 
 /**
- * Delete user
+ * Delete user with school validation
  */
-export const deleteUser = async (req: Request, res: Response) => {
+export const deleteUser = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const existing = await userService.getUserById(id);
+    // Verify user belongs to same school
+    const existing = await userService.getUserById(id, schoolId, isSuperAdmin);
     if (!existing) {
       return ResponseUtil.notFound(res, 'User');
     }
@@ -376,9 +327,13 @@ export const deleteUser = async (req: Request, res: Response) => {
       return ResponseUtil.validationError(res, 'You cannot delete your own account');
     }
 
-    await userService.deleteUser(id);
+    await userService.deleteUser(id, schoolId, isSuperAdmin);
 
-    logger.info('User deleted', { userId: id, deletedBy: req.user?.userId });
+    logger.info('User deleted', { 
+      userId: id, 
+      deletedBy: req.user?.userId,
+      schoolId,
+    });
 
     return ResponseUtil.success(res, 'User deleted successfully');
   } catch (err: any) {
@@ -388,11 +343,11 @@ export const deleteUser = async (req: Request, res: Response) => {
 };
 
 /**
- * Get current user profile
+ * Get current user profile (always allowed)
  */
-export const getUserProfile = async (req: Request, res: Response) => {
+export const getUserProfile = async (req: RequestWithUser, res: Response) => {
   try {
-    const userId = req.user?.userId
+    const userId = req.user?.userId;
 
     if (!userId) {
       return ResponseUtil.unauthorized(res);
@@ -400,9 +355,14 @@ export const getUserProfile = async (req: Request, res: Response) => {
 
     const profile = await userService.getUserProfile(userId);
 
+    logger.info('Profile fetched', { userId });
+
     return ResponseUtil.success(res, 'Profile fetched successfully', profile);
   } catch (err: any) {
-    logger.error('Error fetching user profile', { error: err.message, userId: req.user?.userId });
+    logger.error('Error fetching user profile', { 
+      error: err.message, 
+      userId: req.user?.userId 
+    });
     
     if (err.message === 'User not found') {
       return ResponseUtil.notFound(res, 'User');
@@ -413,12 +373,19 @@ export const getUserProfile = async (req: Request, res: Response) => {
 };
 
 /**
- * Get users by school
+ * Get users by school (deprecated - use getUsers instead)
+ * Kept for backward compatibility
  */
-export const getUsersBySchool = async (req: Request, res: Response) => {
+export const getUsersBySchool = async (req: RequestWithUser, res: Response) => {
   try {
     const { schoolId } = req.params;
     const { role } = req.query;
+    const isSuperAdmin = req.isSuperAdmin || false;
+
+    // Validate school access
+    if (!isSuperAdmin && req.schoolId !== schoolId) {
+      return ResponseUtil.forbidden(res, 'Cannot access users from another school');
+    }
 
     // Validate role if provided
     const roleEnum = role && Object.values(Role).includes(role as Role) 
@@ -426,6 +393,12 @@ export const getUsersBySchool = async (req: Request, res: Response) => {
       : undefined;
 
     const users = await userService.getUsersBySchool(schoolId, roleEnum);
+
+    logger.info('School users fetched', {
+      userId: req.user?.userId,
+      schoolId,
+      role: roleEnum,
+    });
 
     return ResponseUtil.success(
       res,
@@ -443,13 +416,18 @@ export const getUsersBySchool = async (req: Request, res: Response) => {
 };
 
 /**
- * Get user statistics
+ * Get user statistics (school-filtered)
  */
-export const getUserStatistics = async (req: Request, res: Response) => {
+export const getUserStatistics = async (req: RequestWithUser, res: Response) => {
   try {
-    const { schoolId } = req.query;
+    const schoolId = req.schoolId; // From middleware
 
-    const statistics = await userService.getUserStatistics(schoolId as string);
+    const statistics = await userService.getUserStatistics(schoolId);
+
+    logger.info('User statistics fetched', {
+      userId: req.user?.userId,
+      schoolId,
+    });
 
     return ResponseUtil.success(res, 'User statistics fetched successfully', statistics);
   } catch (err: any) {
@@ -459,9 +437,9 @@ export const getUserStatistics = async (req: Request, res: Response) => {
 };
 
 /**
- * Verify user credentials (for login)
+ * Verify user credentials (for login - no school filtering needed)
  */
-export const verifyCredentials = async (req: Request, res: Response) => {
+export const verifyCredentials = async (req: RequestWithUser, res: Response) => {
   try {
     const { email, password } = req.body;
 
@@ -476,17 +454,27 @@ export const verifyCredentials = async (req: Request, res: Response) => {
       return ResponseUtil.unauthorized(res, 'Invalid email or password');
     }
 
-    logger.info('User credentials verified', { userId: user.id, email: user.email });
+    logger.info('User credentials verified', { 
+      userId: user.id, 
+      email: user.email,
+      schoolId: user.schoolId,
+    });
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
     return ResponseUtil.success(res, 'Credentials verified successfully', userWithoutPassword);
   } catch (err: any) {
-    logger.error('Error verifying credentials', { error: err.message, email: req.body.email });
+    logger.error('Error verifying credentials', { 
+      error: err.message, 
+      email: req.body.email 
+    });
     
     if (err.message === 'User account is deactivated') {
-      return ResponseUtil.forbidden(res, 'Your account has been deactivated. Please contact support.');
+      return ResponseUtil.forbidden(
+        res, 
+        'Your account has been deactivated. Please contact support.'
+      );
     }
     
     return ResponseUtil.serverError(res, err.message);
@@ -494,64 +482,86 @@ export const verifyCredentials = async (req: Request, res: Response) => {
 };
 
 /**
- * Bulk create users
+ * Check if email exists (school-filtered for non-super-admins)
  */
-export const bulkCreateUsers = async (req: Request, res: Response) => {
-  try {
-    const { users } = req.body;
-    const createdBy = req.user?.userId || 'system';
-
-    if (!users || !Array.isArray(users) || users.length === 0) {
-      return ResponseUtil.validationError(res, 'users array is required and must not be empty');
-    }
-
-    const results = await userService.bulkCreateUsers(users, createdBy);
-
-    logger.info('Bulk user creation completed', {
-      successful: results.successful.length,
-      failed: results.failed.length,
-      createdBy,
-    });
-
-    return ResponseUtil.success(
-      res,
-      `Bulk user creation completed. ${results.successful.length} successful, ${results.failed.length} failed`,
-      results
-    );
-  } catch (err: any) {
-    logger.error('Error in bulk user creation', { error: err.message });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Check if email exists
- */
-export const checkEmailExists = async (req: Request, res: Response) => {
+export const checkEmailExists = async (req: RequestWithUser, res: Response) => {
   try {
     const { email } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const exists = await userService.checkEmailExists(email);
+    const exists = await userService.checkEmailExists(email, schoolId, isSuperAdmin);
 
     return ResponseUtil.success(res, 'Email check completed', { exists });
   } catch (err: any) {
-    logger.error('Error checking email', { error: err.message, email: req.params.email });
+    logger.error('Error checking email', { 
+      error: err.message, 
+      email: req.params.email 
+    });
     return ResponseUtil.serverError(res, err.message);
   }
 };
 
 /**
- * Check if ID number exists
+ * Check if ID number exists (school-filtered for non-super-admins)
  */
-export const checkIdNumberExists = async (req: Request, res: Response) => {
+export const checkIdNumberExists = async (req: RequestWithUser, res: Response) => {
   try {
     const { idNumber } = req.params;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
 
-    const exists = await userService.checkIdNumberExists(idNumber);
+    const exists = await userService.checkIdNumberExists(idNumber, schoolId, isSuperAdmin);
 
     return ResponseUtil.success(res, 'ID number check completed', { exists });
   } catch (err: any) {
-    logger.error('Error checking ID number', { error: err.message, idNumber: req.params.idNumber });
+    logger.error('Error checking ID number', { 
+      error: err.message, 
+      idNumber: req.params.idNumber 
+    });
+    return ResponseUtil.serverError(res, err.message);
+  }
+};
+
+/**
+ * Bulk update users (admin only, school-filtered)
+ */
+export const bulkUpdateUsers = async (req: RequestWithUser, res: Response) => {
+  try {
+    const { userIds, updates } = req.body;
+    const schoolId = req.schoolId;
+    const isSuperAdmin = req.isSuperAdmin || false;
+
+    if (!userIds || !Array.isArray(userIds) || userIds.length === 0) {
+      return ResponseUtil.validationError(res, 'userIds array is required');
+    }
+
+    if (!updates || typeof updates !== 'object') {
+      return ResponseUtil.validationError(res, 'updates object is required');
+    }
+
+    // Prevent school changes unless super admin
+    if (!isSuperAdmin && updates.schoolId) {
+      return ResponseUtil.forbidden(res, 'Cannot change school assignment');
+    }
+
+    const results = await userService.bulkUpdateUsers(
+      userIds, 
+      updates, 
+      schoolId, 
+      isSuperAdmin
+    );
+
+    logger.info('Bulk user update', {
+      userId: req.user?.userId,
+      schoolId,
+      count: results.successful.length,
+      failed: results.failed.length,
+    });
+
+    return ResponseUtil.success(res, 'Bulk update completed', results);
+  } catch (err: any) {
+    logger.error('Error bulk updating users', { error: err.message });
     return ResponseUtil.serverError(res, err.message);
   }
 };

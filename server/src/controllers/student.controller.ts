@@ -3,51 +3,12 @@ import { StudentService } from '../services/student.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
+import { RequestWithUser } from '@/middleware/school-context';
 
 const studentService = new StudentService();
 
 export class StudentController {
-  async createStudent(req: Request, res: Response): Promise<Response> {
-    try {
-      const { admissionNo, firstName, lastName, gender, schoolId } = req.body;
-      
-      if (!admissionNo || !firstName || !lastName || !gender || !schoolId) {
-        return ResponseUtil.validationError(res, 'Required fields: admissionNo, firstName, lastName, gender, schoolId');
-      }
-
-      const student = await studentService.createStudent(req.body);
-      return ResponseUtil.created(res, 'Student created successfully', student);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Student with this admission number, UPI, or NEMIS UPI already exists');
-      }
-      return ResponseUtil.error(res, error.message, 400);
-    }
-  }
-
-  async createStudentWithUser(req: Request, res: Response): Promise<Response> {
-    try {
-      const currentUser = req.user!;
-      const { admissionNo, firstName, lastName, gender, schoolId, email } = req.body;
-      
-      if (!admissionNo || !firstName || !lastName || !gender || !schoolId || !email) {
-        return ResponseUtil.validationError(res, 'Required fields: admissionNo, firstName, lastName, gender, schoolId, email');
-      }
-
-      const student = await studentService.createStudentWithUser(req.body, {
-        userId: currentUser.userId,
-        role: currentUser.role as Role
-      });
-      return ResponseUtil.created(res, 'Student with user account created successfully', student);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Student or user with these details already exists');
-      }
-      return ResponseUtil.error(res, error.message, 400);
-    }
-  }
-
-  async getStudents(req: Request, res: Response): Promise<Response> {
+  async getStudents(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const filters = req.query;
       const result = await studentService.getStudents({
@@ -62,13 +23,13 @@ export class StudentController {
         search: filters.search as string,
       });
       
-      return ResponseUtil.paginated(res, 'Students retrieved successfully', result.students, result.pagination);
+      return ResponseUtil.paginated(res, 'Students retrieved successfully', result.data.students, result.pagination);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
     }
   }
 
-  async getStudentById(req: Request, res: Response): Promise<Response> {
+  async getStudentById(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
       
@@ -76,7 +37,11 @@ export class StudentController {
         return ResponseUtil.error(res, 'Student ID is required', 400);
       }
       
-      const student = await studentService.getStudentById(id);
+      const student = await studentService.getStudentById(
+        id,
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
       
       if (!student) {
         return ResponseUtil.notFound(res, 'Student');
@@ -88,7 +53,7 @@ export class StudentController {
     }
   }
 
-  async getStudentByAdmissionNo(req: Request, res: Response): Promise<Response> {
+  async getStudentByAdmissionNo(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { admissionNo } = req.params;
       
@@ -127,7 +92,7 @@ export class StudentController {
     }
   }
 
-  async enrollStudent(req: Request, res: Response): Promise<Response> {
+  async enrollStudent(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { studentId, classId, academicYearId } = req.body;
       
@@ -201,24 +166,6 @@ export class StudentController {
     }
   }
 
-  async addGuardianToStudent(req: Request, res: Response): Promise<Response> {
-    try {
-      const { studentId, guardianId } = req.body;
-      
-      if (!studentId || !guardianId) {
-        return ResponseUtil.validationError(res, 'Required fields: studentId, guardianId');
-      }
-
-      const relationship = await studentService.addGuardianToStudent(req.body);
-      return ResponseUtil.created(res, 'Guardian added to student successfully', relationship);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Guardian already assigned to this student');
-      }
-      return ResponseUtil.error(res, error.message, 400);
-    }
-  }
-
   async getStudentsByClass(req: Request, res: Response): Promise<Response> {
     try {
       const { classId } = req.params;
@@ -250,23 +197,41 @@ export class StudentController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
-
-  async bulkCreateStudents(req: Request, res: Response): Promise<Response> {
+  async deleteStudent(req: RequestWithUser, res: Response) {
     try {
-      const currentUser = req.user!;
-      const { students, schoolId } = req.body;
-      
-      if (!students || !Array.isArray(students) || students.length === 0) {
-        return ResponseUtil.validationError(res, 'Students array is required');
-      }
-      if (!schoolId) {
-        return ResponseUtil.validationError(res, 'School ID is required');
-      }
+      const { id } = req.params;
 
-      const result = await studentService.bulkCreateStudents(students, schoolId, currentUser.userId);
-      return ResponseUtil.success(res, 'Bulk student creation completed', result);
+      await studentService.deleteStudent(
+        id,
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
+
+      res.json({ message: 'Student deleted successfully' });
     } catch (error: any) {
-      return ResponseUtil.error(res, error.message, 400);
+      res.status(400).json({
+        error: 'DELETE_STUDENT_FAILED',
+        message: error.message,
+      });
+    }
+  }
+
+  /**
+   * Get student statistics
+   */
+  async getStudentStatistics(req: RequestWithUser, res: Response) {
+    try {
+      const stats = await studentService.getStudentStatistics(
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
+
+      res.json({ data: stats });
+    } catch (error: any) {
+      res.status(400).json({
+        error: 'GET_STATS_FAILED',
+        message: error.message,
+      });
     }
   }
 }

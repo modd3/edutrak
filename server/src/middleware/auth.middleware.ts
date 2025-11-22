@@ -3,6 +3,7 @@ import { verifyToken, JwtPayload } from '../utils/jwt';
 import { ResponseUtil } from '../utils/response';
 import { Role } from '@prisma/client';
 import logger from '../utils/logger';
+import { RequestWithUser } from './school-context';
 
 // Extend Express Request to include user
 declare global {
@@ -17,7 +18,7 @@ declare global {
  * Authenticate middleware - verifies JWT token
  */
 export const authenticate = async (
-  req: Request,
+  req: RequestWithUser,
   res: Response,
   next: NextFunction
 ): Promise<void> => {
@@ -78,6 +79,33 @@ export const authorize = (...allowedRoles: Role[]) => {
   };
 };
 
+// Convenience role guards
+export const requireSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    ResponseUtil.unauthorized(res, 'Authentication required');
+    return;
+  }
+  if (req.user.role !== 'SUPER_ADMIN') {
+    logger.warn('Super admin required', { userId: req.user.userId, role: req.user.role });
+    ResponseUtil.forbidden(res, 'Super admin privileges required');
+    return;
+  }
+  next();
+};
+
+export const requireAdminOrSuperAdmin = (req: Request, res: Response, next: NextFunction): void => {
+  if (!req.user) {
+    ResponseUtil.unauthorized(res, 'Authentication required');
+    return;
+  }
+  if (req.user.role !== 'ADMIN' && req.user.role !== 'SUPER_ADMIN') {
+    logger.warn('Admin or Super Admin required', { userId: req.user.userId, role: req.user.role });
+    ResponseUtil.forbidden(res, 'Admin or Super Admin role required');
+    return;
+  }
+  next();
+};
+
 /**
  * Optional authentication - doesn't fail if no token provided
  */
@@ -122,7 +150,7 @@ export const checkSchoolAccess = (req: Request, res: Response, next: NextFunctio
   }
 
   // Check if user belongs to the school
-  if (req.user.schoolId !== schoolId) {
+  if (!req.user.schoolId || req.user.schoolId !== schoolId) {
     logger.warn('School access denied', {
       userId: req.user.userId,
       userSchoolId: req.user.schoolId,

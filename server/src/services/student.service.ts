@@ -4,134 +4,18 @@ import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
+import { BaseService } from './base.service'
 
-export class StudentService {
-  private prisma: PrismaClient;
+export class StudentService extends BaseService {
 
-  constructor() {
-    this.prisma = prisma;
-  }
-
-  async createStudent(data: {
-    admissionNo: string;
-    upiNumber?: string;
-    kemisUpi?: string;
-    firstName: string;
-    middleName?: string;
-    lastName: string;
-    gender: Gender;
-    dob?: Date;
-    birthCertNo?: string;
-    nationality?: string;
-    county?: string;
-    subCounty?: string;
-    hasSpecialNeeds?: boolean;
-    specialNeedsType?: string;
-    medicalCondition?: string;
-    allergies?: string;
-    schoolId?: string;
-    userId?: string;
-  }): Promise<Student> {
-    const student = await this.prisma.student.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
-
-    logger.info('Student created successfully', { studentId: student.id, admissionNo: student.admissionNo });
-    return student;
-  }
-
-  async createStudentWithUser(data: {
-    admissionNo: string;
-    upiNumber?: string;
-    kemisUpi?: string;
-    firstName: string;
-    middleName?: string;
-    lastName: string;
-    gender: Gender;
-    dob?: Date;
-    birthCertNo?: string;
-    nationality?: string;
-    county?: string;
-    subCounty?: string;
-    hasSpecialNeeds?: boolean;
-    specialNeedsType?: string;
-    medicalCondition?: string;
-    allergies?: string;
-    schoolId?: string;
-    email?: string;
-    phone?: string;
-  }, createdBy: { userId: string; role: Role }) {
-    
-    const { email, phone, ...studentData } = data;
-
-    return await this.prisma.$transaction(async (tx) => {
-      let userId: string | undefined;
-
-      if (email) {
-        const temporaryPassword = this.generateTemporaryPassword();
-        const user = await tx.user.create({
-          data: {
-            id: uuidv4(),
-            email,
-            password: await hashPassword(temporaryPassword),
-            firstName: studentData.firstName,
-            lastName: studentData.lastName,
-            middleName: studentData.middleName,
-            phone,
-            role: 'STUDENT',
-            schoolId: studentData.schoolId,
-          },
-        });
-        userId = user.id;
-
-        // Send welcome email with temporary password
-        try {
-          await emailService.sendWelcomeEmail(
-            email, 
-            `${studentData.firstName} ${studentData.lastName}`,
-            temporaryPassword
-          );
-        } catch (error) {
-          logger.warn('Failed to send welcome email to student', { email, error });
-        }
-      }
-
-      const student = await tx.student.create({
-        data: {
-          id: uuidv4(),
-          ...studentData,
-          userId,
-        },
-        include: {
-          user: true,
-        },
-      });
-
-      logger.info('Student with user account created successfully', { 
-        studentId: student.id, 
-        admissionNo: student.admissionNo,
-        createdBy: createdBy.userId 
-      });
-
-      return student;
-    });
-  }
-
-  private generateTemporaryPassword(): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let password = '';
-    for (let i = 0; i < 8; i++) {
-      password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password + 'A1!';
-  }
+  /*
+  ** Get all students
+  */ 
 
   async getStudents(filters?: {
     schoolId?: string;
     gender?: Gender;
+    isSuperAdmin?: boolean;
     hasSpecialNeeds?: boolean;
     classId?: string;
     streamId?: string;
@@ -140,9 +24,20 @@ export class StudentService {
     limit?: number;
     search?: string;
   }) {
+    const {
+      schoolId,
+      gender,
+      isSuperAdmin,
+      hasSpecialNeeds,
+      classId,
+      streamId,
+      status,
+      search,
+    } = filters;
+
     const where: any = {};
 
-    if (filters?.schoolId) where.schoolId = filters.schoolId;
+    if (schoolId) where.schoolId = schoolId;
     if (filters?.gender) where.gender = filters.gender;
     if (filters?.hasSpecialNeeds !== undefined) where.hasSpecialNeeds = filters.hasSpecialNeeds;
 
@@ -151,12 +46,12 @@ export class StudentService {
         some: {
           ...(filters.classId && { classId: filters.classId }),
           ...(filters.streamId && { streamId: filters.streamId }),
-          ...(filters.status && { status: filters.status }),
+          ...(status && { status: filters.status }),
         },
       };
     }
 
-    if (filters?.search) {
+    if (search) {
       where.OR = [
         { firstName: { contains: filters.search, mode: 'insensitive' } },
         { lastName: { contains: filters.search, mode: 'insensitive' } },
@@ -171,8 +66,7 @@ export class StudentService {
     const limit = filters?.limit || 10;
     const skip = (page - 1) * limit;
 
-    const [students, total] = await Promise.all([
-      this.prisma.student.findMany({
+    return this.getPaginated('student', {
         where,
         include: {
           school: {
@@ -201,29 +95,34 @@ export class StudentService {
             },
           },
         },
-        skip,
-        take: limit,
-        orderBy: { admissionNo: 'asc' },
-      }),
-      this.prisma.student.count({ where })
-    ]);
-
-    return {
-      students,
-      pagination: {
-        page,
-        limit,
-        total,
-        pages: Math.ceil(total / limit),
-      }
-    };
+        orderBy: { admissionNo: 'asc',
+          createdAt: 'desc'
+         },
+         page,
+         limit,
+         schoolId,
+         isSuperAdmin
+      });
   }
 
-  async getStudentById(id: string): Promise<Student | null> {
-    return await this.prisma.student.findUnique({
-      where: { id },
+  async getStudentById(
+    studentId: string,
+    schoolId?: string,
+    isSuperAdmin: boolean = false
+  ) {
+    const where = this.buildWhereClause({id: studentId}, schoolId, isSuperAdmin);
+
+    const student =  await this.prisma.student.findFirst({
+      where,
       include: {
-        school: true,
+        school: {
+          select: {
+            name: true,
+            county: true,
+            gender: true,
+            boardingStatus: true
+          }
+        },
         user: true,
         enrollments: {
           include: {
@@ -261,11 +160,18 @@ export class StudentService {
         },
       },
     });
+    return student;
   }
 
-  async getStudentByAdmissionNo(admissionNo: string): Promise<Student | null> {
+  async getStudentByAdmissionNo(
+    admissionNo: string,
+    schoolId?: string,
+    isSuperAdmin: boolean = false
+  ) {
+    const where = this.buildWhereClause({admissionNo: admissionNo}, schoolId, isSuperAdmin);
+
     return await this.prisma.student.findUnique({
-      where: { admissionNo },
+      where,
       include: {
         school: true,
         enrollments: {
@@ -289,16 +195,59 @@ export class StudentService {
     });
   }
 
-  async updateStudent(id: string, data: Partial<Student>): Promise<Student> {
+  async updateStudent(
+    studentId: string,
+    data: Partial<Student>,
+    schoolId?: string,
+    isSuperAdmin: boolean = false
+  ): Promise<Student> {
+
+    const hasAccess = await this.validateSchoolAccess(
+      studentId,
+      'student',
+      schoolId,
+      isSuperAdmin
+    );
+
+    if (!hasAccess) {
+      throw new Error('Student not found or access denied!')
+    }
     const student = await this.prisma.student.update({
-      where: { id },
+      where: { id: studentId },
       data,
+      include: {
+        user: true,
+        school: true
+      }
     });
 
-    logger.info('Student updated successfully', { studentId: id });
+    logger.info('Student updated successfully', { studentId: studentId });
     return student;
   }
 
+  async deleteStudent(
+    studentId: string,
+    schoolId?: string,
+    isSuperAdmin: boolean = false
+  ) {
+    const hasAccess = await this.validateSchoolAccess(
+      studentId,
+      'student',
+      schoolId,
+      isSuperAdmin
+    );
+
+    if (!hasAccess) {
+      throw new Error('Student not found or access denied');
+    }
+
+    // This should cascade delete the user as well
+    return await this.prisma.student.delete({
+      where: { id: studentId },
+    });
+  }
+
+  
   async enrollStudent(data: {
     studentId: string;
     classId: string;
@@ -586,34 +535,24 @@ export class StudentService {
       totalAssessments: results.length,
     };
   }
+  async getStudentStatistics(schoolId?: string, isSuperAdmin: boolean = false) {
+    const where = this.buildWhereClause({}, schoolId, isSuperAdmin);
 
-  async bulkCreateStudents(students: any[], schoolId: string, createdBy: string) {
-    const results = {
-      successful: [] as any[],
-      failed: [] as any[],
+    return {
+      total: await this.prisma.student.count({ where }),
+      byGender: await this.prisma.student.groupBy({
+        by: ['gender'],
+        where,
+        _count: true,
+      }),
+      byClass: await this.prisma.studentClass.groupBy({
+        by: ['classId'],
+        where: {
+          student: where,
+          status: 'ACTIVE',
+        },
+        _count: true,
+      }),
     };
-
-    for (const studentData of students) {
-      try {
-        const student = await this.createStudent({
-          ...studentData,
-          schoolId,
-        });
-        results.successful.push(student);
-      } catch (error: any) {
-        results.failed.push({
-          data: studentData,
-          error: error.message,
-        });
-      }
-    }
-
-    logger.info('Bulk student creation completed', {
-      successful: results.successful.length,
-      failed: results.failed.length,
-      createdBy,
-    });
-
-    return results;
   }
 }

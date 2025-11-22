@@ -1,8 +1,7 @@
-// services/user-creation.service.ts
 import { PrismaClient, Role } from '@prisma/client';
+import { BaseService } from './base.service';
 import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
 import logger from '../utils/logger';
 import { sequenceGenerator, SequenceType } from './sequence-generator.service';
 
@@ -19,7 +18,7 @@ interface BaseUserData {
 }
 
 interface StudentProfileData {
-  admissionNo: string;
+  admissionNo?: string; // Optional - auto-generated if not provided
   upiNumber?: string;
   kemisUpi?: string;
   gender: 'MALE' | 'FEMALE';
@@ -37,7 +36,6 @@ interface StudentProfileData {
 interface TeacherProfileData {
   tscNumber: string;
   employmentType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'BOM' | 'PTA';
-  employeeNumber?: string;
   qualification?: string;
   specialization?: string;
   dateJoined?: Date;
@@ -50,20 +48,31 @@ interface GuardianProfileData {
   workPhone?: string;
 }
 
-export class UserCreationService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = prisma;
-  }
-
+/**
+ * CRITICAL SERVICE
+ * This is the ONLY service that should create users with profiles
+ * Ensures atomicity and data consistency through transactions
+ */
+export class UserCreationService extends BaseService {
   /**
-   * Create user with role-specific profile in a single transaction
+   * Create user with role-specific profile in a single atomic transaction
+   * This is the PRIMARY method for creating any user in the system
    */
   async createUserWithProfile(
     userData: BaseUserData,
-    profileData?: StudentProfileData | TeacherProfileData | GuardianProfileData
+    profileData?: StudentProfileData | TeacherProfileData | GuardianProfileData,
+    schoolId?: string, // From middleware for school validation
+    isSuperAdmin: boolean = false
   ) {
+    // Validate school context
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        throw new Error('School context required for non-super-admin users');
+      }
+      // Ensure userData.schoolId matches context schoolId
+      userData.schoolId = schoolId;
+    }
+
     // Hash password
     const hashedPassword = await hashPassword(userData.password);
 
@@ -89,17 +98,30 @@ export class UserCreationService {
       });
 
       // 2. Create role-specific profile based on user role
+      let profile = null;
       switch (userData.role) {
         case 'STUDENT':
-          await this.createStudentProfile(tx, user.id, profileData as StudentProfileData, userData.schoolId, userData);
+          profile = await this.createStudentProfile(
+            tx,
+            user,
+            profileData as StudentProfileData
+          );
           break;
 
         case 'TEACHER':
-          await this.createTeacherProfile(tx, user.id, profileData as TeacherProfileData);
+          profile = await this.createTeacherProfile(
+            tx,
+            user,
+            profileData as TeacherProfileData
+          );
           break;
 
         case 'PARENT':
-          await this.createGuardianProfile(tx, user.id, profileData as GuardianProfileData);
+          profile = await this.createGuardianProfile(
+            tx,
+            user,
+            profileData as GuardianProfileData
+          );
           break;
 
         case 'ADMIN':
@@ -112,11 +134,16 @@ export class UserCreationService {
           throw new Error(`Unsupported role: ${userData.role}`);
       }
 
-      // 3. Fetch the complete user with profile
+      // 3. Fetch the complete user with all relations
       const completeUser = await tx.user.findUnique({
         where: { id: user.id },
         include: {
-          school: true,
+          school: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
           student: true,
           teacher: true,
           guardian: true,
@@ -127,9 +154,17 @@ export class UserCreationService {
         userId: user.id,
         email: user.email,
         role: user.role,
+        schoolId: userData.schoolId,
       });
 
-      return completeUser;
+      // Remove password before returning
+      if (completeUser) {
+        const { password, ...userWithoutPassword } = completeUser;
+        return userWithoutPassword;
+      }
+
+      const { password, ...userWithoutPassword } = user;
+      return userWithoutPassword;
     });
   }
 
@@ -141,11 +176,8 @@ export class UserCreationService {
     profileData?: StudentProfileData | TeacherProfileData | GuardianProfileData
   ) {
     if (role === 'STUDENT') {
-      if (!profileData /*|| !('admissionNo' in profileData)*/) {
-        throw new Error('Student profile data with admissionNo is required');
-      }
-      if (!('gender' in profileData)) {
-        throw new Error('Student gender is required');
+      if (!profileData || !('gender' in profileData)) {
+        throw new Error('Student profile data with gender is required');
       }
     }
 
@@ -166,27 +198,30 @@ export class UserCreationService {
   }
 
   /**
-   * Create student profile
+   * Create student profile (PRIVATE - only called within transaction)
    */
   private async createStudentProfile(
     tx: any,
-    userId: string,
-    profileData: StudentProfileData,
-    schoolId?: string,
-    userData?: BaseUserData
+    user: any,
+    profileData: StudentProfileData
   ) {
     // Auto-generate admission number if not provided
     let admissionNo = profileData.admissionNo;
-    
-    if (!admissionNo) {
-      admissionNo = await sequenceGenerator.generateAdmissionNumber(schoolId);
-      logger.info(`Auto-generated admission number: ${admissionNo}`, { admissionNo, schoolId });
-    } else {
-      // Validate uniqueness if manually provided
+
+    if (!admissionNo && user.schoolId) {
+      admissionNo = await sequenceGenerator.generateNext(
+        SequenceType.ADMISSION_NUMBER,
+        user.schoolId
+      );
+      logger.info('Auto-generated admission number', { admissionNo, schoolId: user.schoolId });
+    }
+
+    // Validate uniqueness if manually provided
+    if (admissionNo) {
       const existing = await tx.student.findUnique({
         where: { admissionNo },
       });
-      
+
       if (existing) {
         throw new Error(`Student with admission number ${admissionNo} already exists`);
       }
@@ -194,28 +229,27 @@ export class UserCreationService {
 
     // Auto-generate UPI if not provided
     let upiNumber = profileData.upiNumber;
-    if (!upiNumber) {
-      // Format: COUNTRY-SCHOOL-YEAR-SEQUENCE
+    if (!upiNumber && user.schoolId && admissionNo) {
       const year = new Date().getFullYear();
-      const schoolCode = schoolId?.substring(0, 4).toUpperCase() || 'XXXX';
-      const sequence = await sequenceGenerator.generateNext(
-        SequenceType.ADMISSION_NUMBER,
-        schoolId
-      );
-      upiNumber = `KE-${schoolCode}-${year}-${sequence}`;
+      const schoolCode = user.schoolId.substring(0, 4).toUpperCase();
+      upiNumber = `KE-${schoolCode}-${year}-${admissionNo}`;
     }
 
     return await tx.student.create({
       data: {
         id: uuidv4(),
-        userId,
-        schoolId,
-        admissionNo,
+        userId: user.id,
+        schoolId: user.schoolId,
+
+        // Required name fields
+        firstName: user.firstName,
+        lastName: user.lastName,
+        middleName: user.middleName,
+
+        // Student-specific fields
+        admissionNo: admissionNo!,
         upiNumber,
         kemisUpi: profileData.kemisUpi,
-        firstName: userData?.firstName || '',
-        lastName: userData?.lastName || '',
-        middleName: userData?.middleName || '',
         gender: profileData.gender,
         dob: profileData.dob,
         birthCertNo: profileData.birthCertNo,
@@ -230,36 +264,28 @@ export class UserCreationService {
     });
   }
 
-
   /**
-   * Create teacher profile
+   * Create teacher profile (PRIVATE - only called within transaction)
    */
   private async createTeacherProfile(
     tx: any,
-    userId: string,
-    profileData: TeacherProfileData,
-    schoolId?: string
+    user: any,
+    profileData: TeacherProfileData
   ) {
     // Validate TSC number uniqueness
-    if (profileData.tscNumber) {
-      const existing = await tx.teacher.findUnique({
-        where: { tscNumber: profileData.tscNumber },
-      });
+    const existing = await tx.teacher.findUnique({
+      where: { tscNumber: profileData.tscNumber },
+    });
 
-      if (existing) {
-        throw new Error(`Teacher with TSC number ${profileData.tscNumber} already exists`);
-      }
+    if (existing) {
+      throw new Error(`Teacher with TSC number ${profileData.tscNumber} already exists`);
     }
-
-    // Auto-generate employee number for internal tracking
-    const employeeNumber = await sequenceGenerator.generateEmployeeNumber(schoolId);
 
     return await tx.teacher.create({
       data: {
         id: uuidv4(),
-        userId,
+        userId: user.id,
         tscNumber: profileData.tscNumber,
-        employeeNumber, // Store for internal reference
         employmentType: profileData.employmentType,
         qualification: profileData.qualification,
         specialization: profileData.specialization,
@@ -269,17 +295,17 @@ export class UserCreationService {
   }
 
   /**
-   * Create guardian profile
+   * Create guardian profile (PRIVATE - only called within transaction)
    */
   private async createGuardianProfile(
     tx: any,
-    userId: string,
+    user: any,
     profileData: GuardianProfileData
   ) {
     return await tx.guardian.create({
       data: {
         id: uuidv4(),
-        userId,
+        userId: user.id,
         relationship: profileData.relationship,
         occupation: profileData.occupation,
         employer: profileData.employer,
@@ -296,7 +322,9 @@ export class UserCreationService {
       user: BaseUserData;
       profile?: StudentProfileData | TeacherProfileData | GuardianProfileData;
     }>,
-    createdBy: string
+    schoolId?: string,
+    isSuperAdmin: boolean = false,
+    createdBy?: string
   ) {
     const results = {
       successful: [] as any[],
@@ -305,7 +333,12 @@ export class UserCreationService {
 
     for (const userData of usersData) {
       try {
-        const user = await this.createUserWithProfile(userData.user, userData.profile);
+        const user = await this.createUserWithProfile(
+          userData.user,
+          userData.profile,
+          schoolId,
+          isSuperAdmin
+        );
         results.successful.push(user);
       } catch (error: any) {
         results.failed.push({
@@ -315,9 +348,10 @@ export class UserCreationService {
       }
     }
 
-    logger.info('Bulk user creation with profiles completed', {
+    logger.info('Bulk user creation completed', {
       successful: results.successful.length,
       failed: results.failed.length,
+      schoolId,
       createdBy,
     });
 
@@ -330,7 +364,9 @@ export class UserCreationService {
   async updateUserWithProfile(
     userId: string,
     userData: Partial<BaseUserData>,
-    profileData?: Partial<StudentProfileData | TeacherProfileData | GuardianProfileData>
+    profileData?: Partial<StudentProfileData | TeacherProfileData | GuardianProfileData>,
+    schoolId?: string,
+    isSuperAdmin: boolean = false
   ) {
     return await this.prisma.$transaction(async (tx) => {
       // Get current user to know their role
@@ -340,6 +376,16 @@ export class UserCreationService {
 
       if (!currentUser) {
         throw new Error('User not found');
+      }
+
+      // Validate school access
+      if (!isSuperAdmin && schoolId && currentUser.schoolId !== schoolId) {
+        throw new Error('Access denied: User does not belong to your school');
+      }
+
+      // Prevent changing school unless super admin
+      if (!isSuperAdmin && userData.schoolId && userData.schoolId !== currentUser.schoolId) {
+        throw new Error('Cannot transfer user to another school');
       }
 
       // Update user
@@ -362,10 +408,12 @@ export class UserCreationService {
           case 'STUDENT':
             await tx.student.update({
               where: { userId },
-              data: {...profileData as Partial<StudentProfileData>,
+              data: {
+                ...profileData as Partial<StudentProfileData>,
+                // Sync name fields
                 ...(userData.firstName && { firstName: userData.firstName }),
-                ...(userData.lastName && { lastName: userData.lastName}),
-                ...(userData.middleName && { middleName: userData.middleName}),
+                ...(userData.lastName && { lastName: userData.lastName }),
+                ...(userData.middleName !== undefined && { middleName: userData.middleName }),
               },
             });
             break;
@@ -384,22 +432,10 @@ export class UserCreationService {
             });
             break;
         }
-      } else if (
-        currentUser.role === 'STUDENT' &&
-        userData.firstName || userData.lastName || userData.middleName !== undefined
-      ) {
-        await tx.student.update ({
-          where: {userId},
-          data: {
-            ...(userData.firstName && { firstName: userData.firstName}),
-            ...(userData.lastName && { lastName: userData.lastName}),
-            ...(userData.middleName && { middleName: userData.middleName}),
-          }
-        });
       }
 
       // Return complete user
-      return await tx.user.findUnique({
+      const completeUser = await tx.user.findUnique({
         where: { id: userId },
         include: {
           school: true,
@@ -408,9 +444,16 @@ export class UserCreationService {
           guardian: true,
         },
       });
+
+      if (completeUser) {
+        const { password, ...userWithoutPassword } = completeUser;
+        return userWithoutPassword;
+      }
+
+      return user;
     });
+
   }
 }
 
-// Export singleton instance
 export const userCreationService = new UserCreationService();

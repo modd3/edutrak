@@ -151,7 +151,8 @@ model Student {
   updatedAt       DateTime  @updatedAt
   
   @@index([schoolId])
-  @@index([admissionNo])
+  @@index([schoolId, admissionNo])
+  @@index([schoolId, gender])
 }
 
 enum Gender {
@@ -260,6 +261,7 @@ model AcademicYear {
   updatedAt DateTime @updatedAt
   
   @@index([isActive])
+  @@index([schoolId])
 }
 
 model Term {
@@ -280,6 +282,8 @@ model Term {
   
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
+  @@index([academicYearId, schoolId])
+  @@index([schoolId])
 }
 
 enum TermName {
@@ -319,6 +323,8 @@ model Class {
   @@unique([name, academicYearId, schoolId])
   @@index([curriculum])
   @@index([schoolId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, level])
 }
 
 enum Curriculum {
@@ -432,6 +438,7 @@ model SubjectOffering {
   isActive  Boolean  @default(true)
   
   @@unique([schoolId, subjectId])
+  @@index([schoolId])
 }
 
 model ClassSubject {
@@ -456,6 +463,9 @@ model ClassSubject {
   
   @@unique([classId, subjectId, termId, academicYearId])
   @@index([teacherId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
+  @@index([schoolId, termId])
 }
 
 // ===== STUDENT ENROLLMENT =====
@@ -492,6 +502,8 @@ model StudentClass {
   @@index([studentId])
   @@index([classId])
   @@index([status])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
 }
 
 enum EnrollmentStatus {
@@ -560,6 +572,8 @@ model AssessmentDefinition {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  @@index([schoolId])
+  @@index([academicYearId])
   @@index([termId])
   @@index([classSubjectId])
   @@index([strandId])
@@ -595,6 +609,7 @@ model AssessmentResult {
   
   // A student can only have one result per assessment
   @@unique([studentId, assessmentDefId]) 
+  @@index([schoolId])
   @@index([studentId])
   @@index([assessmentDefId])
   @@index([assessedById])
