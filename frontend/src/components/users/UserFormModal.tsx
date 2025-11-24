@@ -1,7 +1,6 @@
-// Enhanced UserFormModal with conditional profile fields
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { date, z } from 'zod';
+import { z } from 'zod';
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,8 +12,9 @@ import { Separator } from '@/components/ui/separator';
 import { User, Role } from '@/types';
 import { useCreateUserWithProfile, useUpdateUserWithProfile } from '@/hooks/use-users';
 import { useSchools } from '@/hooks/use-schools';
+import { useSchoolContext, isSuperAdmin } from '@/hooks/use-school-context';
 import { toast } from 'sonner';
-import { UserIcon, Eye, EyeOff, GraduationCap, BookOpen, Users, Sparkles, RefreshCw } from 'lucide-react';
+import { UserIcon, Eye, EyeOff, GraduationCap, BookOpen, Users, Sparkles, RefreshCw, Building2 } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
 import { usePreviewSequence } from '@/hooks/use-sequences';
 
@@ -86,6 +86,15 @@ const ROLE_OPTIONS = [
   { value: 'SUPPORT_STAFF', label: 'Support Staff' },
 ];
 
+const getRoleOptions = (isSuperAdmin: boolean) => {
+  const allRoles = ROLE_OPTIONS;
+
+  if (!isSuperAdmin) {
+    return allRoles.filter(role => role.value !== 'SUPER_ADMIN');
+  }
+  return allRoles;
+}
+
 const EMPLOYMENT_TYPES = [
   { value: 'PERMANENT', label: 'Permanent' },
   { value: 'CONTRACT', label: 'Contract' },
@@ -99,10 +108,12 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   const [autoGenerateUPI, setAutoGenerateUPI] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role>(user?.role as Role || 'STUDENT');
-
+  
   const { mutate: createUser, isPending: isCreating } = useCreateUserWithProfile();
   const { mutate: updateUser, isPending: isUpdating } = useUpdateUserWithProfile();
   const { data: schoolsResponse } = useSchools({ limit: 100 });
+  const { schoolId, schoolName, isSuperAdmin } = useSchoolContext();
+  const roleOptions = getRoleOptions(isSuperAdmin);
   const isLoading = isCreating || isUpdating;
 
   // Base user form
@@ -117,7 +128,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       phone: '',
       idNumber: '',
       role: 'STUDENT',
-      schoolId: '',
+      schoolId: schoolId || '',
     },
   });
 
@@ -154,10 +165,16 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     setSelectedRole(watchedRole as Role);
   }, [watchedRole]);
 
+  // Set schoolId when modal opens for non-super-admins
+  useEffect(() => {
+    if (open && !isSuperAdmin && schoolId && mode === 'create') {
+      userForm.setValue('schoolId', schoolId);
+    }
+  }, [open, isSuperAdmin, schoolId, mode, userForm]);
+
   // Populate forms when user data changes (edit mode)
   useEffect(() => {
     if (mode === 'edit' && user && open) {
-      // Reset all forms with user data
       userForm.reset({
         email: user.email,
         firstName: user.firstName,
@@ -167,10 +184,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         idNumber: user.idNumber || '',
         role: user.role as Role,
         schoolId: user.schoolId || '',
-        password: '', // Empty password for edit mode
+        password: '',
       });
 
-      // Populate role-specific forms
       if (user.role === 'STUDENT' && user.student) {
         studentForm.reset({
           admissionNo: user.student.admissionNo,
@@ -187,7 +203,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
           medicalCondition: user.student.medicalCondition || '',
           allergies: user.student.allergies || '',
         });
-        setAutoGenerateAdmission(false); // Disable auto-generation in edit mode
+        setAutoGenerateAdmission(false);
       }
 
       if (user.role === 'TEACHER' && user.teacher) {
@@ -212,6 +228,16 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   }, [mode, user, open, userForm, studentForm, teacherForm, guardianForm]);
 
   const onSubmit = async () => {
+
+    if (!isSuperAdmin && userForm.getValues().role === 'SUPER_ADMIN') {
+      toast.error("Can not create Super Admin. Limited previleges!");
+    }
+
+    // Ensure non-super-admins can't change school
+    if (!isSuperAdmin && schoolId) {
+      userForm.setValue('schoolId', schoolId);
+    }
+
     // Validate base user form
     const isUserValid = await userForm.trigger();
     if (!isUserValid) {
@@ -235,7 +261,6 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         return;
       }
       profileData = studentForm.getValues();
-      // Handle auto-generated admission number
       if (autoGenerateAdmission && mode === 'create' && previewAdmission?.preview) {
         profileData.admissionNo = previewAdmission.preview;
       }
@@ -274,8 +299,8 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
           onOpenChange(false);
           resetAllForms();
         },
-        onError: (error) => {
-          toast.error(error.message || 'Failed to create user');
+        onError: (error: any) => {
+          toast.error(error.response?.data?.message || 'Failed to create user');
         },
       });
     } else if (user) {
@@ -284,15 +309,25 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
           toast.success('User updated successfully');
           onOpenChange(false);
         },
-        onError: (error) => {
-          toast.error(error.message || 'Failed to update user');
+        onError: (error: any) => {
+          toast.error(error.response?.data?.message || 'Failed to update user');
         },
       });
     }
   };
 
   const resetAllForms = () => {
-    userForm.reset();
+    userForm.reset({
+      email: '',
+      password: '',
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      phone: '',
+      idNumber: '',
+      role: 'STUDENT',
+      schoolId: schoolId || '',
+    });
     studentForm.reset({
       gender: 'MALE',
       nationality: 'Kenyan',
@@ -385,7 +420,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                           <SelectValue placeholder="Select role" />
                         </SelectTrigger>
                         <SelectContent>
-                          {ROLE_OPTIONS.map((role) => (
+                          {roleOptions.map((role) => (
                             <SelectItem key={role.value} value={role.value}>
                               {role.label}
                             </SelectItem>
@@ -396,27 +431,53 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                   />
                 </div>
 
+                {/* School Selection - Conditional based on user role */}
                 <div className="space-y-2">
-                  <Label>School</Label>
-                  <Controller
-                    name="schoolId"
-                    control={userForm.control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select school" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="none">No School</SelectItem>
-                          {schools.map((school) => (
-                            <SelectItem key={school.id} value={school.id}>
-                              {school.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
+                  <Label className="flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    School {!isSuperAdmin && <span className="text-xs text-muted-foreground">(Auto-assigned)</span>}
+                  </Label>
+                  
+                  {isSuperAdmin ? (
+                    // Super Admin can select any school
+                    <Controller
+                      name="schoolId"
+                      control={userForm.control}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select school" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">No School</SelectItem>
+                            {schools.map((school: any) => (
+                              <SelectItem key={school.id} value={school.id}>
+                                {school.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  ) : (
+                    // Non-super-admin: Display current school (read-only)
+                    <div className="relative">
+                      <Input
+                        value={schoolName || 'No School Assigned'}
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </div>
+                  )}
+                  
+                  {!isSuperAdmin && (
+                    <p className="text-xs text-muted-foreground">
+                      Users will be automatically assigned to your school: <strong>{schoolName}</strong>
+                    </p>
+                  )}
                 </div>
 
                 {mode === 'create' && (
@@ -471,6 +532,22 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
               </div>
             </div>
 
+            {/* School Assignment Notice */}
+            {!isSuperAdmin && mode === 'create' && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                <div className="flex items-start gap-2">
+                  <Building2 className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900">School Assignment</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      This user will be automatically assigned to <strong>{schoolName}</strong>. 
+                      Only super administrators can assign users to different schools.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Role-Specific Profile Fields */}
             {selectedRole === 'STUDENT' && (
               <>
@@ -498,10 +575,16 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                         <div className="flex items-center justify-between">
                           <Label>Admission Number *</Label>
                           <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="autoAdmission"
-                              checked={autoGenerateAdmission}
-                              onChange={(e) => setAutoGenerateAdmission(e.currentTarget.checked)}
+                            <Controller
+                              name="hasSpecialNeeds"
+                              control={studentForm.control}
+                              render={({ field }) => (
+                                <Checkbox
+                                  id="autoAdmission"
+                                  checked={autoGenerateAdmission}
+                                  onCheckedChange={(checked) => setAutoGenerateAdmission(!!checked)}
+                                />
+                              )}
                             />
                             <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
                               Auto-generate
@@ -632,7 +715,6 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                       <Label>Allergies</Label>
                       <Input {...studentForm.register('allergies')} placeholder="eg. Peanuts" />
                     </div>
-
                   </div>
                 </div>
               </>

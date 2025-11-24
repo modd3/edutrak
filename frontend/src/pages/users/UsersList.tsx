@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, PlusCircle, Upload, Edit, Trash, Eye } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Upload, Edit, Trash, Eye, XCircleIcon, CheckCheckIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -89,7 +89,7 @@ export default function UsersList() {
 
   const handleEditClick = (user: User) => {
     setSelectedUser(user);
-    setShowCreateModal(true);
+    setShowEditModal(true);
   };
 
   const handleUserClick = (user: User) => {
@@ -217,8 +217,20 @@ export default function UsersList() {
                 Edit User
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleToggleActive(user)}>
-                {user.isActive ? 'Deactivate User' : 'Activate User'}
+              <DropdownMenuItem
+              className={user.isActive ? "text-destructive border" : "text-blue-500 bg-green-100"}
+              onClick={() => handleToggleActive(user)}>
+                {user.isActive ? (
+                  <>
+                  <XCircleIcon className="mr-2 h-4 w-4" />
+                  Deactivate User
+                  </>
+                  ) : (
+                    <>
+                    <CheckCheckIcon className="mr-2 h-4 w-4"/>
+                    Activate User
+                    </>
+                    )}
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
