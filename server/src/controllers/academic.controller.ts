@@ -1,343 +1,582 @@
+// src/controllers/academic.controller.ts
 import { Request, Response } from 'express';
 import { AcademicService } from '../services/academic.service';
-import { ResponseUtil } from '../utils/response';
+import { RequestWithUser } from '../middleware/school-context';
+import { Curriculum, Pathway, TermName } from '@prisma/client';
 import logger from '../utils/logger';
-
-const academicService = new AcademicService();
+import { stream } from 'winston';
 
 export class AcademicController {
   // Academic Years
-  async createAcademicYear(req: Request, res: Response): Promise<Response> {
+  static async createAcademicYear(req: RequestWithUser, res: Response) {
     try {
-      const { year, startDate, endDate } = req.body;
+      const { year, startDate, endDate, isActive } = req.body;
       
-      if (!year || !startDate || !endDate) {
-        return ResponseUtil.validationError(res, 'Required fields: year, startDate, endDate');
-      }
+      const academicService = AcademicService.withRequest(req);
+      const academicYear = await academicService.createAcademicYear({
+        year: parseInt(year),
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        isActive: Boolean(isActive),
+      });
 
-      const academicYear = await academicService.createAcademicYear(req.body);
-      return ResponseUtil.created(res, 'Academic year created successfully', academicYear);
+      res.status(201).json({
+        success: true,
+        data: academicYear,
+        message: 'Academic year created successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Academic year already exists');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error creating academic year:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to create academic year',
+      });
     }
   }
 
-  async getAcademicYears(req: Request, res: Response): Promise<Response> {
+  static async getAcademicYears(req: RequestWithUser, res: Response) {
     try {
+      const academicService = AcademicService.withRequest(req);
       const academicYears = await academicService.getAcademicYears();
-      return ResponseUtil.success(res, 'Academic years retrieved successfully', academicYears, academicYears.length);
+
+      res.json({
+        success: true,
+        data: academicYears,
+        message: 'Academic years fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching academic years:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch academic years',
+      });
     }
   }
 
-  async getActiveAcademicYear(req: Request, res: Response): Promise<Response> {
+  static async getActiveAcademicYear(req: RequestWithUser, res: Response) {
     try {
-      const academicYear = await academicService.getActiveAcademicYear();
-      
-      if (!academicYear) {
-        return ResponseUtil.notFound(res, 'Active academic year');
+      const academicService = AcademicService.withRequest(req);
+      const activeYear = await academicService.getActiveAcademicYear();
+
+      if (!activeYear) {
+        return res.status(404).json({
+          success: false,
+          error: 'NO_ACTIVE_YEAR',
+          message: 'No active academic year found',
+        });
       }
 
-      return ResponseUtil.success(res, 'Active academic year retrieved successfully', academicYear);
+      res.json({
+        success: true,
+        data: activeYear,
+        message: 'Active academic year fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching active academic year:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch active academic year',
+      });
     }
+    return 1; 
   }
 
-  async getAcademicYearById(req: Request, res: Response): Promise<Response> {
+  static async getAcademicYearById(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Academic year ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const academicYear = await academicService.getAcademicYearById(id);
-      
+
       if (!academicYear) {
-        return ResponseUtil.notFound(res, 'Academic year');
+        return res.status(404).json({
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Academic year not found',
+        });
       }
 
-      return ResponseUtil.success(res, 'Academic year retrieved successfully', academicYear);
+      res.json({
+        success: true,
+        data: academicYear,
+        message: 'Academic year fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching academic year:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch academic year',
+      });
     }
+    return 1;
   }
 
-  async setActiveAcademicYear(req: Request, res: Response): Promise<Response> {
+  static async setActiveAcademicYear(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Academic year ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const academicYear = await academicService.setActiveAcademicYear(id);
-      
-      return ResponseUtil.success(res, 'Academic year set as active successfully', academicYear);
+
+      res.json({
+        success: true,
+        data: academicYear,
+        message: 'Academic year activated successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2025') {
-        return ResponseUtil.notFound(res, 'Academic year');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error setting active academic year:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to set active academic year',
+      });
     }
   }
 
   // Terms
-  async createTerm(req: Request, res: Response): Promise<Response> {
+  static async createTerm(req: RequestWithUser, res: Response) {
     try {
       const { name, termNumber, startDate, endDate, academicYearId } = req.body;
       
-      if (!name || !termNumber || !startDate || !endDate || !academicYearId) {
-        return ResponseUtil.validationError(res, 'Required fields: name, termNumber, startDate, endDate, academicYearId');
-      }
+      const academicService = AcademicService.withRequest(req);
+      const term = await academicService.createTerm({
+        name: name as TermName,
+        termNumber: parseInt(termNumber),
+        startDate: new Date(startDate),
+        endDate: new Date(endDate),
+        academicYearId,
+      });
 
-      const term = await academicService.createTerm(req.body);
-      return ResponseUtil.created(res, 'Term created successfully', term);
+      res.status(201).json({
+        success: true,
+        data: term,
+        message: 'Term created successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Term already exists for this academic year');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error creating term:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to create term',
+      });
     }
   }
 
-  async getTermById(req: Request, res: Response): Promise<Response> {
+  static async getTermById(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Term ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const term = await academicService.getTermById(id);
-      
+
       if (!term) {
-        return ResponseUtil.notFound(res, 'Term');
+        return res.status(404).json({
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Term not found',
+        });
       }
 
-      return ResponseUtil.success(res, 'Term retrieved successfully', term);
+      res.json({
+        success: true,
+        data: term,
+        message: 'Term fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching term:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch term',
+      });
     }
+    return 1;
   }
 
-  async getTermsByAcademicYear(req: Request, res: Response): Promise<Response> {
+  static async getTermsByAcademicYear(req: RequestWithUser, res: Response) {
     try {
       const { academicYearId } = req.params;
-      
-      if (!academicYearId) {
-        return ResponseUtil.error(res, 'Academic year ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const terms = await academicService.getTermsByAcademicYear(academicYearId);
-      
-      return ResponseUtil.success(res, 'Terms retrieved successfully', terms, terms.length);
+
+      res.json({
+        success: true,
+        data: terms,
+        message: 'Terms fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching terms:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch terms',
+      });
     }
   }
 
   // Classes
-  async createClass(req: Request, res: Response): Promise<Response> {
+  static async createClass(req: RequestWithUser, res: Response) {
     try {
-      const { name, level, curriculum, academicYearId, schoolId } = req.body;
+      const { name, level, curriculum, academicYearId, classTeacherId, pathway } = req.body;
       
-      if (!name || !level || !curriculum || !academicYearId || !schoolId) {
-        return ResponseUtil.validationError(res, 'Required fields: name, level, curriculum, academicYearId, schoolId');
-      }
+      const academicService = AcademicService.withRequest(req);
+      const classData = await academicService.createClass({
+        name,
+        level,
+        curriculum: curriculum as Curriculum,
+        academicYearId,
+        classTeacherId,
+        pathway: pathway as Pathway,
+      });
 
-      const classData = await academicService.createClass(req.body);
-      return ResponseUtil.created(res, 'Class created successfully', classData);
+      res.status(201).json({
+        success: true,
+        data: classData,
+        message: 'Class created successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Class already exists for this academic year and school');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error creating class:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to create class',
+      });
     }
   }
 
-  async getClassById(req: Request, res: Response): Promise<Response> {
+  static async getClassById(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Class ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const classData = await academicService.getClassById(id);
-      
+
       if (!classData) {
-        return ResponseUtil.notFound(res, 'Class');
+        return res.status(404).json({
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Class not found',
+        });
       }
 
-      return ResponseUtil.success(res, 'Class retrieved successfully', classData);
+      res.json({
+        success: true,
+        data: classData,
+        message: 'Class fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching class:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch class',
+      });
     }
+    return 1;
   }
 
-  async getSchoolClasses(req: Request, res: Response): Promise<Response> {
+  static async getSchoolClasses(req: RequestWithUser, res: Response) {
     try {
-      const { schoolId } = req.params;
       const { academicYearId } = req.query;
-      
-      if (!schoolId) {
-        return ResponseUtil.error(res, 'School ID is required', 400);
-      }
+      const academicService = AcademicService.withRequest(req);
       
       const classes = await academicService.getSchoolClasses(
-        schoolId, 
         academicYearId as string
       );
-      
-      return ResponseUtil.success(res, 'School classes retrieved successfully', classes, classes.length);
+
+      res.json({
+        success: true,
+        data: classes,
+        message: 'Classes fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching classes:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch classes',
+      });
     }
   }
 
-  async updateClass(req: Request, res: Response): Promise<Response> {
+  static async updateClass(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
+      const updateData = req.body;
       
-      if (!id) {
-        return ResponseUtil.error(res, 'Class ID is required', 400);
-      }
-      
-      const classData = await academicService.updateClass(id, req.body);
-      
-      return ResponseUtil.success(res, 'Class updated successfully', classData);
+      const academicService = AcademicService.withRequest(req);
+      const classData = await academicService.updateClass(id, updateData);
+
+      res.json({
+        success: true,
+        data: classData,
+        message: 'Class updated successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2025') {
-        return ResponseUtil.notFound(res, 'Class');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error updating class:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to update class',
+      });
     }
   }
 
   // Streams
-  async createStream(req: Request, res: Response): Promise<Response> {
+  static async createStream(req: RequestWithUser, res: Response) {
     try {
-      const { name, classId, schoolId } = req.body;
+      const { name, capacity, classId, streamTeacherId } = req.body;
       
-      if (!name || !classId || !schoolId) {
-        return ResponseUtil.validationError(res, 'Required fields: name, classId, schoolId');
-      }
+      const academicService = AcademicService.withRequest(req);
+      const stream = await academicService.createStream({
+        name,
+        capacity: capacity ? parseInt(capacity) : undefined,
+        classId,
+        streamTeacherId,
+      });
 
-      const stream = await academicService.createStream(req.body);
-      return ResponseUtil.created(res, 'Stream created successfully', stream);
+      res.status(201).json({
+        success: true,
+        data: stream,
+        message: 'Stream created successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Stream already exists for this class');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error creating stream:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to create stream',
+      });
     }
   }
 
-  async getStreamById(req: Request, res: Response): Promise<Response> {
+  static async getStreamById(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Stream ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const stream = await academicService.getStreamById(id);
-      
+
       if (!stream) {
-        return ResponseUtil.notFound(res, 'Stream');
+        return res.status(404).json({
+          success: false,
+          error: 'NOT_FOUND',
+          message: 'Stream not found',
+        });
       }
 
-      return ResponseUtil.success(res, 'Stream retrieved successfully', stream);
+      res.json({
+        success: true,
+        data: stream,
+        message: 'Stream fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching stream:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch stream',
+      });
     }
+    return res.json(stream);
   }
 
-  async getClassStreams(req: Request, res: Response): Promise<Response> {
+  static async getClassStreams(req: RequestWithUser, res: Response) {
     try {
       const { classId } = req.params;
-      
-      if (!classId) {
-        return ResponseUtil.error(res, 'Class ID is required', 400);
-      }
-      
+      const academicService = AcademicService.withRequest(req);
       const streams = await academicService.getClassStreams(classId);
-      
-      return ResponseUtil.success(res, 'Class streams retrieved successfully', streams, streams.length);
+
+      res.json({
+        success: true,
+        data: streams,
+        message: 'Class streams fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching class streams:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch class streams',
+      });
     }
   }
 
-  async updateStream(req: Request, res: Response): Promise<Response> {
+  static async updateStream(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
+      const updateData = req.body;
       
-      if (!id) {
-        return ResponseUtil.error(res, 'Stream ID is required', 400);
-      }
-      
-      const stream = await academicService.updateStream(id, req.body);
-      
-      return ResponseUtil.success(res, 'Stream updated successfully', stream);
+      const academicService = AcademicService.withRequest(req);
+      const stream = await academicService.updateStream(id, updateData);
+
+      res.json({
+        success: true,
+        data: stream,
+        message: 'Stream updated successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2025') {
-        return ResponseUtil.notFound(res, 'Stream');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error updating stream:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to update stream',
+      });
     }
   }
 
-  async deleteStream(req: Request, res: Response): Promise<Response> {
+  static async deleteStream(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
-      
-      if (!id) {
-        return ResponseUtil.error(res, 'Stream ID is required', 400);
-      }
-      
-      await academicService.deleteStream(id);
-      
-      return ResponseUtil.success(res, 'Stream deleted successfully');
+      const academicService = AcademicService.withRequest(req);
+      const stream = await academicService.deleteStream(id);
+
+      res.json({
+        success: true,
+        data: stream,
+        message: 'Stream deleted successfully',
+      });
     } catch (error: any) {
-      if (error.code === 'P2025') {
-        return ResponseUtil.notFound(res, 'Stream');
-      }
-      return ResponseUtil.error(res, error.message, 400);
+      logger.error('Error deleting stream:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to delete stream',
+      });
     }
   }
 
-  // Statistics
-  async getAcademicStatistics(req: Request, res: Response): Promise<Response> {
+  // Statistics and Analytics
+  static async getAcademicStatistics(req: RequestWithUser, res: Response) {
     try {
       const { academicYearId } = req.query;
-      const statistics = await academicService.getAcademicStatistics(academicYearId as string);
+      const academicService = AcademicService.withRequest(req);
       
-      return ResponseUtil.success(res, 'Academic statistics retrieved successfully', statistics);
+      const statistics = await academicService.getAcademicStatistics(
+        academicYearId as string
+      );
+
+      res.json({
+        success: true,
+        data: statistics,
+        message: 'Academic statistics fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching academic statistics:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch academic statistics',
+      });
     }
   }
 
-  async getClassPerformance(req: Request, res: Response): Promise<Response> {
+  static async getClassPerformance(req: RequestWithUser, res: Response) {
     try {
       const { classId } = req.params;
       const { termId } = req.query;
       
-      if (!classId) {
-        return ResponseUtil.error(res, 'Class ID is required', 400);
-      }
-      
-      const performance = await academicService.getClassPerformance(classId, termId as string);
-      return ResponseUtil.success(res, 'Class performance retrieved successfully', performance);
+      const academicService = AcademicService.withRequest(req);
+      const performance = await academicService.getClassPerformance(
+        classId, 
+        termId as string
+      );
+
+      res.json({
+        success: true,
+        data: performance,
+        message: 'Class performance fetched successfully',
+      });
     } catch (error: any) {
-      return ResponseUtil.serverError(res, error.message);
+      logger.error('Error fetching class performance:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch class performance',
+      });
+    }
+  }
+
+  // Bulk Operations
+  static async createMultipleClasses(req: RequestWithUser, res: Response) {
+    try {
+      const { classes } = req.body;
+      
+      if (!Array.isArray(classes) || classes.length === 0) {
+        return res.status(400).json({
+          success: false,
+          error: 'INVALID_DATA',
+          message: 'Classes array is required',
+        });
+      }
+
+      const academicService = AcademicService.withRequest(req);
+      const results = [];
+
+      for (const classData of classes) {
+        try {
+          const createdClass = await academicService.createClass(classData);
+          results.push({ success: true, data: createdClass });
+        } catch (error: any) {
+          results.push({ 
+            success: false, 
+            error: error.message,
+            data: classData 
+          });
+        }
+      }
+
+      const successful = results.filter(r => r.success);
+      const failed = results.filter(r => !r.success);
+
+      res.status(201).json({
+        success: true,
+        data: {
+          created: successful.length,
+          failed: failed.length,
+          results,
+        },
+        message: `Bulk class creation completed: ${successful.length} successful, ${failed.length} failed`,
+      });
+    } catch (error: any) {
+      logger.error('Error in bulk class creation:', error);
+      res.status(400).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to create classes in bulk',
+      });
+    }
+    return res.statusMessage;
+  }
+
+  // Utility endpoints
+  static async getAcademicOverview(req: RequestWithUser, res: Response) {
+    try {
+      const academicService = AcademicService.withRequest(req);
+      
+      const [activeYear, statistics, recentClasses] = await Promise.all([
+        academicService.getActiveAcademicYear(),
+        academicService.getAcademicStatistics(),
+        academicService.getSchoolClasses().then(result => result.data.slice(0, 5)),
+      ]);
+
+      res.json({
+        success: true,
+        data: {
+          activeAcademicYear: activeYear,
+          statistics,
+          recentClasses,
+        },
+        message: 'Academic overview fetched successfully',
+      });
+    } catch (error: any) {
+      logger.error('Error fetching academic overview:', error);
+      res.status(500).json({
+        success: false,
+        error: error.message,
+        message: 'Failed to fetch academic overview',
+      });
     }
   }
 }
+
+export default AcademicController;

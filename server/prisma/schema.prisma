@@ -39,6 +39,12 @@ model School {
   students       Student[]
   streams        Stream[]
   subjectOfferings SubjectOffering[]
+  academicYears  AcademicYear[]
+  terms          Term[]
+  classSubjects  ClassSubject[]
+  studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
+  assessmentResults AssessmentResult[]
   
   @@index([county])
   @@index([type])
@@ -251,11 +257,14 @@ model AcademicYear {
   startDate DateTime
   endDate   DateTime
   isActive  Boolean  @default(false)
+  schoolId  String?
   
+  school         School? @relation(fields: [schoolId], references: [id])
   terms          Term[]
   classes        Class[]
   classSubjects  ClassSubject[]   @relation("AcademicYearClassSubjects")
   studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -273,6 +282,9 @@ model Term {
   
   academicYearId String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  
+  schoolId       String?
+  school         School?  @relation(fields: [schoolId], references: [id])
   
   classSubjects  ClassSubject[]   @relation("TermClassSubjects")
   AssessmentDefinitions    AssessmentDefinition[]
@@ -450,6 +462,9 @@ model ClassSubject {
   academicYearId String
   subjectCategory SubjectCategory
   
+  schoolId       String?
+  school         School?     @relation(fields: [schoolId], references: [id])
+  
   class          Class        @relation(fields: [classId], references: [id])
   subject        Subject      @relation(fields: [subjectId], references: [id])
   term           Term         @relation("TermClassSubjects", fields: [termId], references: [id])
@@ -476,6 +491,9 @@ model StudentClass {
   classId        String
   streamId       String?         // Optional stream assignment
   academicYearId String
+  
+  schoolId       String?
+  school         School?         @relation(fields: [schoolId], references: [id])
   
   status         EnrollmentStatus @default(ACTIVE)
   
@@ -562,6 +580,12 @@ model AssessmentDefinition {
   classSubjectId  String
   classSubject    ClassSubject @relation(fields: [classSubjectId], references: [id])
   
+  // Add missing fields
+  schoolId        String?
+  school          School?  @relation(fields: [schoolId], references: [id])
+  academicYearId  String?
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  
   // For CBC: Link this assessment to a specific strand
   strandId        String?
   strand          Strand?  @relation(fields: [strandId], references: [id])
@@ -588,6 +612,10 @@ model AssessmentResult {
   
   assessmentDefId String
   assessmentDef   AssessmentDefinition @relation(fields: [assessmentDefId], references: [id])
+  
+  // Add missing field
+  schoolId        String?
+  school          School?  @relation(fields: [schoolId], references: [id])
   
   // --- Flexible Score Fields ---
   // For 8-4-4

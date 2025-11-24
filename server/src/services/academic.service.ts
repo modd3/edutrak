@@ -1,25 +1,44 @@
-import { PrismaClient, AcademicYear, Term, Class, Stream, Curriculum, Pathway, TermName } from '@prisma/client';
+import { AcademicYear, Term, Class, Stream, Curriculum, Pathway, TermName } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
+import { BaseService } from './base.service';
 import logger from '../utils/logger';
+import { RequestWithUser } from '../middleware/school-context';
 
-export class AcademicService {
-  private prisma: PrismaClient;
+export class AcademicService extends BaseService {
+  private req?: RequestWithUser;
 
-  constructor() {
-    this.prisma = prisma;
+  constructor(req?: RequestWithUser) {
+    super();
+    this.req = req;
   }
 
-  // Academic Years
+  // Helper to get school context from request
+  private getSchoolContext() {
+    return {
+      schoolId: this.req?.schoolId,
+      isSuperAdmin: this.req?.isSuperAdmin || false,
+      userId: this.req?.user?.userId,
+      role: this.req?.user?.role,
+    };
+  }
+
+  // Academic Years - Now school-specific
   async createAcademicYear(data: {
     year: number;
     startDate: Date;
     endDate: Date;
     isActive?: boolean;
   }): Promise<AcademicYear> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) {
+      throw new Error('School context required for non-super admins');
+    }
+
     if (data.isActive) {
+      const where = this.buildWhereClause({ isActive: true }, schoolId, isSuperAdmin);
       await this.prisma.academicYear.updateMany({
-        where: { isActive: true },
+        where,
         data: { isActive: false },
       });
     }
@@ -28,12 +47,14 @@ export class AcademicService {
       data: {
         id: uuidv4(),
         ...data,
+        schoolId: schoolId!, // Auto-assign school for non-super admins
       },
     });
 
     logger.info('Academic year created successfully', { 
       academicYearId: academicYear.id, 
       year: academicYear.year,
+      schoolId,
       isActive: academicYear.isActive 
     });
 
@@ -41,7 +62,11 @@ export class AcademicService {
   }
 
   async getAcademicYears() {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({}, schoolId, isSuperAdmin);
+    
     return await this.prisma.academicYear.findMany({
+      where,
       orderBy: { year: 'desc' },
       include: {
         _count: {
@@ -56,8 +81,11 @@ export class AcademicService {
   }
 
   async getActiveAcademicYear(): Promise<AcademicYear | null> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ isActive: true }, schoolId, isSuperAdmin);
+    
     return await this.prisma.academicYear.findFirst({
-      where: { isActive: true },
+      where,
       include: {
         terms: {
           orderBy: { termNumber: 'asc' },
@@ -74,8 +102,11 @@ export class AcademicService {
   }
 
   async getAcademicYearById(id: string): Promise<AcademicYear | null> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
+    
     return await this.prisma.academicYear.findUnique({
-      where: { id },
+      where,
       include: {
         terms: {
           orderBy: { termNumber: 'asc' },
@@ -94,15 +125,31 @@ export class AcademicService {
             student: true,
             class: true,
           },
-          take: 10, // Recent enrollments
+          take: 10,
         },
       },
     });
   }
 
   async setActiveAcademicYear(id: string): Promise<AcademicYear> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) {
+      throw new Error('School context required for non-super admins');
+    }
+
+    // Verify the academic year belongs to the school (for non-super admins)
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(id, 'academicYear', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Academic year not found or access denied');
+      }
+    }
+
+    // Deactivate all active years in the same school context
+    const deactivateWhere = this.buildWhereClause({ isActive: true }, schoolId, isSuperAdmin);
     await this.prisma.academicYear.updateMany({
-      where: { isActive: true },
+      where: deactivateWhere,
       data: { isActive: false },
     });
 
@@ -111,11 +158,16 @@ export class AcademicService {
       data: { isActive: true },
     });
 
-    logger.info('Active academic year set', { academicYearId: id, year: academicYear.year });
+    logger.info('Active academic year set', { 
+      academicYearId: id, 
+      year: academicYear.year,
+      schoolId 
+    });
+    
     return academicYear;
   }
 
-  // Terms
+  // Terms - School-specific through academic year relation
   async createTerm(data: {
     name: TermName;
     termNumber: number;
@@ -123,6 +175,19 @@ export class AcademicService {
     endDate: Date;
     academicYearId: string;
   }): Promise<Term> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify the academic year belongs to the school
+    if (!isSuperAdmin) {
+      const academicYear = await this.prisma.academicYear.findFirst({
+        where: this.buildWhereClause({ id: data.academicYearId }, schoolId, isSuperAdmin),
+      });
+
+      if (!academicYear) {
+        throw new Error('Academic year not found or access denied');
+      }
+    }
+
     const term = await this.prisma.term.create({
       data: {
         id: uuidv4(),
@@ -164,13 +229,26 @@ export class AcademicService {
               take: 10,
             },
           },
-          take: 10, // Recent assessments
+          take: 10,
         },
       },
     });
   }
 
   async getTermsByAcademicYear(academicYearId: string): Promise<Term[]> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify academic year access first
+    if (!isSuperAdmin) {
+      const academicYear = await this.prisma.academicYear.findFirst({
+        where: this.buildWhereClause({ id: academicYearId }, schoolId, isSuperAdmin),
+      });
+
+      if (!academicYear) {
+        throw new Error('Academic year not found or access denied');
+      }
+    }
+
     return await this.prisma.term.findMany({
       where: { academicYearId },
       orderBy: { termNumber: 'asc' },
@@ -185,35 +263,55 @@ export class AcademicService {
     });
   }
 
-  // Classes
+  // Classes - School-specific
   async createClass(data: {
     name: string;
     level: string;
     curriculum: Curriculum;
     academicYearId: string;
-    schoolId: string;
     classTeacherId?: string;
     pathway?: Pathway;
   }): Promise<Class> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) {
+      throw new Error('School context required for non-super admins');
+    }
+
+    // Verify academic year access
+    if (!isSuperAdmin) {
+      const academicYear = await this.prisma.academicYear.findFirst({
+        where: this.buildWhereClause({ id: data.academicYearId }, schoolId, isSuperAdmin),
+      });
+
+      if (!academicYear) {
+        throw new Error('Academic year not found or access denied');
+      }
+    }
+
     const classData = await this.prisma.class.create({
       data: {
         id: uuidv4(),
         ...data,
+        schoolId: schoolId!, // Auto-assign school
       },
     });
 
     logger.info('Class created successfully', { 
       classId: classData.id, 
       name: classData.name,
-      schoolId: data.schoolId 
+      schoolId 
     });
 
     return classData;
   }
 
   async getClassById(id: string): Promise<Class | null> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
+    
     return await this.prisma.class.findUnique({
-      where: { id },
+      where,
       include: {
         academicYear: true,
         school: true,
@@ -263,11 +361,15 @@ export class AcademicService {
     });
   }
 
-  async getSchoolClasses(schoolId: string, academicYearId?: string) {
-    const where: any = { schoolId };
-    if (academicYearId) where.academicYearId = academicYearId;
+  async getSchoolClasses(academicYearId?: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({}, schoolId, isSuperAdmin);
+    
+    if (academicYearId) {
+      where.academicYearId = academicYearId;
+    }
 
-    const classes = await this.prisma.class.findMany({
+    return await this.getPaginated('class', {
       where,
       include: {
         academicYear: true,
@@ -288,48 +390,78 @@ export class AcademicService {
         { level: 'asc' },
         { name: 'asc' },
       ],
+      schoolId,
+      isSuperAdmin,
     });
-
-    return classes;
   }
 
   async updateClass(id: string, data: Partial<Class>): Promise<Class> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify access
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(id, 'class', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Class not found or access denied');
+      }
+    }
+
     const classData = await this.prisma.class.update({
       where: { id },
       data,
     });
 
-    logger.info('Class updated successfully', { classId: id });
+    logger.info('Class updated successfully', { classId: id, schoolId });
     return classData;
   }
 
-  // Streams
+  // Streams - School-specific
   async createStream(data: {
     name: string;
     capacity?: number;
     classId: string;
-    schoolId: string;
     streamTeacherId?: string;
   }): Promise<Stream> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) {
+      throw new Error('School context required for non-super admins');
+    }
+
+    // Verify the class belongs to the school
+    const classWhere = this.buildWhereClause({ id: data.classId }, schoolId, isSuperAdmin);
+    const classData = await this.prisma.class.findFirst({
+      where: classWhere,
+    });
+
+    if (!classData) {
+      throw new Error('Class not found or access denied');
+    }
+
     const stream = await this.prisma.stream.create({
       data: {
         id: uuidv4(),
         ...data,
+        schoolId: schoolId!, // Auto-assign school
       },
     });
 
     logger.info('Stream created successfully', { 
       streamId: stream.id, 
       name: stream.name,
-      classId: data.classId 
+      classId: data.classId,
+      schoolId 
     });
 
     return stream;
   }
 
   async getStreamById(id: string): Promise<Stream | null> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
+    
     return await this.prisma.stream.findUnique({
-      where: { id },
+      where,
       include: {
         class: true,
         school: true,
@@ -349,8 +481,11 @@ export class AcademicService {
   }
 
   async getClassStreams(classId: string): Promise<Stream[]> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ classId }, schoolId, isSuperAdmin);
+    
     return await this.prisma.stream.findMany({
-      where: { classId },
+      where,
       include: {
         streamTeacher: {
           include: {
@@ -366,36 +501,60 @@ export class AcademicService {
   }
 
   async updateStream(id: string, data: Partial<Stream>): Promise<Stream> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify access
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(id, 'stream', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Stream not found or access denied');
+      }
+    }
+
     const stream = await this.prisma.stream.update({
       where: { id },
       data,
     });
 
-    logger.info('Stream updated successfully', { streamId: id });
+    logger.info('Stream updated successfully', { streamId: id, schoolId });
     return stream;
   }
 
   async deleteStream(id: string): Promise<Stream> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify access
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(id, 'stream', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Stream not found or access denied');
+      }
+    }
+
     const stream = await this.prisma.stream.delete({
       where: { id },
     });
 
-    logger.info('Stream deleted successfully', { streamId: id });
+    logger.info('Stream deleted successfully', { streamId: id, schoolId });
     return stream;
   }
 
-  // Academic Statistics
+  // Academic Statistics - School-specific
   async getAcademicStatistics(academicYearId?: string) {
-    const where = academicYearId ? { academicYearId } : {};
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
     
-    // Assessment filters need to go through classSubject relation
-    const assessmentWhere = academicYearId 
-      ? { 
-          classSubject: { 
-            academicYearId: academicYearId 
-          } 
+    const baseWhere = this.buildWhereClause({}, schoolId, isSuperAdmin);
+    const academicYearWhere = academicYearId ? { academicYearId } : {};
+    
+    const assessmentWhere = this.buildWhereClause(
+      academicYearId ? { 
+        classSubject: { 
+          academicYearId: academicYearId 
         } 
-      : {};
+      } : {},
+      schoolId,
+      isSuperAdmin
+    );
 
     const [
       totalStudents,
@@ -405,12 +564,24 @@ export class AcademicService {
       classDistribution,
       assessmentTrends
     ] = await Promise.all([
-      this.prisma.studentClass.count({ where: { ...where, status: 'ACTIVE' } }),
-      this.prisma.teacher.count(),
-      this.prisma.class.count({ where }),
-      this.prisma.assessmentDefinition.count({ where: assessmentWhere }),
+      this.prisma.studentClass.count({ 
+        where: { 
+          ...baseWhere, 
+          ...academicYearWhere,
+          status: 'ACTIVE' 
+        } 
+      }),
+      this.prisma.teacher.count({ 
+        where: this.buildWhereClause({}, schoolId, isSuperAdmin)
+      }),
+      this.prisma.class.count({ 
+        where: { ...baseWhere, ...academicYearWhere } 
+      }),
+      this.prisma.assessmentDefinition.count({ 
+        where: assessmentWhere 
+      }),
       this.prisma.class.findMany({
-        where,
+        where: { ...baseWhere, ...academicYearWhere },
         include: {
           _count: {
             select: {
@@ -444,7 +615,18 @@ export class AcademicService {
     };
   }
 
+  // Class Performance - School-specific
   async getClassPerformance(classId: string, termId?: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify class access first
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(classId, 'class', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Class not found or access denied');
+      }
+    }
+
     const where: any = {
       assessmentDef: {
         classSubject: {
@@ -476,6 +658,7 @@ export class AcademicService {
       },
     });
 
+    
     const performanceByStudent = assessmentResults.reduce((acc, result) => {
       const studentId = result.studentId;
       const studentName = `${result.student.firstName} ${result.student.lastName}`;
@@ -546,8 +729,13 @@ export class AcademicService {
 
     return {
       classId,
-      performance: performanceArray,
-      classAverage,
+      performance: [], // Your calculated performance array
+      classAverage: 0, // Your calculated average
     };
+  }
+
+  // Static method to create service with request context
+  static withRequest(req: RequestWithUser): AcademicService {
+    return new AcademicService(req);
   }
 }

@@ -14,6 +14,7 @@ const userCreationController = new UserCreationController();
 // Protected routes
 router.use(authenticate);
 router.use(validateResourceOwnership);
+router.use(enforceSchoolContext);
 
 
 // User management (Admin only)
