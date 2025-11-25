@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { TeacherController } from '../controllers/teacher.controller';
 import { authenticate, authorize, optionalAuth,  } from '../middleware/auth.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
 
 const router = Router();
 const teacherController = new TeacherController();
 
 router.use(authenticate);
+router.use(enforceSchoolContext);
 
 // Teacher management (Admin only)
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), teacherController.createTeacher);

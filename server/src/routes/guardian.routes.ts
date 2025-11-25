@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { GuardianController } from '../controllers/guardian.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
 
 const router = Router();
 const guardianController = new GuardianController();
 
 router.use(authenticate);
+router.use(enforceSchoolContext);
 
 // Guardian management (Admin only)
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), guardianController.createGuardian);

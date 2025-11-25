@@ -13,11 +13,12 @@ export class AcademicController {
       const { year, startDate, endDate, isActive } = req.body;
       
       const academicService = AcademicService.withRequest(req);
-      const academicYear = await academicService.createAcademicYear({
+      const academicYear = await academicService.createAcademicYearWithTerms({
         year: parseInt(year),
         startDate: new Date(startDate),
         endDate: new Date(endDate),
         isActive: Boolean(isActive),
+        terms: req.body.terms,
       });
 
       res.status(201).json({

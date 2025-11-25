@@ -2,14 +2,25 @@ import { PrismaClient, AssessmentDefinition, AssessmentResult, AssessmentType, C
 import { v4 as uuidv4 } from 'uuid';
 import prisma from '../database/client';
 import logger from '../utils/logger';
+import { BaseService } from './base.service';
+import { RequestWithUser } from '../middleware/school-context';
 
-export class AssessmentService {
-  private prisma: PrismaClient;
-
-  constructor() {
-    this.prisma = prisma;
-  }
-
+export class AssessmentService extends BaseService {
+  private req?: RequestWithUser;
+  constructor(req?: RequestWithUser) {
+      super();
+      this.req = req;
+    }
+  
+    // Helper to get school context from request
+    private getSchoolContext() {
+      return {
+        schoolId: this.req?.schoolId,
+        isSuperAdmin: this.req?.isSuperAdmin || false,
+        userId: this.req?.user?.userId,
+        role: this.req?.user?.role,
+      };
+    }
   // Assessment Definition methods
   async createAssessmentDefinition(data: {
     name: string;
@@ -19,10 +30,23 @@ export class AssessmentService {
     classSubjectId: string;
     strandId?: string;
   }): Promise<AssessmentDefinition> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const classSubject = await this.prisma.classSubject.findUnique({
+        where: { id: data.classSubjectId },
+        select: { schoolId: true }
+    });
+
+    if (!classSubject || (!isSuperAdmin && classSubject.schoolId !== schoolId)) {
+        throw new Error("Class subject not found or access denied.");
+    }
+
+
     const assessmentDef = await this.prisma.assessmentDefinition.create({
       data: {
         id: uuidv4(),
         ...data,
+        schoolId: classSubject.schoolId,
       },
       include: {
         term: true,
@@ -39,15 +63,18 @@ export class AssessmentService {
     logger.info('Assessment definition created successfully', { 
       assessmentDefId: assessmentDef.id, 
       name: assessmentDef.name,
-      type: assessmentDef.type 
+      type: assessmentDef.type,
+      schoolId: classSubject.schoolId,
     });
 
     return assessmentDef;
   }
 
   async getAssessmentDefinitionById(id: string): Promise<AssessmentDefinition | null> {
-    return await this.prisma.assessmentDefinition.findUnique({
-      where: { id },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
+    return await this.prisma.assessmentDefinition.findFirst({
+      where,
       include: {
         term: true,
         classSubject: {
@@ -72,6 +99,16 @@ export class AssessmentService {
   }
 
   async getClassSubjectAssessmentDefinitions(classSubjectId: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const classSubject = await this.prisma.classSubject.findFirst({
+        where: this.buildWhereClause({ id: classSubjectId }, schoolId, isSuperAdmin)
+    });
+
+    if (!classSubject) {
+        throw new Error("Class subject not found or access denied.");
+    }
+
     return await this.prisma.assessmentDefinition.findMany({
       where: { classSubjectId },
       include: {
@@ -97,13 +134,14 @@ export class AssessmentService {
     comment?: string;
     assessedById: string;
   }): Promise<AssessmentResult> {
-    // Get assessment definition to determine grading system
-    const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
-      where: { id: data.assessmentDefId },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    // Get assessment definition to determine grading system and schoolId
+    const assessmentDef = await this.prisma.assessmentDefinition.findFirst({
+      where: this.buildWhereClause({ id: data.assessmentDefId }, schoolId, isSuperAdmin),
     });
 
     if (!assessmentDef) {
-      throw new Error('Assessment definition not found');
+      throw new Error('Assessment definition not found or access denied.');
     }
 
     // Calculate grade if not provided and numeric value is available
@@ -130,6 +168,7 @@ export class AssessmentService {
         competencyLevel,
         comment: data.comment,
         assessedById: data.assessedById,
+        schoolId: assessmentDef.schoolId,
       },
       include: {
         student: true,
@@ -148,7 +187,8 @@ export class AssessmentService {
     logger.info('Assessment result created successfully', { 
       resultId: result.id, 
       studentId: data.studentId,
-      assessmentDefId: data.assessmentDefId 
+      assessmentDefId: data.assessmentDefId,
+      schoolId: assessmentDef.schoolId,
     });
 
     return result;
@@ -163,13 +203,19 @@ export class AssessmentService {
     comment?: string;
     assessedById: string;
   }[]) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const assessmentDefId = results[0]?.assessmentDefId;
+    if (!assessmentDefId) {
+        throw new Error("assessmentDefId is required for bulk creation.")
+    }
+
     // Get assessment definition once
-    const assessmentDef = await this.prisma.assessmentDefinition.findUnique({
-      where: { id: results[0]?.assessmentDefId },
+    const assessmentDef = await this.prisma.assessmentDefinition.findFirst({
+      where: this.buildWhereClause({id: assessmentDefId }, schoolId, isSuperAdmin)
     });
 
     if (!assessmentDef) {
-      throw new Error('Assessment definition not found');
+      throw new Error('Assessment definition not found or access denied');
     }
 
     const resultsWithGrades = results.map(result => {
@@ -191,6 +237,7 @@ export class AssessmentService {
         ...result,
         grade,
         competencyLevel,
+        schoolId: assessmentDef.schoolId
       };
     });
 
@@ -200,15 +247,19 @@ export class AssessmentService {
 
     logger.info('Bulk assessment results created successfully', { 
       count: created.count,
-      assessmentDefId: results[0]?.assessmentDefId 
+      assessmentDefId: results[0]?.assessmentDefId,
+      schoolId: assessmentDef.schoolId,
     });
 
     return created;
   }
 
   async getAssessmentResultById(id: string): Promise<AssessmentResult | null> {
-    return await this.prisma.assessmentResult.findUnique({
-      where: { id },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
+
+    return await this.prisma.assessmentResult.findFirst({
+      where,
       include: {
         student: true,
         assessmentDef: {
@@ -245,16 +296,17 @@ export class AssessmentService {
     competencyLevel?: CompetencyLevel;
     comment?: string;
   }): Promise<AssessmentResult> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
     // Get the result and its assessment definition
-    const existing = await this.prisma.assessmentResult.findUnique({
-      where: { id },
+    const existing = await this.prisma.assessmentResult.findFirst({
+      where: this.buildWhereClause({ id }, schoolId, isSuperAdmin),
       include: {
         assessmentDef: true,
       },
     });
 
     if (!existing) {
-      throw new Error('Assessment result not found');
+      throw new Error('Assessment result not found or access denied.');
     }
 
     // Recalculate grade/competency if marks are updated
@@ -288,6 +340,14 @@ export class AssessmentService {
   }
 
   async deleteAssessmentResult(id: string): Promise<AssessmentResult> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const existing = await this.prisma.assessmentResult.findFirst({
+        where: this.buildWhereClause({ id }, schoolId, isSuperAdmin),
+    });
+
+    if (!existing) {
+        throw new Error("Assessment result not found or access denied.");
+    }
     const result = await this.prisma.assessmentResult.delete({
       where: { id },
     });
@@ -303,7 +363,8 @@ export class AssessmentService {
     page?: number;
     limit?: number;
   }) {
-    const where: any = { studentId };
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = this.buildWhereClause({ studentId }, schoolId, isSuperAdmin);
     
     if (filters?.termId || filters?.classSubjectId || filters?.assessmentType) {
       where.assessmentDef = {};
@@ -351,8 +412,11 @@ export class AssessmentService {
   }
 
   async getAssessmentDefinitionResults(assessmentDefId: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({ assessmentDefId }, schoolId, isSuperAdmin);
+
     return await this.prisma.assessmentResult.findMany({
-      where: { assessmentDefId },
+      where,
       include: {
         student: true,
       },
@@ -365,14 +429,17 @@ export class AssessmentService {
   }
 
   async calculateStudentTermAverage(studentId: string, termId: string) {
-    const results = await this.prisma.assessmentResult.findMany({
-      where: {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where = this.buildWhereClause({
         studentId,
         assessmentDef: {
-          termId,
+            termId,
         },
         numericValue: { not: null },
-      },
+    }, schoolId, isSuperAdmin);
+
+    const results = await this.prisma.assessmentResult.findMany({
+      where,
       include: {
         assessmentDef: {
           include: {
@@ -413,12 +480,13 @@ export class AssessmentService {
   }
 
   async getClassSubjectStatistics(classSubjectId: string, termId?: string) {
-    const where: any = {
-      assessmentDef: {
-        classSubjectId,
-        ...(termId && { termId }),
-      },
-    };
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = this.buildWhereClause({
+        assessmentDef: {
+            classSubjectId,
+            ...(termId && { termId }),
+        },
+    }, schoolId, isSuperAdmin);
 
     const results = await this.prisma.assessmentResult.findMany({
       where,
@@ -493,8 +561,10 @@ export class AssessmentService {
   }
 
   async generateStudentTermReport(studentId: string, termId: string) {
-    const student = await this.prisma.student.findUnique({
-      where: { id: studentId },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const student = await this.prisma.student.findFirst({
+      where: this.buildWhereClause({ id: studentId }, schoolId, isSuperAdmin),
       include: {
         enrollments: {
           where: { status: 'ACTIVE' },
@@ -566,5 +636,9 @@ export class AssessmentService {
         behavior: 'Good', // This would come from behavior tracking
       },
     };
+  }
+
+  static withRequest(req: RequestWithUser): AssessmentService {
+    return new AssessmentService(req);
   }
 }

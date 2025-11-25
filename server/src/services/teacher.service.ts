@@ -1,16 +1,28 @@
-import { PrismaClient, Teacher, EmploymentType, Role, SubjectCategory } from '@prisma/client';
+import { Teacher, EmploymentType, Role, SubjectCategory } from '@prisma/client';
 import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
 import { sequenceGenerator } from './sequence-generator.service';
+import { BaseService } from './base.service';
+import { RequestWithUser } from '../middleware/school-context';
 
-export class TeacherService {
-  private prisma: PrismaClient;
+export class TeacherService extends BaseService {
+  private req?: RequestWithUser;
 
-  constructor() {
-    this.prisma = prisma;
+  constructor(req?: RequestWithUser) {
+    super();
+    this.req = req;
+  }
+
+  // Helper to get school context from request
+  private getSchoolContext() {
+    return {
+      schoolId: this.req?.schoolId,
+      isSuperAdmin: this.req?.isSuperAdmin || false,
+      userId: this.req?.user?.userId,
+      role: this.req?.user?.role,
+    };
   }
 
   async createTeacher(data: {
@@ -108,13 +120,21 @@ export class TeacherService {
     limit?: number;
     search?: string;
   }) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where: any = {};
 
-    if (filters?.schoolId) {
-      where.user = {
-        schoolId: filters.schoolId,
-      };
+    // Enforce school isolation for non-super admins
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        where.user = { schoolId: 'NONE' }; // Force no results
+      } else {
+        where.user = { schoolId };
+      }
+    } else if (filters?.schoolId) {
+      // Super admin can filter by specific school
+      where.user = { schoolId: filters.schoolId };
     }
+
     if (filters?.employmentType) where.employmentType = filters.employmentType;
 
     if (filters?.search) {
@@ -181,8 +201,18 @@ export class TeacherService {
   }
 
   async getTeacherById(id: string): Promise<Teacher | null> {
-    return await this.prisma.teacher.findUnique({
-      where: { id },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = { id };
+
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        return null;
+      }
+      where.user = { schoolId };
+    }
+
+    return await this.prisma.teacher.findFirst({
+      where,
       include: {
         user: {
           include: {
@@ -233,8 +263,18 @@ export class TeacherService {
   }
 
   async getTeacherByUserId(userId: string): Promise<Teacher | null> {
-    return await this.prisma.teacher.findUnique({
-      where: { userId },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = { userId };
+
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        return null;
+      }
+      where.user = { schoolId };
+    }
+
+    return await this.prisma.teacher.findFirst({
+      where,
       include: {
         user: true,
         teachingSubjects: {
@@ -249,8 +289,18 @@ export class TeacherService {
   }
 
   async getTeacherByTscNumber(tscNumber: string): Promise<Teacher | null> {
-    return await this.prisma.teacher.findUnique({
-      where: { tscNumber },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = { tscNumber };
+
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        return null;
+      }
+      where.user = { schoolId };
+    }
+
+    return await this.prisma.teacher.findFirst({
+      where,
       include: {
         user: {
           include: {
@@ -262,12 +312,24 @@ export class TeacherService {
   }
 
   async updateTeacher(id: string, data: Partial<Teacher>): Promise<Teacher> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin) {
+      const existing = await this.prisma.teacher.findFirst({
+        where: { id, user: { schoolId } },
+        select: { id: true },
+      });
+      if (!existing) {
+        throw new Error('Teacher not found or access denied');
+      }
+    }
+
     const teacher = await this.prisma.teacher.update({
       where: { id },
       data,
     });
 
-    logger.info('Teacher updated successfully', { teacherId: id });
+    logger.info('Teacher updated successfully', { teacherId: id, schoolId });
     return teacher;
   }
 

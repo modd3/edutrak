@@ -1,50 +1,54 @@
 import { Router } from 'express';
-import { createAssessmentDefinition, 
-         getAssessmentDefinitionById, 
-         getClassSubjectAssessmentDefinitions, 
-         //updateAssessmentDefinition, 
-         //deleteAssessmentDefinition, 
-         createAssessmentResult, 
-         createBulkAssessmentResults, 
-         getAssessmentResultById, 
-         updateAssessmentResult, 
-         deleteAssessmentResult, 
-         getStudentAssessmentResults, 
-         getAssessmentDefinitionResults,
-         getClassSubjectStatistics,
-         generateStudentTermReport,
-         getClassAssessmentAnalytics,
-         exportAssessmentResults
-        } from '../controllers/assessment.controller';
+import * as assessmentController from '../controllers/assessment.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
 
 const router = Router();
 
+// Apply authentication and school context middleware to all assessment routes
 router.use(authenticate);
+router.use(enforceSchoolContext);
 
-// Assessment management (Teacher & Admins)
-router.post('/create', authorize('ADMIN', 'SUPER_ADMIN'), createAssessmentDefinition);
-router.post('/result/bulk', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), createBulkAssessmentResults);
-router.post('/result', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), createAssessmentResult);
-router.put('/result/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), updateAssessmentResult);
-router.delete('/result/:id', authorize('ADMIN', 'SUPER_ADMIN'), deleteAssessmentResult);
-
-// Assessment access
-router.get('/:id', getAssessmentDefinitionById);
-router.get('/def/result/:id', getAssessmentDefinitionResults)
-router.get('result/:id', getAssessmentResultById);
-router.get('/students/:studentId', getStudentAssessmentResults);
-router.get('/class-subjects/:classSubjectId', getClassSubjectAssessmentDefinitions);
-
-// Statistics and calculations
-router.get('/class-subjects/:classSubjectId/statistics', getClassSubjectStatistics);
-router.get('/class/analytics', getClassAssessmentAnalytics)
-//router.get('/students/:studentId/trends', validateUUIDParam, assessmentController.getAssessmentTrends);
+// --- Assessment Definition Routes ---
+router.post(
+    '/definitions', 
+    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
+    assessmentController.createAssessmentDefinition
+);
+router.get(
+    '/definitions/class-subject/:classSubjectId',
+    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+    assessmentController.getClassSubjectAssessmentDefinitions
+);
+router.get('/definitions/:id', assessmentController.getAssessmentDefinitionById);
+// router.put('/definitions/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), assessmentController.updateAssessmentDefinition);
+// router.delete('/definitions/:id', authorize('ADMIN', 'SUPER_ADMIN'), assessmentController.deleteAssessmentDefinition);
 
 
-// Reports
-router.get('/students/:studentId/report', generateStudentTermReport);
-router.get('/result/export', exportAssessmentResults);
-//router.get('/classes/:classId/report', validateUUIDParam, assessmentController.generateClassTermReport);
+// --- Assessment Result Routes ---
+router.post(
+    '/results', 
+    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
+    assessmentController.createAssessmentResult
+);
+router.post(
+    '/results/bulk', 
+    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
+    assessmentController.createBulkAssessmentResults
+);
+router.get('/results/:id', assessmentController.getAssessmentResultById);
+router.put('/results/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), assessmentController.updateAssessmentResult);
+router.delete('/results/:id', authorize('ADMIN', 'SUPER_ADMIN'), assessmentController.deleteAssessmentResult);
+router.get('/definitions/:assessmentDefId/results', assessmentController.getAssessmentDefinitionResults);
+
+// --- Student-Specific Assessment Routes ---
+router.get('/students/:studentId/results', assessmentController.getStudentAssessmentResults);
+router.get('/students/:studentId/reports/term/:termId', assessmentController.generateStudentTermReport);
+router.get('/students/:studentId/average/term/:termId', assessmentController.calculateStudentTermAverage);
+
+// --- Statistics & Analytics ---
+router.get('/statistics/class-subject/:classSubjectId', assessmentController.getClassSubjectStatistics);
+router.get('/analytics/class/:classId', assessmentController.getClassAssessmentAnalytics);
+router.get('/export/definition/:assessmentDefId', assessmentController.exportAssessmentResults);
 
 export default router;

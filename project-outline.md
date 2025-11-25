@@ -58,9 +58,20 @@ DevOps & Infrastructure
 
 Database Schema
 
-Core Models
+*Source of Truth: `server/prisma/schema.prisma`*
 
-School
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ===== SCHOOL & ORGANIZATION =====
+
 model School {
   id             String    @id @default(uuid())
   name           String
@@ -69,22 +80,68 @@ model School {
   county         String
   subCounty      String?
   ward           String?
-  knecCode       String?   @unique
-  kemisCode      String?   @unique
+  knecCode       String?   @unique  // KNEC school code
+  kemisCode      String?   @unique  // KEMIS code for reporting
+  
+  // Contact
   phone          String?
   email          String?
   address        String?
+  
+  // School characteristics
   ownership      Ownership
   boardingStatus BoardingStatus
   gender         SchoolGender
   
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
   users          User[]
   classes        Class[]
   students       Student[]
-  // ... other relations
+  streams        Stream[]
+  subjectOfferings SubjectOffering[]
+  academicYears  AcademicYear[]
+  terms          Term[]
+  classSubjects  ClassSubject[]
+  studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
+  assessmentResults AssessmentResult[]
+  
+  @@index([county])
+  @@index([type])
 }
 
-User (Base Profile)
+enum SchoolType {
+  PRIMARY
+  SECONDARY
+  TVET
+  SPECIAL_NEEDS
+  PRE_PRIMARY
+}
+
+enum Ownership {
+  PUBLIC
+  PRIVATE
+  FAITH_BASED
+  NGO
+}
+
+enum BoardingStatus {
+  DAY
+  BOARDING
+  BOTH
+}
+
+enum SchoolGender {
+  BOYS
+  GIRLS
+  MIXED
+}
+
+// ===== USERS & PROFILES =====
+
 model User {
   id        String   @id @default(uuid())
   email     String   @unique
@@ -93,128 +150,580 @@ model User {
   lastName  String
   middleName String?
   phone     String?
-  idNumber  String?   @unique
+  idNumber  String?   @unique  // National ID or Birth Cert No
   role      Role     @default(TEACHER)
+
   schoolId  String?
-  isActive  Boolean  @default(true)
-  
   school    School?  @relation(fields: [schoolId], references: [id])
+
+  // Role profiles
   student   Student?
   teacher   Teacher?
   guardian  Guardian?
+  
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([role])
+  @@index([schoolId])
 }
 
-Student (Extended Profile)
+enum Role {
+  SUPER_ADMIN    // System admin
+  ADMIN          // School admin
+  TEACHER
+  STUDENT
+  PARENT
+  SUPPORT_STAFF
+}
+
 model Student {
   id              String    @id @default(uuid())
   admissionNo     String    @unique
-  upiNumber       String?   @unique
-  kemisUpi        String?   @unique
+  upiNumber       String?   @unique  // Unique Personal Identifier
+  kemisUpi        String?   @unique  // KEMIS UPI
+  
   firstName       String
   middleName      String?
   lastName        String
   gender          Gender
   dob             DateTime?
   birthCertNo     String?
+  
+  // Kenyan-specific
   nationality     String    @default("Kenyan")
   county          String?
   subCounty       String?
+  
+  // Special needs
   hasSpecialNeeds Boolean   @default(false)
-  specialNeedsType String?
+  specialNeedsType String?  // Visual, Hearing, Physical, Learning, etc.
+  
+  // Medical
   medicalCondition String?
   allergies        String?
   
-  userId          String?   @unique
   schoolId        String?
-  user            User?     @relation(fields: [userId], references: [id])
   school          School?   @relation(fields: [schoolId], references: [id])
+
+  userId          String?   @unique
+  user            User?     @relation(fields: [userId], references: [id])
+
+  // Relations
   enrollments     StudentClass[]
   guardians       StudentGuardian[]
+  assessmentResults     AssessmentResult[]
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  @@index([schoolId])
+  @@index([schoolId, admissionNo])
+  @@index([schoolId, gender])
 }
 
-Teacher (Extended Profile)
+enum Gender {
+  MALE
+  FEMALE
+}
+
+model Guardian {
+  id              String   @id @default(uuid())
+  userId          String   @unique
+  user            User     @relation(fields: [userId], references: [id])
+  
+  relationship    String   // Father, Mother, Guardian, etc.
+  occupation      String?
+  employer        String?
+  workPhone       String?
+  
+  students        StudentGuardian[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model StudentGuardian {
+  id          String   @id @default(uuid())
+  studentId   String
+  guardianId  String
+  isPrimary   Boolean  @default(false)
+  
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  guardian    Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  
+  @@unique([studentId, guardianId])
+}
+
 model Teacher {
   id             String   @id @default(uuid())
   userId         String   @unique
-  tscNumber      String   @unique
-  employmentType EmploymentType
-  qualification  String?
-  specialization String?
-  dateJoined     DateTime?
-  
   user           User     @relation(fields: [userId], references: [id])
-  classTeacherOf Class[]  @relation("ClassTeacher")
-  teachingSubjects ClassSubject[]
-}
-
-Guardian (Extended Profile)
-model Guardian {
-  id           String   @id @default(uuid())
-  userId       String   @unique
-  relationship String
-  occupation   String?
-  employer     String?
-  workPhone    String?
   
-  user      User     @relation(fields: [userId], references: [id])
-  students  StudentGuardian[]
+  tscNumber      String   @unique
+  employeeNumber String   @unique
+  employmentType EmploymentType
+  qualification  String?  // Diploma, Degree, Masters, etc.
+  specialization String?  // Subject specialization
+  
+  dateJoined     DateTime?    @default(now())
+  
+  // Relations
+  classTeacherOf Class[]       @relation("ClassTeacher")
+  streamTeacherOf Stream[]     @relation("StreamTeacher")
+  teachingSubjects ClassSubject[] @relation("TeacherClassSubjects")
+
+  // Assessment relations
+  assessmentsGraded AssessmentResult[] @relation("AssessedBy")
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 }
 
-Academic Structure
+enum EmploymentType {
+  PERMANENT
+  CONTRACT
+  TEMPORARY
+  BOM          // Board of Management
+  PTA          // Parents Teachers Association
+}
 
-Class
+// ===== SEQUENCE GENERATOR =====
+
+model Sequence {
+  id        String   @id @default(uuid())
+  key       String   @unique  // Composite key: TYPE_SCHOOL_YEAR
+  type      String              // ADMISSION_NUMBER, EMPLOYEE_NUMBER, etc.
+  schoolId  String?             // Optional: for school-specific sequences
+  year      Int?                // Optional: for annually resetting sequences
+  
+  currentValue Int    @default(0)  // Current counter value
+  prefix       String?              // Prefix for formatting (e.g., "STU", "EMP")
+  
+  lastGeneratedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([type])
+  @@index([schoolId])
+  @@index([year])
+  @@index([type, schoolId, year])
+}
+
+// ===== ACADEMIC STRUCTURE =====
+
+model AcademicYear {
+  id        String   @id @default(uuid())
+  year      Int      @unique  // e.g., 2024
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+  schoolId  String?
+  
+  school         School? @relation(fields: [schoolId], references: [id])
+  terms          Term[]
+  classes        Class[]
+  classSubjects  ClassSubject[]   @relation("AcademicYearClassSubjects")
+  studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([isActive])
+  @@index([schoolId])
+}
+
+model Term {
+  id             String   @id @default(uuid())
+  name           TermName
+  termNumber     Int      // 1, 2, or 3
+  startDate      DateTime
+  endDate        DateTime
+  
+  academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  
+  schoolId       String?
+  school         School?  @relation(fields: [schoolId], references: [id])
+  
+  classSubjects  ClassSubject[]   @relation("TermClassSubjects")
+  AssessmentDefinitions    AssessmentDefinition[]
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@unique([academicYearId, termNumber])
+  @@index([academicYearId])
+  @@index([academicYearId, schoolId])
+  @@index([schoolId])
+}
+
+enum TermName {
+  TERM_1
+  TERM_2
+  TERM_3
+}
+
+// ===== CURRICULUM & CLASSES =====
+
 model Class {
   id             String      @id @default(uuid())
-  name           String
-  level          String
+  name           String       // e.g., "Grade 7", "Form 3"
+  level          String       // Grade/Form level
   curriculum     Curriculum
+  
   academicYearId String
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  
   schoolId       String
+  school         School       @relation(fields: [schoolId], references: [id])
+  
   classTeacherId String?
+  classTeacher   Teacher?        @relation("ClassTeacher", fields: [classTeacherId], references: [id])
+  
+  // For CBC: Track which pathway/strand
   pathway        Pathway?
   
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  school         School       @relation(fields: [schoolId], references: [id])
-  classTeacher   Teacher?     @relation("ClassTeacher", fields: [classTeacherId], references: [id])
   streams        Stream[]
   students       StudentClass[]
   subjects       ClassSubject[]
-}
-
-Subscription & Billing (SaaS)
-
-Subscription
-model Subscription {
-  id                String           @id @default(uuid())
-  schoolId          String           @unique
-  plan              SubscriptionPlan @default(FREE)
-  status            SubscriptionStatus @default(ACTIVE)
-  currentPeriodStart DateTime
-  currentPeriodEnd   DateTime
-  maxStudents       Int              @default(50)
-  maxTeachers       Int              @default(5)
-  maxStorage        Int              @default(100)
-  smsCredits        Int              @default(0)
-  features          String[]
+  promotedStudents StudentClass[] @relation("Promotion")
   
-  school      School   @relation(fields: [schoolId], references: [id])
-  invoices    Invoice[]
-  usageMetrics UsageMetric[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  @@unique([name, academicYearId, schoolId])
+  @@index([curriculum])
+  @@index([schoolId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, level])
 }
 
-Sequence Generation
+enum Curriculum {
+  CBC              // Competency Based Curriculum (2-6-3-3)
+  EIGHT_FOUR_FOUR  // 8-4-4 System (being phased out)
+  TVET             // Technical & Vocational
+  IGCSE            // International
+  IB               // International Baccalaureate
+}
 
-Sequence
-model Sequence {
+enum Pathway {
+  // CBC Junior Secondary pathways
+  STEM            // Science, Technology, Engineering, Math
+  ARTS_SPORTS     // Arts and Sports Sciences
+  SOCIAL_SCIENCES // Social Sciences
+}
+
+// Streams within a class (e.g., Form 3 North, Form 3 South)
+model Stream {
+  id             String   @id @default(uuid())
+  name           String   // North, South, East, West, etc.
+  capacity       Int?
+  
+  classId        String
+  class          Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id])
+  
+  streamTeacherId String?
+  streamTeacher   Teacher?   @relation("StreamTeacher", fields: [streamTeacherId], references: [id])
+  
+  students       StudentClass[]
+  
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  @@unique([classId, name])
+  @@index([classId])
+}
+
+// ===== SUBJECTS =====
+
+model Subject {
+  id            String   @id @default(uuid())
+  name          String
+  code          String   @unique
+  
+  // Subject classification
+  category      SubjectCategory
+    
+  // CBC-specific
+  learningArea  LearningArea?  // For CBC subjects
+  
+  // 8-4-4 specific
+  subjectGroup  SubjectGroup?  // Sciences, Languages, etc.
+  
+  curriculum    Curriculum[]   // Which curricula offer this subject
+  
+  description   String?
+  
+  offerings     SubjectOffering[]
+  classLinks    ClassSubject[]
+  strands       Strand[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([code])
+  @@index([category])
+}
+
+enum SubjectCategory {
+  CORE
+  ELECTIVE
+  OPTIONAL
+  TECHNICAL
+  APPLIED
+}
+
+enum LearningArea {
+  // CBC Learning Areas
+  LANGUAGES
+  MATHEMATICS
+  SCIENCE_TECHNOLOGY
+  SOCIAL_STUDIES
+  RELIGIOUS_EDUCATION
+  CREATIVE_ARTS
+  PHYSICAL_HEALTH_EDUCATION
+  PRE_TECHNICAL_STUDIES
+}
+
+enum SubjectGroup {
+  // 8-4-4 Groups
+  LANGUAGES
+  SCIENCES
+  HUMANITIES
+  TECHNICAL_APPLIED
+  BUSINESS_STUDIES
+}
+
+// Subjects offered by a school
+model SubjectOffering {
+  id        String   @id @default(uuid())
+  schoolId  String
+  subjectId String
+  
+  school    School   @relation(fields: [schoolId], references: [id])
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  
+  isActive  Boolean  @default(true)
+  
+  @@unique([schoolId, subjectId])
+  @@index([schoolId])
+}
+
+model ClassSubject {
+  id             String      @id @default(uuid())
+  classId        String
+  subjectId      String
+  teacherId      String
+  termId         String
+  academicYearId String
+  subjectCategory SubjectCategory
+  
+  schoolId       String?
+  school         School?     @relation(fields: [schoolId], references: [id])
+  
+  class          Class        @relation(fields: [classId], references: [id])
+  subject        Subject      @relation(fields: [subjectId], references: [id])
+  term           Term         @relation("TermClassSubjects", fields: [termId], references: [id])
+  academicYear   AcademicYear @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
+  teacherProfile Teacher      @relation("TeacherClassSubjects", fields: [teacherId], references: [id])
+  
+  // CBC: Strand/Sub-strand tracking
+  strands        ClassSubjectStrand[]      
+  
+  assessments    AssessmentDefinition[]
+  
+  @@unique([classId, subjectId, termId, academicYearId])
+  @@index([teacherId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
+  @@index([schoolId, termId])
+}
+
+// ===== STUDENT ENROLLMENT =====
+
+model StudentClass {
+  id             String          @id @default(uuid())
+  studentId      String
+  classId        String
+  streamId       String?         // Optional stream assignment
+  academicYearId String
+  
+  schoolId       String?
+  school         School?         @relation(fields: [schoolId], references: [id])
+  
+  status         EnrollmentStatus @default(ACTIVE)
+  
+  // For subject selection (especially CBC pathways & electives)
+  selectedSubjects String[]       
+  
+  // Promotion tracking
+  promotedToId   String?
+  promotionDate  DateTime?
+  
+  // Transfer tracking
+  transferredFrom String?
+  transferDate   DateTime?
+  
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  student        Student      @relation(fields: [studentId], references: [id])
+  class          Class        @relation(fields: [classId], references: [id])
+  stream         Stream?      @relation(fields: [streamId], references: [id])
+  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
+  promotedTo     Class?       @relation("Promotion", fields: [promotedToId], references: [id])
+  
+  @@index([studentId])
+  @@index([classId])
+  @@index([status])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  PROMOTED
+  TRANSFERRED
+  GRADUATED
+  DROPPED_OUT
+  SUSPENDED
+}
+
+// ===== ASSESSMENT & GRADING =====
+
+// 1. Defines the CBC Strands/Competencies
+
+model Strand {
+  id           String    @id @default(uuid())
+  name         String  // e.g., "1.1: Number Recognition", "2.3: Speaking and Listening"
+  description  String?
+  
+  subjectId    String
+  subject      Subject   @relation(fields: [subjectId], references: [id])
+  
+  // This links strands to the class subjects that teach them
+  classSubjects ClassSubjectStrand[]
+  
+  // This links a strand to a specific assessment activity
+  assessmentDefinitions AssessmentDefinition[]
+  
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// Join table for ClassSubject and Strand 
+model ClassSubjectStrand {
+  id             String   @id @default(uuid())
+  classSubjectId String
+  strandId       String
+  
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id])
+  strand       Strand       @relation(fields: [strandId], references: [id])
+  
+  @@unique([classSubjectId, strandId])
+}
+
+// 2. Defines the assessment activity itself
+model AssessmentDefinition {
   id              String   @id @default(uuid())
-  key             String   @unique  // TYPE_SCHOOL_YEAR
-  type            String   // ADMISSION_NUMBER, EMPLOYEE_NUMBER, etc.
+  name            String   // "CAT 1", "End of Term", "Project 1"
+  type            AssessmentType
+  maxMarks        Float?   // For 8-4-4 (e.g., 100)
+  
+  termId          String
+  term            Term     @relation(fields: [termId], references: [id])
+  
+  classSubjectId  String
+  classSubject    ClassSubject @relation(fields: [classSubjectId], references: [id])
+  
+  // Add missing fields
   schoolId        String?
-  year            Int?
-  currentValue    Int      @default(0)
-  prefix          String?
-  lastGeneratedAt DateTime
+  school          School?  @relation(fields: [schoolId], references: [id])
+  academicYearId  String?
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  
+  // For CBC: Link this assessment to a specific strand
+  strandId        String?
+  strand          Strand?  @relation(fields: [strandId], references: [id])
+  
+  // All the student scores for this test
+  results         AssessmentResult[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([schoolId])
+  @@index([academicYearId])
+  @@index([termId])
+  @@index([classSubjectId])
+  @@index([strandId])
 }
+
+// 3. Stores the individual student's result
+model AssessmentResult {
+  id              String   @id @default(uuid())
+  
+  studentId       String
+  student         Student  @relation(fields: [studentId], references: [id])
+  
+  assessmentDefId String
+  assessmentDef   AssessmentDefinition @relation(fields: [assessmentDefId], references: [id])
+  
+  // Add missing field
+  schoolId        String?
+  school          School?  @relation(fields: [schoolId], references: [id])
+  
+  // --- Flexible Score Fields ---
+  // For 8-4-4
+  numericValue    Float?
+  grade           String?  // A, B+, C
+  
+  // For CBC
+  competencyLevel CompetencyLevel?
+  
+  // --- End Flexible Fields ---
+  
+  comment         String?  // Teacher's remarks
+  
+  assessedById    String   // The Teacher ID of the teacher
+  assessedBy      Teacher     @relation("AssessedBy", fields: [assessedById], references: [id])
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  // A student can only have one result per assessment
+  @@unique([studentId, assessmentDefId]) 
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([assessmentDefId])
+  @@index([assessedById])
+}
+
+enum AssessmentType {
+  CAT             // Continuous Assessment Test
+  MIDTERM
+  END_OF_TERM
+  MOCK
+  NATIONAL_EXAM   // KCPE/KCSE
+  COMPETENCY_BASED
+}
+
+enum CompetencyLevel {
+  // CBC Competency Levels
+  EXCEEDING_EXPECTATIONS
+  MEETING_EXPECTATIONS
+  APPROACHING_EXPECTATIONS
+  BELOW_EXPECTATIONS
+}
+```
+
 
 Architecture Overview
 
@@ -765,12 +1274,12 @@ Phase 1: Core SaaS Features (Weeks 1-20)
 
 
 Phase 2: Academic Features (Months 4-6)
-◇ [ ] Class & Stream Management
-◇ [ ] Subject Management
+◇ [x] Class & Stream Management
+◇ [x] Subject Management
 ◇ [ ] Timetable System
 ◇ [ ] Attendance Tracking
-◇ [ ] Grade Entry & Reports
-◇ [ ] Assessment Management
+◇ [x] Grade Entry & Reports
+◇ [x] Assessment Management
 
 
 Phase 3: Communication (Months 7-9)

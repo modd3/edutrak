@@ -15,11 +15,11 @@ export const assignClassSubject = async (req: Request, res: Response) => {
 
     const mapping = await prisma.classSubject.create({
       data: {
-        classId: String(classId),
-        subjectId: String(subjectId),
-        teacherId: String(teacherId),
-        academicYearId: String(academicYearId),
-        termId: String(termId),
+        classId,
+        subjectId,
+        teacherId,
+        academicYearId,
+        termId,
       },
     });
 
@@ -34,7 +34,7 @@ export const getClassSubjects = async (req: Request, res: Response) => {
     const { classId } = req.params;
     const mappings = await prisma.classSubject.findMany({
       where: { classId: String(classId) },
-      include: { subject: true, teacher: true, term: true },
+      include: { subject: true, teacherProfile: true, term: true },
     });
     return ResponseUtil.success(res, 'Class subjects fetched', mappings);
   } catch (err) {

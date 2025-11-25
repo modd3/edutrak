@@ -22,7 +22,84 @@ export class AcademicService extends BaseService {
     };
   }
 
-  // Academic Years - Now school-specific
+  // Create Academic Year with Terms in a single transaction
+  async createAcademicYearWithTerms(data: {
+    year: number;
+    startDate: Date;
+    endDate: Date;
+    isActive?: boolean;
+    terms: Array<{
+      name: TermName;
+      termNumber: number;
+      startDate: Date;
+      endDate: Date;
+    }>;
+  }): Promise<{ academicYear: AcademicYear; terms: Term[] }> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) {
+      throw new Error('School context required for non-super admins');
+    }
+
+  
+    // Validate term numbers are 1, 2, 3
+    const termNumbers = data.terms.map(t => t.termNumber).sort();
+    if (JSON.stringify(termNumbers) !== JSON.stringify([1, 2, 3])) {
+      throw new Error('Terms must have term numbers 1, 2, and 3');
+    }
+
+    return await this.prisma.$transaction(async (tx) => {
+      // Deactivate other active years if this one is active
+      if (data.isActive) {
+        const where = this.buildWhereClause({ isActive: true }, schoolId, isSuperAdmin);
+        await tx.academicYear.updateMany({
+          where,
+          data: { isActive: false },
+        });
+      }
+
+      // 1. Create the academic year
+      const academicYear = await tx.academicYear.create({
+        data: {
+          id: uuidv4(),
+          year: data.year,
+          startDate: data.startDate,
+          endDate: data.endDate,
+          isActive: data.isActive || false,
+          schoolId: schoolId!,
+        },
+      });
+
+      // 2. Create all terms for this academic year
+      const terms = await Promise.all(
+        data.terms.map(termData =>
+          tx.term.create({
+            data: {
+              id: uuidv4(),
+              name: termData.name,
+              termNumber: termData.termNumber,
+              startDate: termData.startDate,
+              endDate: termData.endDate,
+              academicYearId: academicYear.id,
+              schoolId: schoolId!,
+            },
+          })
+        )
+      );
+
+      logger.info('Academic year with terms created successfully', {
+        academicYearId: academicYear.id,
+        year: academicYear.year,
+        termCount: terms.length,
+        schoolId,
+        isActive: academicYear.isActive,
+      });
+
+      return { academicYear, terms };
+    });
+  }
+
+  // Original createAcademicYear (kept for backward compatibility)
   async createAcademicYear(data: {
     year: number;
     startDate: Date;
@@ -47,15 +124,15 @@ export class AcademicService extends BaseService {
       data: {
         id: uuidv4(),
         ...data,
-        schoolId: schoolId!, // Auto-assign school for non-super admins
+        schoolId: schoolId!,
       },
     });
 
-    logger.info('Academic year created successfully', { 
-      academicYearId: academicYear.id, 
+    logger.info('Academic year created successfully', {
+      academicYearId: academicYear.id,
       year: academicYear.year,
       schoolId,
-      isActive: academicYear.isActive 
+      isActive: academicYear.isActive,
     });
 
     return academicYear;
@@ -64,11 +141,14 @@ export class AcademicService extends BaseService {
   async getAcademicYears() {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({}, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.academicYear.findMany({
       where,
       orderBy: { year: 'desc' },
       include: {
+        terms: {
+          orderBy: { termNumber: 'asc' },
+        },
         _count: {
           select: {
             classes: true,
@@ -83,7 +163,7 @@ export class AcademicService extends BaseService {
   async getActiveAcademicYear(): Promise<AcademicYear | null> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({ isActive: true }, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.academicYear.findFirst({
       where,
       include: {
@@ -104,7 +184,7 @@ export class AcademicService extends BaseService {
   async getAcademicYearById(id: string): Promise<AcademicYear | null> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.academicYear.findUnique({
       where,
       include: {
@@ -158,12 +238,12 @@ export class AcademicService extends BaseService {
       data: { isActive: true },
     });
 
-    logger.info('Active academic year set', { 
-      academicYearId: id, 
+    logger.info('Active academic year set', {
+      academicYearId: id,
       year: academicYear.year,
-      schoolId 
+      schoolId,
     });
-    
+
     return academicYear;
   }
 
@@ -192,13 +272,14 @@ export class AcademicService extends BaseService {
       data: {
         id: uuidv4(),
         ...data,
+        schoolId: schoolId!,
       },
     });
 
-    logger.info('Term created successfully', { 
-      termId: term.id, 
+    logger.info('Term created successfully', {
+      termId: term.id,
       name: term.name,
-      academicYearId: data.academicYearId 
+      academicYearId: data.academicYearId,
     });
 
     return term;
@@ -293,14 +374,14 @@ export class AcademicService extends BaseService {
       data: {
         id: uuidv4(),
         ...data,
-        schoolId: schoolId!, // Auto-assign school
+        schoolId: schoolId!,
       },
     });
 
-    logger.info('Class created successfully', { 
-      classId: classData.id, 
+    logger.info('Class created successfully', {
+      classId: classData.id,
       name: classData.name,
-      schoolId 
+      schoolId,
     });
 
     return classData;
@@ -309,7 +390,7 @@ export class AcademicService extends BaseService {
   async getClassById(id: string): Promise<Class | null> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.class.findUnique({
       where,
       include: {
@@ -329,8 +410,8 @@ export class AcademicService extends BaseService {
               include: {
                 user: {
                   include: {
-                    teacher: true
-                  }
+                    teacher: true,
+                  },
                 },
               },
             },
@@ -364,7 +445,7 @@ export class AcademicService extends BaseService {
   async getSchoolClasses(academicYearId?: string) {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({}, schoolId, isSuperAdmin);
-    
+
     if (academicYearId) {
       where.academicYearId = academicYearId;
     }
@@ -442,15 +523,15 @@ export class AcademicService extends BaseService {
       data: {
         id: uuidv4(),
         ...data,
-        schoolId: schoolId!, // Auto-assign school
+        schoolId: schoolId!,
       },
     });
 
-    logger.info('Stream created successfully', { 
-      streamId: stream.id, 
+    logger.info('Stream created successfully', {
+      streamId: stream.id,
       name: stream.name,
       classId: data.classId,
-      schoolId 
+      schoolId,
     });
 
     return stream;
@@ -459,7 +540,7 @@ export class AcademicService extends BaseService {
   async getStreamById(id: string): Promise<Stream | null> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({ id }, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.stream.findUnique({
       where,
       include: {
@@ -483,7 +564,7 @@ export class AcademicService extends BaseService {
   async getClassStreams(classId: string): Promise<Stream[]> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where = this.buildWhereClause({ classId }, schoolId, isSuperAdmin);
-    
+
     return await this.prisma.stream.findMany({
       where,
       include: {
@@ -542,16 +623,18 @@ export class AcademicService extends BaseService {
   // Academic Statistics - School-specific
   async getAcademicStatistics(academicYearId?: string) {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
-    
+
     const baseWhere = this.buildWhereClause({}, schoolId, isSuperAdmin);
     const academicYearWhere = academicYearId ? { academicYearId } : {};
-    
+
     const assessmentWhere = this.buildWhereClause(
-      academicYearId ? { 
-        classSubject: { 
-          academicYearId: academicYearId 
-        } 
-      } : {},
+      academicYearId
+        ? {
+            classSubject: {
+              academicYearId: academicYearId,
+            },
+          }
+        : {},
       schoolId,
       isSuperAdmin
     );
@@ -562,23 +645,23 @@ export class AcademicService extends BaseService {
       totalClasses,
       totalAssessments,
       classDistribution,
-      assessmentTrends
+      assessmentTrends,
     ] = await Promise.all([
-      this.prisma.studentClass.count({ 
-        where: { 
-          ...baseWhere, 
+      this.prisma.studentClass.count({
+        where: {
+          ...baseWhere,
           ...academicYearWhere,
-          status: 'ACTIVE' 
-        } 
+          status: 'ACTIVE',
+        },
       }),
-      this.prisma.teacher.count({ 
-        where: this.buildWhereClause({}, schoolId, isSuperAdmin)
+      this.prisma.teacher.count({
+        where: this.buildWhereClause({}, schoolId, isSuperAdmin),
       }),
-      this.prisma.class.count({ 
-        where: { ...baseWhere, ...academicYearWhere } 
+      this.prisma.class.count({
+        where: { ...baseWhere, ...academicYearWhere },
       }),
-      this.prisma.assessmentDefinition.count({ 
-        where: assessmentWhere 
+      this.prisma.assessmentDefinition.count({
+        where: assessmentWhere,
       }),
       this.prisma.class.findMany({
         where: { ...baseWhere, ...academicYearWhere },
@@ -658,11 +741,10 @@ export class AcademicService extends BaseService {
       },
     });
 
-    
     const performanceByStudent = assessmentResults.reduce((acc, result) => {
       const studentId = result.studentId;
       const studentName = `${result.student.firstName} ${result.student.lastName}`;
-      
+
       if (!acc[studentId]) {
         acc[studentId] = {
           studentId,
@@ -673,7 +755,7 @@ export class AcademicService extends BaseService {
           subjects: {},
         };
       }
-      
+
       // Handle both numeric scores (8-4-4) and competency levels (CBC)
       if (result.numericValue !== null && result.assessmentDef.maxMarks) {
         acc[studentId].totalMarks += result.numericValue;
@@ -689,12 +771,12 @@ export class AcademicService extends BaseService {
             competencyLevels: [],
           };
         }
-        
+
         acc[studentId].subjects[subjectName].totalMarks += result.numericValue;
         acc[studentId].subjects[subjectName].totalMaxMarks += result.assessmentDef.maxMarks;
         acc[studentId].subjects[subjectName].count += 1;
       }
-      
+
       // Track competency levels for CBC
       if (result.competencyLevel) {
         const subjectName = result.assessmentDef.classSubject.subject.name;
@@ -715,22 +797,25 @@ export class AcademicService extends BaseService {
     // Calculate averages
     Object.values(performanceByStudent).forEach((student: any) => {
       student.average = student.count > 0 ? (student.totalMarks / student.totalMaxMarks) * 100 : 0;
-      
+
       Object.keys(student.subjects).forEach(subject => {
         const subjectData = student.subjects[subject];
-        subjectData.average = subjectData.count > 0 ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 : 0;
+        subjectData.average =
+          subjectData.count > 0 ? (subjectData.totalMarks / subjectData.totalMaxMarks) * 100 : 0;
       });
     });
 
     const performanceArray = Object.values(performanceByStudent);
-    const classAverage = performanceArray.length > 0
-      ? performanceArray.reduce((total: number, student: any) => total + student.average, 0) / performanceArray.length
-      : 0;
+    const classAverage =
+      performanceArray.length > 0
+        ? performanceArray.reduce((total: number, student: any) => total + student.average, 0) /
+          performanceArray.length
+        : 0;
 
     return {
       classId,
-      performance: [], // Your calculated performance array
-      classAverage: 0, // Your calculated average
+      performance: performanceArray,
+      classAverage,
     };
   }
 

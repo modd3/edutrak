@@ -24,6 +24,11 @@ import { useClassEnrollments, useDeleteEnrollment } from '@/hooks/use-class-stud
 import { useClassSubjects, useAssignSubject, useRemoveClassSubject } from '@/hooks/use-class-subjects';
 import { EnrollStudentDialog } from '@/components/classes/EnrollStudentDialog';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
+import { useSubjectOfferings } from '@/hooks/use-subjects';
+import { useAuthStore } from '@/store/auth-store';
+
 
 export default function ClassDetails() {
   const { id } = useParams();
@@ -33,11 +38,17 @@ export default function ClassDetails() {
   const { mutate: createStream, isPending: isCreatingStream } = useCreateStream();
   const { mutate: deleteStream } = useDeleteStream();
   const { data: students, isLoading: isLoadingStudents } = useClassEnrollments(id!);
-const { mutate: unenrollStudent } = useDeleteEnrollment();
-const { mutate: removeClassSubject } = useRemoveClassSubject();
-const { data: subjects, isLoading: isLoadingSubjects } = useClassSubjects(id!);
-const { mutate: assignSubjects, isPending: isAssigningSubjects } = useAssignSubject();
-const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const { mutate: unenrollStudent } = useDeleteEnrollment();
+  const { mutate: removeClassSubject } = useRemoveClassSubject();
+  const { data: classSubjects, isLoading: isLoadingClassSubjects } = useClassSubjects(id!);
+  const { mutate: assignSubjectToClass, isPending: isAssigningSubjectToClass } = useAssignSubject();
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const { user } = useAuthStore();
+  const { data: availableSubjects } = useSubjectOfferings(user?.schoolId || '');
+
+
+  const academicYearId = classData?.academicYearId;
+
 
 const studentColumns: ColumnDef<StudentClass>[] = [
   {
@@ -106,10 +117,10 @@ const subjectColumns: ColumnDef<ClassSubject>[] = [
     },
   },
   {
-    accessorKey: 'isCompulsory',
+    accessorKey: 'subjectCategory',
     header: 'Compulsory',
     cell: ({ row }) => (
-      row.original.subjectCategory? (
+      row.original.subjectCategory === 'CORE' ? (
         <CheckCircle className="h-4 w-4 text-green-500" />
       ) : (
         <XCircle className="h-4 w-4 text-gray-400" />
@@ -186,8 +197,8 @@ const subjectColumns: ColumnDef<ClassSubject>[] = [
     );
   }
 
-  if (!classData) {
-    return <div>Class not found</div>;
+  if (!classData || !academicYearId) {
+    return <div>Class not found or academic year not available.</div>;
   }
 
   return (
@@ -292,7 +303,7 @@ const subjectColumns: ColumnDef<ClassSubject>[] = [
   <Card>
     <CardHeader className="flex flex-row items-center justify-between">
       <CardTitle>Enrolled Students</CardTitle>
-      <EnrollStudentDialog classId={id!} />
+      <EnrollStudentDialog classId={id!} academicYearId={academicYearId} />
     </CardHeader>
     <CardContent>
       {isLoadingStudents ? (
@@ -329,44 +340,56 @@ const subjectColumns: ColumnDef<ClassSubject>[] = [
             <DialogTitle>Assign Subjects to Class</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-            {availableSubjects?.data.map((subject) => (
-              <div key={subject.id} className="flex items-center space-x-2">
+            {availableSubjects?.data.map((subjectOffering) => (
+              <div key={subjectOffering.id} className="flex items-center space-x-2">
                 <Checkbox
-                  id={`subject-${subject.id}`}
-                  checked={selectedSubjects.includes(subject.id.toString())}
+                  id={`subject-${subjectOffering.subject.id}`}
+                  checked={selectedSubjects.includes(subjectOffering.subject.id.toString())}
                   onCheckedChange={(checked) => {
                     if (checked) {
-                      setSelectedSubjects([...selectedSubjects, subject.id.toString()]);
+                      setSelectedSubjects([...selectedSubjects, subjectOffering.subject.id.toString()]);
                     } else {
                       setSelectedSubjects(
-                        selectedSubjects.filter((id) => id !== subject.id.toString())
+                        selectedSubjects.filter((id) => id !== subjectOffering.subject.id.toString())
                       );
                     }
                   }}
                 />
-                <Label htmlFor={`subject-${subject.id}`}>
-                  {subject.name} ({subject.code})
+                <Label htmlFor={`subject-${subjectOffering.subject.id}`}>
+                  {subjectOffering.subject.name} ({subjectOffering.subject.code})
                 </Label>
               </div>
             ))}
             <Button
               onClick={() => {
-                assignSubjects({
-                  classId: id!,
-                  subjectIds: selectedSubjects,
-                });
+                // Determine subjectCategory - for simplicity, assuming CORE for now
+                // In a real app, this might come from the SubjectOffering or a user selection
+                const assignments = selectedSubjects.map(subjectId => ({
+                    classId: id!,
+                    subjectId: subjectId,
+                    teacherId: user?.teacher?.id, // Assign to current user as teacher for now
+                    termId: classData.academicYear?.terms[0]?.id || '', // Default to first term
+                    academicYearId: academicYearId,
+                    subjectCategory: 'CORE',
+                }));
+
+                // Call bulk assign subject if available or iterate
+                assignments.forEach(assignment => {
+                    assignSubjectToClass(assignment);
+                })
+                
               }}
-              disabled={isAssigningSubjects}
+              disabled={isAssigningSubjectToClass || selectedSubjects.length === 0}
               className="w-full"
             >
-              {isAssigningSubjects ? 'Assigning...' : 'Assign Selected Subjects'}
+              {isAssigningSubjectToClass ? 'Assigning...' : 'Assign Selected Subjects'}
             </Button>
           </div>
         </DialogContent>
       </Dialog>
     </CardHeader>
     <CardContent>
-      {isLoadingSubjects ? (
+      {isLoadingClassSubjects ? (
         <div className="space-y-4">
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
@@ -375,7 +398,7 @@ const subjectColumns: ColumnDef<ClassSubject>[] = [
       ) : (
         <DataTable
           columns={subjectColumns}
-          data={subjects?.data || []}
+          data={classSubjects?.data || []}
         />
       )}
     </CardContent>

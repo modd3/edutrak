@@ -1,12 +1,28 @@
-import { PrismaClient, Student, Gender, EnrollmentStatus, Role } from '@prisma/client';
+import { Student, Gender, EnrollmentStatus, Role } from '@prisma/client';
 import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
-import { BaseService } from './base.service'
+import { BaseService } from './base.service';
+import { RequestWithUser } from '../middleware/school-context';
 
 export class StudentService extends BaseService {
+  private req?: RequestWithUser;
+
+  constructor(req?: RequestWithUser) {
+    super();
+    this.req = req;
+  }
+
+  // Helper to get school context from request
+  private getSchoolContext() {
+    return {
+      schoolId: this.req?.schoolId,
+      isSuperAdmin: this.req?.isSuperAdmin || false,
+      userId: this.req?.user?.userId,
+      role: this.req?.user?.role,
+    };
+  }
 
   /*
   ** Get all students
@@ -423,6 +439,16 @@ export class StudentService extends BaseService {
   }
 
   async getStudentsByClass(classId: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    // Verify class access first
+    if (!isSuperAdmin) {
+      const hasAccess = await this.validateSchoolAccess(classId, 'class', schoolId, isSuperAdmin);
+      if (!hasAccess) {
+        throw new Error('Class not found or access denied');
+      }
+    }
+
     return await this.prisma.studentClass.findMany({
       where: {
         classId,

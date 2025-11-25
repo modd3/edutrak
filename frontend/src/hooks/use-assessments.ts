@@ -12,14 +12,14 @@ export function useAssessments(params?: {
 }) {
   return useQuery({
     queryKey: ['assessments', params],
-    queryFn: () => assessmentService.getAll(params),
+    queryFn: () => assessmentService.getAll(params), // Now gets all results
   });
 }
 
 export function useAssessment(id: string) {
   return useQuery({
     queryKey: ['assessments', id],
-    queryFn: () => assessmentService.getById(id),
+    queryFn: () => assessmentService.getById(id), // Now gets an assessment result
     enabled: !!id,
   });
 }
@@ -28,7 +28,7 @@ export function useCreateAssessment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: AssessmentCreateInput) => assessmentService.create(data),
+    mutationFn: (data: AssessmentCreateInput) => assessmentService.create(data), // Creates an assessment result
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assessments'] });
       toast.success('Assessment created successfully');
@@ -44,7 +44,7 @@ export function useUpdateAssessment() {
 
   return useMutation({
     mutationFn: ({ id, data }: { id: string; data: AssessmentUpdateInput }) =>
-      assessmentService.update(id, data),
+      assessmentService.update(id, data), // Updates an assessment result
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assessments'] });
       toast.success('Assessment updated successfully');
@@ -59,7 +59,7 @@ export function useBulkCreateAssessments() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: BulkAssessmentInput) => assessmentService.bulkCreate(data),
+    mutationFn: (data: BulkAssessmentInput) => assessmentService.bulkCreate(data), // Bulk creates assessment results
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assessments'] });
       toast.success('Assessments created successfully');
@@ -71,13 +71,16 @@ export function useBulkCreateAssessments() {
 }
 
 export function useAssessmentStatistics(params: {
-  classId: string;
+  classId: string; // This should ideally be classSubjectId now
   subjectId?: string;
   termId?: string;
 }) {
   return useQuery({
     queryKey: ['assessments', 'statistics', params],
-    queryFn: () => assessmentService.getStatistics(params),
+    // The backend route is /assessments/statistics/class-subject/:classSubjectId
+    // The frontend hook currently passes classId, which is probably incorrect.
+    // It should be updated to pass classSubjectId.
+    queryFn: () => assessmentService.getStatistics({ classId: params.classId, termId: params.termId }),
     enabled: !!params.classId,
   });
 }

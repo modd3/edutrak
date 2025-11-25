@@ -1,15 +1,27 @@
-import { PrismaClient, Guardian, Role } from '@prisma/client';
+import { Guardian, Role } from '@prisma/client';
 import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
-import prisma from '../database/client';
 import logger from '../utils/logger';
 import emailService from '../utils/email';
+import { BaseService } from './base.service';
+import { RequestWithUser } from '../middleware/school-context';
 
-export class GuardianService {
-  private prisma: PrismaClient;
+export class GuardianService extends BaseService {
+  private req?: RequestWithUser;
 
-  constructor() {
-    this.prisma = prisma;
+  constructor(req?: RequestWithUser) {
+    super();
+    this.req = req;
+  }
+
+  // Helper to get school context from request
+  private getSchoolContext() {
+    return {
+      schoolId: this.req?.schoolId,
+      isSuperAdmin: this.req?.isSuperAdmin || false,
+      userId: this.req?.user?.userId,
+      role: this.req?.user?.role,
+    };
   }
 
   async createGuardian(data: {
@@ -99,12 +111,19 @@ export class GuardianService {
     limit?: number;
     search?: string;
   }) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
     const where: any = {};
 
-    if (filters?.schoolId) {
-      where.user = {
-        schoolId: filters.schoolId,
-      };
+    // Enforce school isolation for non-super admins
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        where.user = { schoolId: 'NONE' }; // Force no results
+      } else {
+        where.user = { schoolId };
+      }
+    } else if (filters?.schoolId) {
+      // Super admin can filter by specific school
+      where.user = { schoolId: filters.schoolId };
     }
 
     if (filters?.search) {
@@ -166,8 +185,18 @@ export class GuardianService {
   }
 
   async getGuardianById(id: string): Promise<Guardian | null> {
-    return await this.prisma.guardian.findUnique({
-      where: { id },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = { id };
+
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        return null;
+      }
+      where.user = { schoolId };
+    }
+
+    return await this.prisma.guardian.findFirst({
+      where,
       include: {
         user: true,
         students: {
@@ -192,8 +221,18 @@ export class GuardianService {
   }
 
   async getGuardianByUserId(userId: string): Promise<Guardian | null> {
-    return await this.prisma.guardian.findUnique({
-      where: { userId },
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const where: any = { userId };
+
+    if (!isSuperAdmin) {
+      if (!schoolId) {
+        return null;
+      }
+      where.user = { schoolId };
+    }
+
+    return await this.prisma.guardian.findFirst({
+      where,
       include: {
         user: true,
         students: {
@@ -216,12 +255,24 @@ export class GuardianService {
   }
 
   async updateGuardian(id: string, data: Partial<Guardian>): Promise<Guardian> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin) {
+      const existing = await this.prisma.guardian.findFirst({
+        where: { id, user: { schoolId } },
+        select: { id: true },
+      });
+      if (!existing) {
+        throw new Error('Guardian not found or access denied');
+      }
+    }
+
     const guardian = await this.prisma.guardian.update({
       where: { id },
       data,
     });
 
-    logger.info('Guardian updated successfully', { guardianId: id });
+    logger.info('Guardian updated successfully', { guardianId: id, schoolId });
     return guardian;
   }
 

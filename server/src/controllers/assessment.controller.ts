@@ -3,17 +3,17 @@ import { AssessmentService } from '../services/assessment.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { AssessmentType, CompetencyLevel } from '@prisma/client';
-
-const assessmentService = new AssessmentService();
+import { RequestWithUser } from '../middleware/school-context';
 
 // ========== ASSESSMENT DEFINITION CONTROLLERS ==========
 
 /**
  * Create a new assessment definition
  */
-export const createAssessmentDefinition = async (req: Request, res: Response) => {
-  try {
-    const { name, type, maxMarks, termId, classSubjectId, strandId } = req.body;
+export const createAssessmentDefinition = async (req: RequestWithUser, res: Response) => {
+    try {
+        const assessmentService = AssessmentService.withRequest(req);
+        const { name, type, maxMarks, termId, classSubjectId, strandId } = req.body;
 
     // Validate required fields
     if (!name || !type || !termId || !classSubjectId) {
@@ -60,10 +60,10 @@ export const createAssessmentDefinition = async (req: Request, res: Response) =>
 /**
  * Get assessment definition by ID
  */
-export const getAssessmentDefinitionById = async (req: Request, res: Response) => {
+export const getAssessmentDefinitionById = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const assessmentDef = await assessmentService.getAssessmentDefinitionById(id);
 
     if (!assessmentDef) {
@@ -83,10 +83,10 @@ export const getAssessmentDefinitionById = async (req: Request, res: Response) =
 /**
  * Get all assessment definitions for a class subject
  */
-export const getClassSubjectAssessmentDefinitions = async (req: Request, res: Response) => {
+export const getClassSubjectAssessmentDefinitions = async (req: RequestWithUser, res: Response) => {
   try {
     const { classSubjectId } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const assessments = await assessmentService.getClassSubjectAssessmentDefinitions(classSubjectId);
 
     return ResponseUtil.success(
@@ -178,8 +178,9 @@ export const deleteAssessmentDefinition = async (req: Request, res: Response) =>
 /**
  * Create a single assessment result
  */
-export const createAssessmentResult = async (req: Request, res: Response) => {
+export const createAssessmentResult = async (req: RequestWithUser, res: Response) => {
   try {
+    const assessmentService = AssessmentService.withRequest(req);
     const { studentId, assessmentDefId, numericValue, grade, competencyLevel, comment } = req.body;
     const assessedById = req.user?.userId;
 
@@ -239,8 +240,9 @@ export const createAssessmentResult = async (req: Request, res: Response) => {
 /**
  * Create bulk assessment results
  */
-export const createBulkAssessmentResults = async (req: Request, res: Response) => {
+export const createBulkAssessmentResults = async (req: RequestWithUser, res: Response) => {
   try {
+    const assessmentService = AssessmentService.withRequest(req);
     const { results } = req.body;
     const assessedById = req.user?.userId;
 
@@ -291,10 +293,10 @@ export const createBulkAssessmentResults = async (req: Request, res: Response) =
 /**
  * Get assessment result by ID
  */
-export const getAssessmentResultById = async (req: Request, res: Response) => {
+export const getAssessmentResultById = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const result = await assessmentService.getAssessmentResultById(id);
 
     if (!result) {
@@ -314,15 +316,11 @@ export const getAssessmentResultById = async (req: Request, res: Response) => {
 /**
  * Update assessment result
  */
-export const updateAssessmentResult = async (req: Request, res: Response) => {
+export const updateAssessmentResult = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
     const { numericValue, grade, competencyLevel, comment } = req.body;
-
-    const existing = await assessmentService.getAssessmentResultById(id);
-    if (!existing) {
-      return ResponseUtil.notFound(res, 'Assessment result');
-    }
+    const assessmentService = AssessmentService.withRequest(req);
 
     const updated = await assessmentService.updateAssessmentResult(id, {
       numericValue,
@@ -346,15 +344,10 @@ export const updateAssessmentResult = async (req: Request, res: Response) => {
 /**
  * Delete assessment result
  */
-export const deleteAssessmentResult = async (req: Request, res: Response) => {
+export const deleteAssessmentResult = async (req: RequestWithUser, res: Response) => {
   try {
     const { id } = req.params;
-
-    const existing = await assessmentService.getAssessmentResultById(id);
-    if (!existing) {
-      return ResponseUtil.notFound(res, 'Assessment result');
-    }
-
+    const assessmentService = AssessmentService.withRequest(req);
     await assessmentService.deleteAssessmentResult(id);
 
     logger.info('Assessment result deleted', { resultId: id, deletedBy: req.user?.userId });
@@ -372,11 +365,11 @@ export const deleteAssessmentResult = async (req: Request, res: Response) => {
 /**
  * Get student assessment results with filters
  */
-export const getStudentAssessmentResults = async (req: Request, res: Response) => {
+export const getStudentAssessmentResults = async (req: RequestWithUser, res: Response) => {
   try {
     const { studentId } = req.params;
     const { termId, classSubjectId, assessmentType, page, limit } = req.query;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const results = await assessmentService.getStudentAssessmentResults(studentId, {
       termId: termId as string,
       classSubjectId: classSubjectId as string,
@@ -403,10 +396,10 @@ export const getStudentAssessmentResults = async (req: Request, res: Response) =
 /**
  * Get all results for an assessment definition
  */
-export const getAssessmentDefinitionResults = async (req: Request, res: Response) => {
+export const getAssessmentDefinitionResults = async (req: RequestWithUser, res: Response) => {
   try {
     const { assessmentDefId } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const results = await assessmentService.getAssessmentDefinitionResults(assessmentDefId);
 
     return ResponseUtil.success(
@@ -429,10 +422,10 @@ export const getAssessmentDefinitionResults = async (req: Request, res: Response
 /**
  * Calculate student term average
  */
-export const calculateStudentTermAverage = async (req: Request, res: Response) => {
+export const calculateStudentTermAverage = async (req: RequestWithUser, res: Response) => {
   try {
     const { studentId, termId } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const average = await assessmentService.calculateStudentTermAverage(studentId, termId);
 
     return ResponseUtil.success(res, 'Student term average calculated successfully', average);
@@ -449,10 +442,11 @@ export const calculateStudentTermAverage = async (req: Request, res: Response) =
 /**
  * Get class subject statistics
  */
-export const getClassSubjectStatistics = async (req: Request, res: Response) => {
+export const getClassSubjectStatistics = async (req: RequestWithUser, res: Response) => {
   try {
     const { classSubjectId } = req.params;
     const { termId } = req.query;
+    const assessmentService = AssessmentService.withRequest(req);
 
     const statistics = await assessmentService.getClassSubjectStatistics(
       classSubjectId,
@@ -476,10 +470,10 @@ export const getClassSubjectStatistics = async (req: Request, res: Response) => 
 /**
  * Generate student term report
  */
-export const generateStudentTermReport = async (req: Request, res: Response) => {
+export const generateStudentTermReport = async (req: RequestWithUser, res: Response) => {
   try {
     const { studentId, termId } = req.params;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const report = await assessmentService.generateStudentTermReport(studentId, termId);
 
     logger.info('Student term report generated', {
@@ -507,7 +501,7 @@ export const generateStudentTermReport = async (req: Request, res: Response) => 
 /**
  * Get assessment analytics for a class
  */
-export const getClassAssessmentAnalytics = async (req: Request, res: Response) => {
+export const getClassAssessmentAnalytics = async (req: RequestWithUser, res: Response) => {
   try {
     const { classId } = req.params;
     const { termId, academicYearId } = req.query;
@@ -534,11 +528,11 @@ export const getClassAssessmentAnalytics = async (req: Request, res: Response) =
 /**
  * Export assessment results (CSV/Excel)
  */
-export const exportAssessmentResults = async (req: Request, res: Response) => {
+export const exportAssessmentResults = async (req: RequestWithUser, res: Response) => {
   try {
     const { assessmentDefId } = req.params;
     const { format = 'csv' } = req.query;
-
+    const assessmentService = AssessmentService.withRequest(req);
     const results = await assessmentService.getAssessmentDefinitionResults(assessmentDefId);
 
     if (results.length === 0) {
