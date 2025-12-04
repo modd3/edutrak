@@ -2,8 +2,7 @@ import { useState } from 'react';
 import {
   useAcademicYears,
   useSetActiveAcademicYear,
-  useTerms,
-} from '@/hooks/use-academic-years';
+} from '@/hooks/use-academic';
 import { AcademicYear } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,8 +13,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CreateAcademicYearForm } from '@/components/academic-years/CreateAcademicYearForm';
-import { TermDatesForm } from '@/components/academic-years/TermDatesForm';
+import { CreateAcademicYearForm } from '@/components/academic/CreateAcademicYearForm';
+import { TermDatesForm } from '@/components/academic/TermDatesForm';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils';
 import { CheckCircle, Loader2 } from 'lucide-react';

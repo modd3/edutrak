@@ -12,16 +12,16 @@ router.use(enforceSchoolContext);
 router.use(validateResourceOwnership);
 
 // Academic Years
-router.post('/academic-years', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.createAcademicYear);
-router.get('/academic-years', AcademicController.getAcademicYears);
-router.get('/academic-years/active', AcademicController.getActiveAcademicYear);
-router.get('/academic-years/:id', AcademicController.getAcademicYearById);
-router.patch('/academic-years/:id/activate', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.setActiveAcademicYear);
+router.post('/years', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.createAcademicYear);
+router.get('/years', AcademicController.getAcademicYears);
+router.get('/years/active', AcademicController.getActiveAcademicYear);
+router.get('/years/:id', AcademicController.getAcademicYearById);
+router.patch('/years/:id/activate', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.setActiveAcademicYear);
 
 // Terms
 router.post('/terms', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.createTerm);
 router.get('/terms/:id', AcademicController.getTermById);
-router.get('/academic-years/:academicYearId/terms', AcademicController.getTermsByAcademicYear);
+router.get('/years/:academicYearId/terms', AcademicController.getTermsByAcademicYear);
 
 // Classes
 router.post('/classes', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.createClass);

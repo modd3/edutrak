@@ -3,6 +3,7 @@ import { Response } from 'express';
 import { RequestWithUser } from '../middleware/school-context';
 import { userCreationService } from '../services/user-creation.service';
 import logger from '../utils/logger';
+import { ResponseUtil } from '../utils/response';
 
 export class UserCreationController {
   /**
@@ -32,16 +33,11 @@ export class UserCreationController {
         schoolId,
       });
 
-      res.status(201).json({
-        data: user,
-        message: 'User created successfully',
-      });
+      ResponseUtil.created(res, 'User Created Successfully', user);
+
     } catch (error: any) {
       logger.error('User creation error', { error: error.message });
-      res.status(400).json({
-        error: 'USER_CREATION_FAILED',
-        message: error.message,
-      });
+      ResponseUtil.error(res, 'Error Creating User!', res.statusCode, error);
     }
   }
 

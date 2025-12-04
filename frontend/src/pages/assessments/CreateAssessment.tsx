@@ -19,7 +19,7 @@ import { useCreateAssessment } from '@/hooks/use-assessments';
 import { GradeBasedForm } from '@/components/assessments/GradeBasedForm';
 import { CompetencyBasedForm } from '@/components/assessments/CompetencyBasedForm';
 import { useClassSubjects } from '@/hooks/use-class-subjects';
-import { useAcademicYears, useTerms } from '@/hooks/use-academic-years';
+import { useAcademicYears, useTerms } from '@/hooks/use-academic';
 import { useStudents } from '@/hooks/use-students';
 import { useAuthStore } from '@/store/auth-store';
 import { useSchoolClasses } from '@/hooks/use-classes';

@@ -14,6 +14,7 @@ import CreateClass from './pages/classes/CreateClass';
 import SchoolsList from './pages/schools/SchoolsList';
 import CreateSchool from './pages/schools/CreateSchool';
 import UsersList from './pages/users/UsersList';
+import { AcademicYearsPage } from './pages/academic/AcademicYearsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -150,6 +151,17 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   < ClassesList />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+<Route
+            path="/academic-year"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < AcademicYearsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }
