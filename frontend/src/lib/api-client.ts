@@ -14,9 +14,18 @@ export const apiClient = axios.create({
 // Request interceptor to add auth token
 apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('authToken')
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+    // Get token from Zustand store instead of localStorage
+    const authState = localStorage.getItem('auth-storage')
+    if (authState) {
+      try {
+        const { state } = JSON.parse(authState)
+        const token = state?.token
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`
+        }
+      } catch (error) {
+        console.error('Error parsing auth state:', error)
+      }
     }
     return config
   },
@@ -32,10 +41,16 @@ apiClient.interceptors.response.use(
     const message = error.response?.data?.message || 'An error occurred'
     
     if (error.response?.status === 401) {
-      localStorage.removeItem('authToken')
+      // Clear auth state and redirect to login
+      localStorage.removeItem('auth-storage')
       window.location.href = '/login'
+      toast.error('Session expired. Please login again.')
+    } else if (error.response?.status === 403) {
+      toast.error('You do not have permission to perform this action.')
     } else if (error.response?.status >= 500) {
       toast.error('Server error. Please try again later.')
+    } else if (error.response?.status === 404) {
+      toast.error('Resource not found.')
     } else {
       toast.error(message)
     }
