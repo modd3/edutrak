@@ -312,6 +312,11 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       delete userData.password;
     }
 
+      // Ensure idNumber is null if empty (extra safety)
+  if (userData.idNumber === '') {
+    userData.idNumber = null;
+  }
+
     // Validate and get profile data based on role
     if (selectedRole === 'STUDENT') {
       const isProfileValid = await studentForm.trigger();
