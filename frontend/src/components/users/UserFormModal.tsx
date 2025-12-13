@@ -49,10 +49,10 @@ const studentProfileSchema = z.object({
   allergies: z.string().optional(),
 });
 
-// Teacher profile schema
+// Teacher profile schema - employeeNumber is REQUIRED
 const teacherProfileSchema = z.object({
   tscNumber: z.string().min(1, 'TSC number is required'),
-  employeeNumber: z.string().optional(),
+  employeeNumber: z.string().min(1, 'Employee number is required'),
   employmentType: z.enum(['PERMANENT', 'CONTRACT', 'TEMPORARY', 'BOM', 'PTA']),
   qualification: z.string().optional(),
   specialization: z.string().optional(),
@@ -118,7 +118,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   const roleOptions = getRoleOptions(isSuperAdmin);
   const isLoading = isCreating || isUpdating;
 
-  // Base user form - MUST BE DEFINED FIRST
+  // Base user form - DEFINED FIRST
   const userForm = useForm<BaseUserFormData>({
     resolver: zodResolver(baseUserSchema),
     defaultValues: {
@@ -172,7 +172,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   // Get schoolId from form
   const watchedSchoolId = userForm.watch('schoolId');
 
-  // Get previews for auto-generated numbers - NOW AFTER FORMS ARE DEFINED
+  // Get previews for auto-generated numbers - AFTER forms are defined
   const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
     'ADMISSION_NUMBER',
     watchedSchoolId,
@@ -340,6 +340,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         profileData.dob = new Date(profileData.dob);
       }
     } else if (selectedRole === 'TEACHER') {
+      // Validate teacher form
       const isProfileValid = await teacherForm.trigger();
       if (!isProfileValid) {
         const teacherErrors = Object.values(teacherForm.formState.errors);
@@ -352,12 +353,12 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       }
       profileData = teacherForm.getValues();
       
-      // Ensure employee number is set
+      // Ensure employee number is set (either auto-generated or manual)
       if (!profileData.employeeNumber) {
         if (autoGenerateEmployee && previewEmployee?.preview) {
           profileData.employeeNumber = previewEmployee.preview;
-        } else if (mode === 'create') {
-          toast.error('Employee number is required when not auto-generating');
+        } else {
+          toast.error('Employee number is required');
           return;
         }
       }
@@ -555,7 +556,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                             <SelectValue placeholder="Select school" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">-- Select School --</SelectItem>
+                            <SelectItem value="select-school">-- Select School --</SelectItem>
                             {schools.map((school: any) => (
                               <SelectItem key={school.id} value={school.id}>
                                 {school.name}
@@ -880,7 +881,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label>Employee Number</Label>
+                        <Label>Employee Number *</Label>
                         {mode === 'create' && (
                           <div className="flex items-center gap-2">
                             <Checkbox
@@ -921,6 +922,12 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                               <RefreshCw className="h-3 w-3" />
                             </Button>
                           </div>
+                          {/* Hidden input to satisfy form validation */}
+                          <input
+                            type="hidden"
+                            {...teacherForm.register('employeeNumber')}
+                            value={previewEmployee?.preview || ''}
+                          />
                         </div>
                       ) : (
                         <Input
