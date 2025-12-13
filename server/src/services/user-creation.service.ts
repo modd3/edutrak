@@ -35,6 +35,7 @@ interface StudentProfileData {
 
 interface TeacherProfileData {
   tscNumber: string;
+  employeeNumber: string;
   employmentType: 'PERMANENT' | 'CONTRACT' | 'TEMPORARY' | 'BOM' | 'PTA';
   qualification?: string;
   specialization?: string;
@@ -286,6 +287,7 @@ export class UserCreationService extends BaseService {
         id: uuidv4(),
         userId: user.id,
         tscNumber: profileData.tscNumber,
+        employeeNumber: profileData.employeeNumber,
         employmentType: profileData.employmentType,
         qualification: profileData.qualification,
         specialization: profileData.specialization,
