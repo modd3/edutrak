@@ -5,6 +5,7 @@ import { RequestWithUser } from '../middleware/school-context';
 import { Curriculum, Pathway, TermName } from '@prisma/client';
 import logger from '../utils/logger';
 import { stream } from 'winston';
+import { ResponseUtil } from '../utils/response';
 
 export class AcademicController {
   // Academic Years
@@ -41,11 +42,7 @@ export class AcademicController {
       const academicService = AcademicService.withRequest(req);
       const academicYears = await academicService.getAcademicYears();
 
-      res.json({
-        success: true,
-        data: academicYears,
-        message: 'Academic years fetched successfully',
-      });
+      ResponseUtil.success(res, 'Academic Years Fetched Successfully!', academicYears);
     } catch (error: any) {
       logger.error('Error fetching academic years:', error);
       res.status(500).json({

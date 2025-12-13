@@ -1,3 +1,4 @@
+// src/components/users/UserFormModal.tsx
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,7 +27,7 @@ const baseUserSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
   phone: z.string().optional(),
-  idNumber: z.string().optional(),
+  idNumber: z.string().nullable().optional().transform(e => e === "" ? null : e),
   role: z.enum(['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPPORT_STAFF']),
   schoolId: z.string().optional(),
 });
@@ -51,6 +52,7 @@ const studentProfileSchema = z.object({
 // Teacher profile schema
 const teacherProfileSchema = z.object({
   tscNumber: z.string().min(1, 'TSC number is required'),
+  employeeNumber: z.string().optional(),
   employmentType: z.enum(['PERMANENT', 'CONTRACT', 'TEMPORARY', 'BOM', 'PTA']),
   qualification: z.string().optional(),
   specialization: z.string().optional(),
@@ -105,7 +107,7 @@ const EMPLOYMENT_TYPES = [
 
 export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalProps) {
   const [autoGenerateAdmission, setAutoGenerateAdmission] = useState(mode === 'create');
-  const [autoGenerateUPI, setAutoGenerateUPI] = useState(true);
+  const [autoGenerateEmployee, setAutoGenerateEmployee] = useState(mode === 'create');
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role>(user?.role as Role || 'STUDENT');
   
@@ -116,7 +118,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   const roleOptions = getRoleOptions(isSuperAdmin);
   const isLoading = isCreating || isUpdating;
 
-  // Base user form
+  // Base user form - MUST BE DEFINED FIRST
   const userForm = useForm<BaseUserFormData>({
     resolver: zodResolver(baseUserSchema),
     defaultValues: {
@@ -132,31 +134,56 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     },
   });
 
-  const { data: previewAdmission, refetch: refreshPreview } = usePreviewSequence(
-    'ADMISSION_NUMBER',
-    userForm.watch('schoolId'),
-    { enabled: autoGenerateAdmission && mode === 'create' }
-  );
-
   // Student profile form
   const studentForm = useForm<StudentProfileFormData>({
     resolver: zodResolver(studentProfileSchema),
     defaultValues: {
+      admissionNo: '',
       gender: 'MALE',
       nationality: 'Kenyan',
       hasSpecialNeeds: false,
+      specialNeedsType: '',
+      medicalCondition: '',
+      allergies: '',
     },
   });
 
   // Teacher profile form
   const teacherForm = useForm<TeacherProfileFormData>({
     resolver: zodResolver(teacherProfileSchema),
+    defaultValues: {
+      tscNumber: '',
+      employeeNumber: '',
+      employmentType: 'PERMANENT',
+    },
   });
 
   // Guardian profile form
   const guardianForm = useForm<GuardianProfileFormData>({
     resolver: zodResolver(guardianProfileSchema),
+    defaultValues: {
+      relationship: '',
+      occupation: '',
+      employer: '',
+      workPhone: '',
+    },
   });
+
+  // Get schoolId from form
+  const watchedSchoolId = userForm.watch('schoolId');
+
+  // Get previews for auto-generated numbers - NOW AFTER FORMS ARE DEFINED
+  const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
+    'ADMISSION_NUMBER',
+    watchedSchoolId,
+    { enabled: autoGenerateAdmission && mode === 'create' && open }
+  );
+
+  const { data: previewEmployee, refetch: refreshEmployeePreview } = usePreviewSequence(
+    'EMPLOYEE_NUMBER',
+    watchedSchoolId,
+    { enabled: autoGenerateEmployee && mode === 'create' && open }
+  );
 
   // Watch role changes
   const watchedRole = userForm.watch('role');
@@ -171,6 +198,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       userForm.setValue('schoolId', schoolId);
     }
   }, [open, isSuperAdmin, schoolId, mode, userForm]);
+
+  // Reset forms when opening in create mode
+  useEffect(() => {
+    if (open && mode === 'create') {
+      resetAllForms();
+    }
+  }, [open, mode]);
 
   // Populate forms when user data changes (edit mode)
   useEffect(() => {
@@ -209,11 +243,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       if (user.role === 'TEACHER' && user.teacher) {
         teacherForm.reset({
           tscNumber: user.teacher.tscNumber,
+          employeeNumber: user.teacher.employeeNumber,
           employmentType: user.teacher.employmentType,
           qualification: user.teacher.qualification || '',
           specialization: user.teacher.specialization || '',
           dateJoined: user.teacher.dateJoined ? new Date(user.teacher.dateJoined).toISOString().split('T')[0] : '',
         });
+        setAutoGenerateEmployee(false);
       }
 
       if (user.role === 'PARENT' && user.guardian) {
@@ -227,10 +263,28 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     }
   }, [mode, user, open, userForm, studentForm, teacherForm, guardianForm]);
 
-  const onSubmit = async () => {
+  // Set admission number when preview changes
+  useEffect(() => {
+    if (autoGenerateAdmission && mode === 'create' && previewAdmission?.preview) {
+      studentForm.setValue('admissionNo', previewAdmission.preview, {
+        shouldValidate: true
+      });
+    }
+  }, [previewAdmission, autoGenerateAdmission, mode, studentForm]);
 
+  // Set employee number when preview changes
+  useEffect(() => {
+    if (autoGenerateEmployee && mode === 'create' && previewEmployee?.preview) {
+      teacherForm.setValue('employeeNumber', previewEmployee.preview, {
+        shouldValidate: true
+      });
+    }
+  }, [previewEmployee, autoGenerateEmployee, mode, teacherForm]);
+
+  const onSubmit = async () => {
     if (!isSuperAdmin && userForm.getValues().role === 'SUPER_ADMIN') {
-      toast.error("Can not create Super Admin. Limited previleges!");
+      toast.error("Cannot create Super Admin. Limited privileges!");
+      return;
     }
 
     // Ensure non-super-admins can't change school
@@ -241,7 +295,12 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     // Validate base user form
     const isUserValid = await userForm.trigger();
     if (!isUserValid) {
-      toast.error('Please fill in all required user fields');
+      const userErrors = Object.values(userForm.formState.errors);
+      if (userErrors.length > 0) {
+        toast.error(`User error: ${userErrors[0].message}`);
+      } else {
+        toast.error('Please fill in all required user fields');
+      }
       return;
     }
 
@@ -257,30 +316,64 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     if (selectedRole === 'STUDENT') {
       const isProfileValid = await studentForm.trigger();
       if (!isProfileValid) {
-        toast.error('Please fill in all required student fields');
+        const studentErrors = Object.values(studentForm.formState.errors);
+        if (studentErrors.length > 0) {
+          toast.error(`Student error: ${studentErrors[0].message}`);
+        } else {
+          toast.error('Please fill in all required student fields');
+        }
         return;
       }
       profileData = studentForm.getValues();
-      if (autoGenerateAdmission && mode === 'create' && previewAdmission?.preview) {
-        profileData.admissionNo = previewAdmission.preview;
+      
+      // Ensure admission number is set
+      if (!profileData.admissionNo) {
+        if (autoGenerateAdmission && previewAdmission?.preview) {
+          profileData.admissionNo = previewAdmission.preview;
+        } else {
+          toast.error('Admission number is required');
+          return;
+        }
       }
+      
       if (profileData.dob) {
         profileData.dob = new Date(profileData.dob);
       }
     } else if (selectedRole === 'TEACHER') {
       const isProfileValid = await teacherForm.trigger();
       if (!isProfileValid) {
-        toast.error('Please fill in all required teacher fields');
+        const teacherErrors = Object.values(teacherForm.formState.errors);
+        if (teacherErrors.length > 0) {
+          toast.error(`Teacher error: ${teacherErrors[0].message}`);
+        } else {
+          toast.error('Please fill in all required teacher fields');
+        }
         return;
       }
       profileData = teacherForm.getValues();
+      
+      // Ensure employee number is set
+      if (!profileData.employeeNumber) {
+        if (autoGenerateEmployee && previewEmployee?.preview) {
+          profileData.employeeNumber = previewEmployee.preview;
+        } else if (mode === 'create') {
+          toast.error('Employee number is required when not auto-generating');
+          return;
+        }
+      }
+      
       if (profileData.dateJoined) {
         profileData.dateJoined = new Date(profileData.dateJoined);
       }
     } else if (selectedRole === 'PARENT') {
       const isProfileValid = await guardianForm.trigger();
       if (!isProfileValid) {
-        toast.error('Please fill in all required guardian fields');
+        const guardianErrors = Object.values(guardianForm.formState.errors);
+        if (guardianErrors.length > 0) {
+          toast.error(`Guardian error: ${guardianErrors[0].message}`);
+        } else {
+          toast.error('Please fill in all required guardian fields');
+        }
         return;
       }
       profileData = guardianForm.getValues();
@@ -329,15 +422,28 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       schoolId: schoolId || '',
     });
     studentForm.reset({
+      admissionNo: '',
       gender: 'MALE',
       nationality: 'Kenyan',
       hasSpecialNeeds: false,
+      specialNeedsType: '',
+      medicalCondition: '',
+      allergies: '',
     });
-    teacherForm.reset();
-    guardianForm.reset();
+    teacherForm.reset({
+      tscNumber: '',
+      employeeNumber: '',
+      employmentType: 'PERMANENT',
+    });
+    guardianForm.reset({
+      relationship: '',
+      occupation: '',
+      employer: '',
+      workPhone: '',
+    });
     setShowPassword(false);
     setAutoGenerateAdmission(mode === 'create');
-    setAutoGenerateUPI(true);
+    setAutoGenerateEmployee(mode === 'create');
     setSelectedRole('STUDENT');
   };
 
@@ -449,7 +555,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                             <SelectValue placeholder="Select school" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No School</SelectItem>
+                            <SelectItem value="">-- Select School --</SelectItem>
                             {schools.map((school: any) => (
                               <SelectItem key={school.id} value={school.id}>
                                 {school.name}
@@ -558,80 +664,70 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     Student Profile
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {mode === 'edit' ? (
-                      <div className="space-y-2">
-                        <Label>Admission Number</Label>
-                        <Input
-                          {...studentForm.register('admissionNo')}
-                          disabled
-                          className="bg-muted"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Admission number cannot be changed in edit mode
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <Label>Admission Number *</Label>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Admission Number *</Label>
+                        {mode === 'create' && (
                           <div className="flex items-center gap-2">
-                            <Controller
-                              name="hasSpecialNeeds"
-                              control={studentForm.control}
-                              render={({ field }) => (
-                                <Checkbox
-                                  id="autoAdmission"
-                                  checked={autoGenerateAdmission}
-                                  onCheckedChange={(checked) => setAutoGenerateAdmission(!!checked)}
-                                />
-                              )}
+                            <Checkbox
+                              id="autoAdmission"
+                              checked={autoGenerateAdmission}
+                              onCheckedChange={(checked) => {
+                                setAutoGenerateAdmission(!!checked);
+                                if (checked) {
+                                  studentForm.setValue('admissionNo', '');
+                                } else {
+                                  studentForm.setValue('admissionNo', '');
+                                }
+                              }}
                             />
                             <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
                               Auto-generate
                             </Label>
                           </div>
-                        </div>
-
-                        {autoGenerateAdmission ? (
-                          <div className="relative">
-                            <Input
-                              value={previewAdmission?.preview || 'Will be auto-generated...'}
-                              disabled
-                              className="bg-muted"
-                            />
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                              <Sparkles className="h-4 w-4 text-primary animate-pulse" />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => refreshPreview()}
-                              >
-                                <RefreshCw className="h-3 w-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ) : (
-                          <Input
-                            {...studentForm.register('admissionNo')}
-                            placeholder="Enter admission number manually"
-                          />
-                        )}
-                        
-                        {previewAdmission && autoGenerateAdmission && (
-                          <p className="text-xs text-muted-foreground">
-                            Next available: {previewAdmission.preview}
-                          </p>
-                        )}
-                        
-                        {studentForm.formState.errors.admissionNo && !autoGenerateAdmission && (
-                          <p className="text-sm text-destructive">
-                            {studentForm.formState.errors.admissionNo.message}
-                          </p>
                         )}
                       </div>
-                    )}
+
+                      {autoGenerateAdmission && mode === 'create' ? (
+                        <div className="relative">
+                          <Input
+                            value={previewAdmission?.preview || 'Generating...'}
+                            disabled
+                            className="bg-muted"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => refreshAdmissionPreview()}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Input
+                          {...studentForm.register('admissionNo')}
+                          placeholder="Enter admission number manually"
+                          disabled={mode === 'edit'}
+                        />
+                      )}
+                      
+                      {previewAdmission && autoGenerateAdmission && (
+                        <p className="text-xs text-muted-foreground">
+                          Next available: {previewAdmission.preview}
+                        </p>
+                      )}
+                      
+                      {studentForm.formState.errors.admissionNo && !autoGenerateAdmission && (
+                        <p className="text-sm text-destructive">
+                          {studentForm.formState.errors.admissionNo.message}
+                        </p>
+                      )}
+                    </div>
 
                     <div className="space-y-2">
                       <Label>Gender *</Label>
@@ -654,7 +750,11 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
                     <div className="space-y-2">
                       <Label>Date of Birth</Label>
-                      <Input {...studentForm.register('dob')} type="date" />
+                      <Input 
+                        {...studentForm.register('dob')} 
+                        type="date" 
+                        max={new Date().toISOString().split('T')[0]}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -664,7 +764,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
                     <div className="space-y-2">
                       <Label>Nationality</Label>
-                      <Input {...studentForm.register('nationality')} placeholder="Kenyan" />
+                      <Input {...studentForm.register('nationality')} placeholder="Kenyan" defaultValue="Kenyan" />
                     </div>
 
                     <div className="space-y-2">
@@ -686,34 +786,72 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                       <Label>Sub County</Label>
                       <Input {...studentForm.register('subCounty')} placeholder="Kilimani" />
                     </div>
-                    
-                    <div className="space-y-2 flex items-center gap-2">
+
+                    {/* Special Needs Section */}
+                    <div className="space-y-2 md:col-span-2">
                       <Controller
                         name="hasSpecialNeeds"
                         control={studentForm.control}
                         render={({ field }) => (
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="hasSpecialNeeds"
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (!checked) {
+                                  studentForm.setValue('specialNeedsType', '');
+                                }
+                              }}
+                            />
+                            <Label 
+                              htmlFor="hasSpecialNeeds" 
+                              className="cursor-pointer select-none font-medium"
+                            >
+                              Has Special Needs?
+                            </Label>
+                          </div>
                         )}
                       />
-                      <Label>Has Special Needs?</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Check this if the student requires special accommodations
+                      </p>
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>Special Needs Type</Label>
-                      <Input {...studentForm.register('specialNeedsType')} placeholder="eg. Visual" />
-                    </div>
+                    {/* Special Needs Type - Conditional */}
+                    {studentForm.watch('hasSpecialNeeds') && (
+                      <div className="space-y-2 md:col-span-2">
+                        <Label>Special Needs Type</Label>
+                        <Input
+                          {...studentForm.register('specialNeedsType')}
+                          placeholder="e.g., Visual impairment, Hearing impairment, Learning disability"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Examples: Visual, Hearing, Physical, Learning disabilities, Autism, etc.
+                        </p>
+                      </div>
+                    )}
 
                     <div className="space-y-2">
                       <Label>Medical Conditions</Label>
-                      <Input {...studentForm.register('medicalCondition')} placeholder="eg. Asthmatic" />
+                      <Input
+                        {...studentForm.register('medicalCondition')}
+                        placeholder="e.g., Asthmatic, Diabetic, Epileptic"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        List any known medical conditions
+                      </p>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Allergies</Label>
-                      <Input {...studentForm.register('allergies')} placeholder="eg. Peanuts" />
+                      <Input
+                        {...studentForm.register('allergies')}
+                        placeholder="e.g., Peanuts, Dairy, Pollen"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        List any known allergies
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -729,27 +867,82 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     Teacher Profile
                   </h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {mode === 'edit' ? (
-                      <div className="space-y-2">
-                        <Label>TSC Number</Label>
-                        <Input
-                          {...teacherForm.register('tscNumber')}
-                          disabled
-                          className="bg-muted"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          TSC number cannot be changed in edit mode
-                        </p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label>TSC Number *</Label>
-                        <Input {...teacherForm.register('tscNumber')} placeholder="TSC123456" />
-                        {teacherForm.formState.errors.tscNumber && (
-                          <p className="text-sm text-destructive">{teacherForm.formState.errors.tscNumber.message}</p>
+                    <div className="space-y-2">
+                      <Label>TSC Number *</Label>
+                      <Input 
+                        {...teacherForm.register('tscNumber')} 
+                        placeholder="TSC123456" 
+                      />
+                      {teacherForm.formState.errors.tscNumber && (
+                        <p className="text-sm text-destructive">{teacherForm.formState.errors.tscNumber.message}</p>
+                      )}
+                    </div>
+
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Employee Number</Label>
+                        {mode === 'create' && (
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="autoEmployee"
+                              checked={autoGenerateEmployee}
+                              onCheckedChange={(checked) => {
+                                setAutoGenerateEmployee(!!checked);
+                                if (checked) {
+                                  teacherForm.setValue('employeeNumber', '');
+                                } else {
+                                  teacherForm.setValue('employeeNumber', '');
+                                }
+                              }}
+                            />
+                            <Label htmlFor="autoEmployee" className="text-xs font-normal cursor-pointer">
+                              Auto-generate
+                            </Label>
+                          </div>
                         )}
                       </div>
-                    )}
+
+                      {autoGenerateEmployee && mode === 'create' ? (
+                        <div className="relative">
+                          <Input
+                            value={previewEmployee?.preview || 'Generating...'}
+                            disabled
+                            className="bg-muted"
+                          />
+                          <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <Sparkles className="h-4 w-4 text-primary" />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => refreshEmployeePreview()}
+                            >
+                              <RefreshCw className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <Input
+                          {...teacherForm.register('employeeNumber')}
+                          placeholder="Enter employee number manually"
+                          disabled={mode === 'edit'}
+                          className={mode === 'edit' ? "bg-muted" : ""}
+                        />
+                      )}
+                      
+                      {previewEmployee && autoGenerateEmployee && (
+                        <p className="text-xs text-muted-foreground">
+                          Next available: {previewEmployee.preview}
+                        </p>
+                      )}
+                      
+                      {teacherForm.formState.errors.employeeNumber && !autoGenerateEmployee && (
+                        <p className="text-sm text-destructive">
+                          {teacherForm.formState.errors.employeeNumber.message}
+                        </p>
+                      )}
+                    </div>
 
                     <div className="space-y-2">
                       <Label>Employment Type *</Label>

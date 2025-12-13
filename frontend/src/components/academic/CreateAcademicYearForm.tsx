@@ -13,7 +13,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { useCreateAcademicYear } from '@/hooks/use-academic-years';
+import { useCreateAcademicYear } from '@/hooks/use-academic';
 import { useState } from 'react';
 import { PlusCircle } from 'lucide-react';
 

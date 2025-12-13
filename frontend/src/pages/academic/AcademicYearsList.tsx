@@ -2,8 +2,7 @@ import { useState } from 'react';
 import {
   useAcademicYears,
   useSetActiveAcademicYear,
-  useTerms,
-} from '@/hooks/use-academic-years';
+} from '@/hooks/use-academic';
 import { AcademicYear } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -14,8 +13,8 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { CreateAcademicYearForm } from '@/components/academic-years/CreateAcademicYearForm';
-import { TermDatesForm } from '@/components/academic-years/TermDatesForm';
+import { CreateAcademicYearForm } from '@/components/academic/CreateAcademicYearForm';
+import { TermDatesForm } from '@/components/academic/TermDatesForm';
 import { Button } from '@/components/ui/button';
 import { formatDate } from '@/lib/utils';
 import { CheckCircle, Loader2 } from 'lucide-react';
@@ -76,7 +75,7 @@ function AcademicYearCard({
 // The main page component
 export default function AcademicYearsList() {
   const [page] = useState(1);
-  const { data, isLoading, isError } = useAcademicYears({ page, pageSize: 10 });
+  const { data, isLoading, isError } = useAcademicYears();
   const { mutate: setActiveYear, isPending: isSettingActive } =
     useSetActiveAcademicYear();
 
@@ -104,7 +103,7 @@ export default function AcademicYearsList() {
 
     return (
       <div className="grid gap-6 lg:grid-cols-1">
-        {data.data.map((year) => (
+        {data.data.map((year: any) => (
           <AcademicYearCard
             key={year.id}
             year={year}

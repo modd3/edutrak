@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { useUpdateTerm } from '@/hooks/use-academic-years';
+import { useUpdateTerm } from '@/hooks/use-academic';
 import { toast } from 'sonner';
 
 // Zod schema for a single term

@@ -15,6 +15,7 @@ import {
     Trophy,
     type LucideIcon,
     Lock,
+    CalendarFoldIcon,
   } from 'lucide-react';
   import { UserRole } from '../store/auth-store';
   
@@ -195,6 +196,14 @@ import {
     href: '/academic-year',
     icon: Calendar,
     roles: ['SUPER_ADMIN', 'ADMIN'],
+    children: [
+      {
+        title: 'Set-Up Calendar',
+        href: '/academic-year',
+        icon: CalendarFoldIcon,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      }
+    ]
   },
   {
     title: 'Users',

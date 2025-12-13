@@ -1,6 +1,6 @@
 // hooks/use-sequences.ts
 import { useQuery } from '@tanstack/react-query';
-import api from '@/services/api.service';
+import api from '@/api';
 
 export type SequenceType = 
   | 'ADMISSION_NUMBER' 
