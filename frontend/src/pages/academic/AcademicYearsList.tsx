@@ -75,7 +75,7 @@ function AcademicYearCard({
 // The main page component
 export default function AcademicYearsList() {
   const [page] = useState(1);
-  const { data, isLoading, isError } = useAcademicYears({ page, pageSize: 10 });
+  const { data, isLoading, isError } = useAcademicYears();
   const { mutate: setActiveYear, isPending: isSettingActive } =
     useSetActiveAcademicYear();
 
@@ -103,7 +103,7 @@ export default function AcademicYearsList() {
 
     return (
       <div className="grid gap-6 lg:grid-cols-1">
-        {data.data.map((year) => (
+        {data.data.map((year: any) => (
           <AcademicYearCard
             key={year.id}
             year={year}

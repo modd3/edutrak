@@ -1,4 +1,4 @@
-import apiClient from '@/lib/api-client';
+import api from '@/api';
 import { Class, Stream, ApiResponse, PaginatedResponse } from '@/types';
 
 // --- Class Types ---
@@ -23,7 +23,7 @@ export const classService = {
       name?: string;
     }
   ): Promise<PaginatedResponse<Class>> => {
-    const response = await apiClient.get(`/schools/${schoolId}/classes`, { params });
+    const response = await api.get(`/schools/${schoolId}/classes`, { params });
     return response.data;
   },
 
@@ -31,7 +31,7 @@ export const classService = {
    * Fetches a single class by its ID.
    */
   getClassById: async (id: string): Promise<Class> => {
-    const response = await apiClient.get<ApiResponse<Class>>(`/classes/${id}`);
+    const response = await api.get<ApiResponse<Class>>(`/classes/${id}`);
     if (!response.data.data) {
       throw new Error('Class not found');
     }
@@ -42,7 +42,7 @@ export const classService = {
    * Creates a new class for a school.
    */
   createClass: async (data: ClassCreateInput): Promise<Class> => {
-    const response = await apiClient.post<ApiResponse<Class>>('/classes', data);
+    const response = await api.post<ApiResponse<Class>>('/classes', data);
     if (!response.data.data) {
       throw new Error('Failed to create class');
     }
@@ -53,7 +53,7 @@ export const classService = {
    * Updates an existing class.
    */
   updateClass: async (id: string, data: ClassUpdateInput): Promise<Class> => {
-    const response = await apiClient.put<ApiResponse<Class>>(`/classes/${id}`, data);
+    const response = await api.put<ApiResponse<Class>>(`/classes/${id}`, data);
     if (!response.data.data) {
       throw new Error('Failed to update class');
     }
@@ -64,7 +64,7 @@ export const classService = {
    * Deletes a class by its ID.
    */
   deleteClass: async (id: string): Promise<void> => {
-    await apiClient.delete(`/classes/${id}`);
+    await api.delete(`/classes/${id}`);
   },
 
   // === Stream Endpoints ===
@@ -73,7 +73,7 @@ export const classService = {
    * Fetches all streams for a specific class.
    */
   getStreamsByClass: async (classId: string): Promise<Stream[]> => {
-    const response = await apiClient.get<ApiResponse<Stream[]>>(`/classes/${classId}/streams`);
+    const response = await api.get<ApiResponse<Stream[]>>(`/classes/${classId}/streams`);
     return response.data.data || [];
   },
 
@@ -81,7 +81,7 @@ export const classService = {
    * Creates a new stream within a class.
    */
   createStream: async (data: StreamCreateInput): Promise<Stream> => {
-    const response = await apiClient.post<ApiResponse<Stream>>('/streams', data);
+    const response = await api.post<ApiResponse<Stream>>('/streams', data);
     if (!response.data.data) {
       throw new Error('Failed to create stream');
     }
@@ -92,7 +92,7 @@ export const classService = {
    * Updates an existing stream.
    */
   updateStream: async (id: string, data: StreamUpdateInput): Promise<Stream> => {
-    const response = await apiClient.put<ApiResponse<Stream>>(`/streams/${id}`, data);
+    const response = await api.put<ApiResponse<Stream>>(`/streams/${id}`, data);
     return response.data.data!;
   },
 
@@ -100,6 +100,6 @@ export const classService = {
    * Deletes a stream by its ID.
    */
   deleteStream: async (id: string): Promise<void> => {
-    await apiClient.delete(`/streams/${id}`);
+    await api.delete(`/streams/${id}`);
   },
 };

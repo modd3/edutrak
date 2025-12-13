@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import api from '@/api';
 import { toast } from 'sonner';
 import { ClassSubject, PaginatedResponse } from '@/types';
 
@@ -14,7 +14,7 @@ export function useClassSubjects(classId: string) {
   return useQuery({
     queryKey: ['classes', classId, 'subjects'],
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<ClassSubject>>(
+      const response = await api.get<PaginatedResponse<ClassSubject>>(
         `/classes/${classId}/subjects`
       );
       return response.data;
@@ -28,7 +28,7 @@ export function useAssignSubject() {
 
   return useMutation({
     mutationFn: async (data: ClassSubjectInput) => {
-      const response = await apiClient.post<ClassSubject>('/class-subjects', data);
+      const response = await api.post<ClassSubject>('/class-subjects', data);
       return response.data;
     },
     onSuccess: (data) => {
@@ -54,7 +54,7 @@ export function useUpdateClassSubject() {
       id: string; 
       data: Partial<ClassSubjectInput>;
     }) => {
-      const response = await apiClient.patch<ClassSubject>(`/class-subjects/${id}`, data);
+      const response = await api.patch<ClassSubject>(`/class-subjects/${id}`, data);
       return response.data;
     },
     onSuccess: (data) => {
@@ -74,7 +74,7 @@ export function useRemoveClassSubject() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/class-subjects/${id}`);
+      await api.delete(`/class-subjects/${id}`);
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['class-subjects'] });

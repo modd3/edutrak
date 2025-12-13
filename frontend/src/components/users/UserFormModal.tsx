@@ -1,3 +1,4 @@
+// src/components/users/UserFormModal.tsx
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,7 +27,7 @@ const baseUserSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
   phone: z.string().optional(),
-  idNumber: z.string().optional(),
+  idNumber: z.string().nullable().optional().transform(e => e === "" ? null : e),
   role: z.enum(['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPPORT_STAFF']),
   schoolId: z.string().optional(),
 });
@@ -51,6 +52,7 @@ const studentProfileSchema = z.object({
 // Teacher profile schema
 const teacherProfileSchema = z.object({
   tscNumber: z.string().min(1, 'TSC number is required'),
+  employeeNumber: z.string().min(1, 'Employee number is required'), 
   employmentType: z.enum(['PERMANENT', 'CONTRACT', 'TEMPORARY', 'BOM', 'PTA']),
   qualification: z.string().optional(),
   specialization: z.string().optional(),
@@ -145,12 +147,18 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       gender: 'MALE',
       nationality: 'Kenyan',
       hasSpecialNeeds: false,
+      specialNeedsType: '',
+      medicalCondition: '',
+      allergies: '',
     },
   });
 
   // Teacher profile form
   const teacherForm = useForm<TeacherProfileFormData>({
     resolver: zodResolver(teacherProfileSchema),
+    defaultValues: {
+      employmentType: 'PERMANENT',
+    },
   });
 
   // Guardian profile form
@@ -171,6 +179,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       userForm.setValue('schoolId', schoolId);
     }
   }, [open, isSuperAdmin, schoolId, mode, userForm]);
+
+  // Reset forms when opening in create mode
+  useEffect(() => {
+    if (open && mode === 'create') {
+      resetAllForms();
+    }
+  }, [open, mode]);
 
   // Populate forms when user data changes (edit mode)
   useEffect(() => {
@@ -209,6 +224,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       if (user.role === 'TEACHER' && user.teacher) {
         teacherForm.reset({
           tscNumber: user.teacher.tscNumber,
+          employeeNumber: user.teacher.employeeNumber,
           employmentType: user.teacher.employmentType,
           qualification: user.teacher.qualification || '',
           specialization: user.teacher.specialization || '',
@@ -228,9 +244,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   }, [mode, user, open, userForm, studentForm, teacherForm, guardianForm]);
 
   const onSubmit = async () => {
-
     if (!isSuperAdmin && userForm.getValues().role === 'SUPER_ADMIN') {
-      toast.error("Can not create Super Admin. Limited previleges!");
+      toast.error("Cannot create Super Admin. Limited privileges!");
+      return;
     }
 
     // Ensure non-super-admins can't change school
@@ -332,8 +348,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       gender: 'MALE',
       nationality: 'Kenyan',
       hasSpecialNeeds: false,
+      specialNeedsType: '',
+      medicalCondition: '',
+      allergies: '',
     });
-    teacherForm.reset();
+    teacherForm.reset({
+      employmentType: 'PERMANENT',
+    });
     guardianForm.reset();
     setShowPassword(false);
     setAutoGenerateAdmission(mode === 'create');
@@ -449,7 +470,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                             <SelectValue placeholder="Select school" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">No School</SelectItem>
+                            <SelectItem value="select-school">-- Select School --</SelectItem>
                             {schools.map((school: any) => (
                               <SelectItem key={school.id} value={school.id}>
                                 {school.name}
@@ -575,16 +596,10 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                         <div className="flex items-center justify-between">
                           <Label>Admission Number *</Label>
                           <div className="flex items-center gap-2">
-                            <Controller
-                              name="hasSpecialNeeds"
-                              control={studentForm.control}
-                              render={({ field }) => (
-                                <Checkbox
-                                  id="autoAdmission"
-                                  checked={autoGenerateAdmission}
-                                  onCheckedChange={(checked) => setAutoGenerateAdmission(!!checked)}
-                                />
-                              )}
+                            <Checkbox
+                              id="autoAdmission"
+                              checked={autoGenerateAdmission}
+                              onCheckedChange={(checked) => setAutoGenerateAdmission(!!checked)}
                             />
                             <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
                               Auto-generate
@@ -654,7 +669,11 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
                     <div className="space-y-2">
                       <Label>Date of Birth</Label>
-                      <Input {...studentForm.register('dob')} type="date" />
+                      <Input 
+                        {...studentForm.register('dob')} 
+                        type="date" 
+                        max={new Date().toISOString().split('T')[0]}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -686,34 +705,74 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                       <Label>Sub County</Label>
                       <Input {...studentForm.register('subCounty')} placeholder="Kilimani" />
                     </div>
-                    
-                    <div className="space-y-2 flex items-center gap-2">
-                      <Controller
-                        name="hasSpecialNeeds"
-                        control={studentForm.control}
-                        render={({ field }) => (
-                          <Checkbox
-                            checked={field.value}
-                            onCheckedChange={field.onChange}
-                          />
-                        )}
-                      />
-                      <Label>Has Special Needs?</Label>
-                    </div>
+                                  
 
-                    <div className="space-y-2">
-                      <Label>Special Needs Type</Label>
-                      <Input {...studentForm.register('specialNeedsType')} placeholder="eg. Visual" />
-                    </div>
+{/* Special Needs Section */}
+<div className="space-y-2 md:col-span-2">
+  <Controller
+    name="hasSpecialNeeds"
+    control={studentForm.control}
+    render={({ field }) => (
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id="hasSpecialNeeds"
+          checked={field.value}
+          onCheckedChange={(checked) => {
+            field.onChange(checked);
+            if (!checked) {
+              studentForm.setValue('specialNeedsType', '');
+            }
+          }}
+        />
+        <Label 
+          htmlFor="hasSpecialNeeds" 
+          className="cursor-pointer select-none font-medium"
+        >
+          Has Special Needs?
+        </Label>
+      </div>
+    )}
+  />
+  <p className="text-xs text-muted-foreground">
+    Check this if the student requires special accommodations
+  </p>
+</div>
+
+{/* Special Needs Type - Conditional */}
+{studentForm.watch('hasSpecialNeeds') && (
+  <div className="space-y-2 md:col-span-2">
+    <Label>Special Needs Type</Label>
+    <Input
+      {...studentForm.register('specialNeedsType')}
+      placeholder="e.g., Visual impairment, Hearing impairment, Learning disability"
+    />
+    <p className="text-xs text-muted-foreground">
+      Examples: Visual, Hearing, Physical, Learning disabilities, Autism, etc.
+    </p>
+  </div>
+)}
+
 
                     <div className="space-y-2">
                       <Label>Medical Conditions</Label>
-                      <Input {...studentForm.register('medicalCondition')} placeholder="eg. Asthmatic" />
+                      <Input
+                        {...studentForm.register('medicalCondition')}
+                        placeholder="e.g., Asthmatic, Diabetic, Epileptic"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        List any known medical conditions
+                      </p>
                     </div>
 
                     <div className="space-y-2">
                       <Label>Allergies</Label>
-                      <Input {...studentForm.register('allergies')} placeholder="eg. Peanuts" />
+                      <Input
+                        {...studentForm.register('allergies')}
+                        placeholder="e.g., Peanuts, Dairy, Pollen"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        List any known allergies
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -750,6 +809,21 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                         )}
                       </div>
                     )}
+
+<div className="space-y-2">
+          <Label>Employee Number *</Label>
+          <Input 
+            {...teacherForm.register('employeeNumber')} 
+            placeholder="EMP001" 
+            disabled={mode === 'edit'} // Usually unique IDs are immutable in edit
+            className={mode === 'edit' ? "bg-muted" : ""}
+          />
+          {teacherForm.formState.errors.employeeNumber && (
+            <p className="text-sm text-destructive">
+              {teacherForm.formState.errors.employeeNumber.message}
+            </p>
+          )}
+        </div>
 
                     <div className="space-y-2">
                       <Label>Employment Type *</Label>

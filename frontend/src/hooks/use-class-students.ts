@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { apiClient } from '@/lib/api-client';
+import api from '@/api';
 import { toast } from 'sonner';
 import { StudentClass, PaginatedResponse } from '@/types';
 
@@ -15,7 +15,7 @@ export function useClassEnrollments(classId: string) {
   return useQuery({
     queryKey: ['classes', classId, 'enrollments'],
     queryFn: async () => {
-      const response = await apiClient.get<PaginatedResponse<StudentClass>>(
+      const response = await api.get<PaginatedResponse<StudentClass>>(
         `/classes/${classId}/enrollments`
       );
       return response.data;
@@ -29,7 +29,7 @@ export function useEnrollStudent() {
 
   return useMutation({
     mutationFn: async (data: EnrollmentData) => {
-      const response = await apiClient.post<StudentClass>('/student-classes', data);
+      const response = await api.post<StudentClass>('/student-classes', data);
       return response.data;
     },
     onSuccess: (_, { classId }) => {
@@ -53,7 +53,7 @@ export function useUpdateEnrollment() {
       id: string; 
       data: Partial<StudentClass>;
     }) => {
-      const response = await apiClient.patch<StudentClass>(`/student-classes/${id}`, data);
+      const response = await api.patch<StudentClass>(`/student-classes/${id}`, data);
       return response.data;
     },
     onSuccess: (data) => {
@@ -73,7 +73,7 @@ export function useDeleteEnrollment() {
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await apiClient.delete(`/student-classes/${id}`);
+      await api.delete(`/student-classes/${id}`);
     },
     onSuccess: (_, id) => {
       queryClient.invalidateQueries({ queryKey: ['classes'] });

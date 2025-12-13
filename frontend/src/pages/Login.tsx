@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
-import { authApi } from '@/services/api.service';
+import { authApi } from '@/api';
 
 // Validation schema
 const loginSchema = z.object({

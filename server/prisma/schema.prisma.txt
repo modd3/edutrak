@@ -39,6 +39,12 @@ model School {
   students       Student[]
   streams        Stream[]
   subjectOfferings SubjectOffering[]
+  academicYears  AcademicYear[]
+  terms          Term[]
+  classSubjects  ClassSubject[]
+  studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
+  assessmentResults AssessmentResult[]
   
   @@index([county])
   @@index([type])
@@ -151,7 +157,8 @@ model Student {
   updatedAt       DateTime  @updatedAt
   
   @@index([schoolId])
-  @@index([admissionNo])
+  @@index([schoolId, admissionNo])
+  @@index([schoolId, gender])
 }
 
 enum Gender {
@@ -193,6 +200,7 @@ model Teacher {
   user           User     @relation(fields: [userId], references: [id])
   
   tscNumber      String   @unique
+  employeeNumber String   @unique
   employmentType EmploymentType
   qualification  String?  // Diploma, Degree, Masters, etc.
   specialization String?  // Subject specialization
@@ -219,6 +227,28 @@ enum EmploymentType {
   PTA          // Parents Teachers Association
 }
 
+// ===== SEQUENCE GENERATOR =====
+
+model Sequence {
+  id        String   @id @default(uuid())
+  key       String   @unique  // Composite key: TYPE_SCHOOL_YEAR
+  type      String              // ADMISSION_NUMBER, EMPLOYEE_NUMBER, etc.
+  schoolId  String?             // Optional: for school-specific sequences
+  year      Int?                // Optional: for annually resetting sequences
+  
+  currentValue Int    @default(0)  // Current counter value
+  prefix       String?              // Prefix for formatting (e.g., "STU", "EMP")
+  
+  lastGeneratedAt DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([type])
+  @@index([schoolId])
+  @@index([year])
+  @@index([type, schoolId, year])
+}
+
 // ===== ACADEMIC STRUCTURE =====
 
 model AcademicYear {
@@ -227,16 +257,20 @@ model AcademicYear {
   startDate DateTime
   endDate   DateTime
   isActive  Boolean  @default(false)
+  schoolId  String?
   
+  school         School? @relation(fields: [schoolId], references: [id])
   terms          Term[]
   classes        Class[]
   classSubjects  ClassSubject[]   @relation("AcademicYearClassSubjects")
   studentClasses StudentClass[]
+  assessmentDefinitions AssessmentDefinition[]
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   @@index([isActive])
+  @@index([schoolId])
 }
 
 model Term {
@@ -249,6 +283,9 @@ model Term {
   academicYearId String
   academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
   
+  schoolId       String?
+  school         School?  @relation(fields: [schoolId], references: [id])
+  
   classSubjects  ClassSubject[]   @relation("TermClassSubjects")
   AssessmentDefinitions    AssessmentDefinition[]
   
@@ -257,6 +294,8 @@ model Term {
   
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
+  @@index([academicYearId, schoolId])
+  @@index([schoolId])
 }
 
 enum TermName {
@@ -296,6 +335,8 @@ model Class {
   @@unique([name, academicYearId, schoolId])
   @@index([curriculum])
   @@index([schoolId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, level])
 }
 
 enum Curriculum {
@@ -409,6 +450,7 @@ model SubjectOffering {
   isActive  Boolean  @default(true)
   
   @@unique([schoolId, subjectId])
+  @@index([schoolId])
 }
 
 model ClassSubject {
@@ -419,6 +461,9 @@ model ClassSubject {
   termId         String
   academicYearId String
   subjectCategory SubjectCategory
+  
+  schoolId       String?
+  school         School?     @relation(fields: [schoolId], references: [id])
   
   class          Class        @relation(fields: [classId], references: [id])
   subject        Subject      @relation(fields: [subjectId], references: [id])
@@ -433,6 +478,9 @@ model ClassSubject {
   
   @@unique([classId, subjectId, termId, academicYearId])
   @@index([teacherId])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
+  @@index([schoolId, termId])
 }
 
 // ===== STUDENT ENROLLMENT =====
@@ -443,6 +491,9 @@ model StudentClass {
   classId        String
   streamId       String?         // Optional stream assignment
   academicYearId String
+  
+  schoolId       String?
+  school         School?         @relation(fields: [schoolId], references: [id])
   
   status         EnrollmentStatus @default(ACTIVE)
   
@@ -469,6 +520,8 @@ model StudentClass {
   @@index([studentId])
   @@index([classId])
   @@index([status])
+  @@index([schoolId, academicYearId])
+  @@index([schoolId, classId])
 }
 
 enum EnrollmentStatus {
@@ -527,6 +580,12 @@ model AssessmentDefinition {
   classSubjectId  String
   classSubject    ClassSubject @relation(fields: [classSubjectId], references: [id])
   
+  // Add missing fields
+  schoolId        String?
+  school          School?  @relation(fields: [schoolId], references: [id])
+  academicYearId  String?
+  academicYear    AcademicYear? @relation(fields: [academicYearId], references: [id])
+  
   // For CBC: Link this assessment to a specific strand
   strandId        String?
   strand          Strand?  @relation(fields: [strandId], references: [id])
@@ -537,6 +596,8 @@ model AssessmentDefinition {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   
+  @@index([schoolId])
+  @@index([academicYearId])
   @@index([termId])
   @@index([classSubjectId])
   @@index([strandId])
@@ -551,6 +612,10 @@ model AssessmentResult {
   
   assessmentDefId String
   assessmentDef   AssessmentDefinition @relation(fields: [assessmentDefId], references: [id])
+  
+  // Add missing field
+  schoolId        String?
+  school          School?  @relation(fields: [schoolId], references: [id])
   
   // --- Flexible Score Fields ---
   // For 8-4-4
@@ -572,6 +637,7 @@ model AssessmentResult {
   
   // A student can only have one result per assessment
   @@unique([studentId, assessmentDefId]) 
+  @@index([schoolId])
   @@index([studentId])
   @@index([assessmentDefId])
   @@index([assessedById])
