@@ -73,20 +73,13 @@ export default function ClassesList() {
   const { data: activeYearData } = useActiveAcademicYear();
   const activeAcademicYearId = activeYearData?.data?.id;
 
- // Debug logs
-  console.log('=== DEBUG INFO ===');
-  console.log('School ID:', schoolId);
-  console.log('Active Year Data:', activeYearData);
-  
-  console.log('Active Year ID:', activeYearData?.data?.id);
 
   // Fetch classes with filters
-  const { data: classesData, isLoading, isError } = useClasses({academicYearId:activeAcademicYearId,
-});
+  const { data: classesData, isLoading, isError } = useClasses(activeAcademicYearId);
 
   const { mutate: deleteClass, isPending: isDeleting } = useDeleteClass();
 
-  const classes = classesData?.data || [];
+  const classes = classesData?.data?.data || [];
   
   // Filter classes by search
   const filteredClasses = classes.filter((cls: Class) =>

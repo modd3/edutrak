@@ -132,7 +132,7 @@ export function useActiveAcademicYear() {
     queryKey: ['academic-years', 'active'],
     queryFn: async () => {
       const response = await api.get('/academic/years/active');
-      return response.data;
+      return response.data.data;
     },
   });
 }
