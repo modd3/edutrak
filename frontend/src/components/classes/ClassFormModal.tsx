@@ -10,8 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Class, Curriculum, Pathway } from '@/types';
-import { useCreateClass, useUpdateClass } from '@/hooks/use-classes';
-import { useAcademicYears, useActiveAcademicYear } from '@/hooks/use-academic';
+import { 
+   useAcademicYears, 
+   useActiveAcademicYear,
+   useCreateClass,
+   useUpdateClass 
+   } from '@/hooks/use-academic';
 import { useTeachers } from '@/hooks/use-teachers';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { GraduationCap } from 'lucide-react';

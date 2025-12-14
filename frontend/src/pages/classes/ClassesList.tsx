@@ -24,8 +24,11 @@ import {
 import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useClasses, useDeleteClass } from '@/hooks/use-classes';
-import { useActiveAcademicYear } from '@/hooks/use-academic';
+import {
+   useActiveAcademicYear,
+   useClasses,
+   useDeleteClass, 
+} from '@/hooks/use-academic';
 import { Class } from '@/types';
 import { ClassDetailsModal } from '@/components/classes/ClassDetailsModal';
 import { ClassFormModal } from '@/components/classes/ClassFormModal';
@@ -70,12 +73,16 @@ export default function ClassesList() {
   const { data: activeYearData } = useActiveAcademicYear();
   const activeAcademicYearId = activeYearData?.data?.id;
 
+ // Debug logs
+  console.log('=== DEBUG INFO ===');
+  console.log('School ID:', schoolId);
+  console.log('Active Year Data:', activeYearData);
+  
+  console.log('Active Year ID:', activeYearData?.data?.id);
+
   // Fetch classes with filters
-  const { data: classesData, isLoading, isError } = useClasses({
-    schoolId,
-    academicYearId: activeAcademicYearId,
-    curriculum: curriculumFilter === 'all' ? undefined : curriculumFilter,
-  });
+  const { data: classesData, isLoading, isError } = useClasses({academicYearId:activeAcademicYearId,
+});
 
   const { mutate: deleteClass, isPending: isDeleting } = useDeleteClass();
 
