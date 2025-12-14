@@ -26,9 +26,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import {
    useActiveAcademicYear,
-   useClasses,
-   useDeleteClass, 
+   useClasses, 
 } from '@/hooks/use-academic';
+import { useDeleteClass } from '@/hooks/use-classes';
 import { Class } from '@/types';
 import { ClassDetailsModal } from '@/components/classes/ClassDetailsModal';
 import { ClassFormModal } from '@/components/classes/ClassFormModal';
