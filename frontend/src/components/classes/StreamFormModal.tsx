@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Stream } from '@/types';
-import { useCreateStream, useUpdateStream } from '@/hooks/use-classes';
+import { useCreateStream, useUpdateStream } from '@/hooks/use-academic';
 import { useTeachers } from '@/hooks/use-teachers';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { Users } from 'lucide-react';

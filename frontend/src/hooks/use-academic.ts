@@ -249,6 +249,7 @@ export function useClassStreams(classId: string) {
     queryKey: ['streams', classId],
     queryFn: async () => {
       const response = await api.get(`/academic/classes/${classId}/streams`);
+      console.log(response.data, ': is resp.data')
       return response.data;
     },
     enabled: !!classId,

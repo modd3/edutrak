@@ -10,6 +10,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import ClassesList from '@/pages/classes/ClassesList';
+import StudentsList from '@/pages/students/StudentsList';
 import SchoolsList from './pages/schools/SchoolsList';
 import CreateSchool from './pages/schools/CreateSchool';
 import UsersList from './pages/users/UsersList';
@@ -114,7 +115,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-        <ClassesList/> 
+        <StudentsList/> 
                 </DashboardLayout>
               </ProtectedRoute>
             }

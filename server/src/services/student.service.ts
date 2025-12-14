@@ -111,9 +111,10 @@ export class StudentService extends BaseService {
             },
           },
         },
-        orderBy: { admissionNo: 'asc',
-          createdAt: 'desc'
-         },
+        orderBy: [
+          { admissionNo: 'asc' },
+          { createdAt: 'desc' }
+          ],
          page,
          limit,
          schoolId,

@@ -25,7 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { ClassFormModal } from './ClassFormModal';
 import { StreamFormModal } from './StreamFormModal';
-import { useClassStreams, useDeleteStream } from '@/hooks/use-classes';
+import { useClassStreams, useDeleteStream } from '@/hooks/use-academic';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -74,7 +74,9 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
   const { data: streamsData } = useClassStreams(classData.id);
   const { mutate: deleteStream, isPending: isDeletingStream } = useDeleteStream();
 
-  const streams = streamsData || [];
+  const streams = streamsData.data || [];
+  console.log(streams, ': streams');
+  console.log('data: ', streamsData)
 
   const basicInfo = [
     { label: 'Class Name', value: classData.name, icon: GraduationCap },
