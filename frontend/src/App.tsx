@@ -10,7 +10,6 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import ClassesList from '@/pages/classes/ClassesList';
-import CreateClass from './pages/classes/CreateClass';
 import SchoolsList from './pages/schools/SchoolsList';
 import CreateSchool from './pages/schools/CreateSchool';
 import UsersList from './pages/users/UsersList';
@@ -115,7 +114,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <div className='border border-rounded hover:shadow'>Students Page</div>
+        <ClassesList/> 
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -139,7 +138,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  < CreateClass />
+                  < ClassesList />
                 </DashboardLayout>
               </ProtectedRoute>
             }

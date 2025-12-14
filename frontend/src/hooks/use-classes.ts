@@ -23,6 +23,20 @@ export function useSchoolClasses(
   });
 }
 
+export function useClasses(
+	params: {
+		schoolId?: string;
+		academicYearId?: string;
+		curriculum?: string;
+		level?: string;
+	}
+){
+return useQuery({                                                    queryKey: ['classes', params],
+   queryFn: () => classService.getAll(params),
+   enabled: !!schoolId,
+     });
+ }
+
 /**
  * Hook to fetch a single class by ID
  */
