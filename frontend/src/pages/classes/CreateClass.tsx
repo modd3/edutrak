@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ClassForm } from '@/components/classes/ClassForm';
+import { ClassForm } from '@/components/classes/ClassFormModal';
 import { useCreateClass } from '@/hooks/use-classes';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

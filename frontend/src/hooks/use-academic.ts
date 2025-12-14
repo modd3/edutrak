@@ -122,9 +122,6 @@ export function useAcademicYears() {
     queryKey: ['academic-years'],
     queryFn: async () => {
       const response = await api.get('/academic/years');
-      console.log('Hook reached!');
-      console.log('resp: ', response);
-      console.log('resp.data.data: ', response.data.data);
       return response.data;
     },
   });

@@ -1,105 +1,44 @@
+// src/services/class.service.ts
 import api from '@/api';
-import { Class, Stream, ApiResponse, PaginatedResponse } from '@/types';
-
-// --- Class Types ---
-export type ClassCreateInput = Omit<Class, 'id' | 'createdAt' | 'updatedAt' | 'streams' | 'school'>;
-export type ClassUpdateInput = Partial<ClassCreateInput>;
-
-// --- Stream Types ---
-export type StreamCreateInput = Omit<Stream, 'id' | 'createdAt' | 'updatedAt' | 'class'>;
-export type StreamUpdateInput = Partial<StreamCreateInput>;
+import { Class, ApiResponse, PaginatedResponse } from '@/types';
 
 export const classService = {
-  // === Class Endpoints (School Specific) ===
-
-  /**
-   * Fetches a paginated list of classes for a specific school.
-   */
-  getClassesBySchool: async (
-    schoolId: string,
-    params?: {
-      page?: number;
-      pageSize?: number;
-      name?: string;
-    }
-  ): Promise<PaginatedResponse<Class>> => {
-    const response = await api.get(`/schools/${schoolId}/classes`, { params });
+  getAll: async (params?: {
+    schoolId?: string;
+    academicYearId?: string;
+    curriculum?: string;
+    level?: string;
+  }): Promise<PaginatedResponse<Class>> => {
+    const response = await api.get<PaginatedResponse<Class>>('/academic/classes', { params });
     return response.data;
   },
 
-  /**
-   * Fetches a single class by its ID.
-   */
-  getClassById: async (id: string): Promise<Class> => {
-    const response = await api.get<ApiResponse<Class>>(`/classes/${id}`);
-    if (!response.data.data) {
-      throw new Error('Class not found');
-    }
-    return response.data.data;
-  },
-
-  /**
-   * Creates a new class for a school.
-   */
-  createClass: async (data: ClassCreateInput): Promise<Class> => {
-    const response = await api.post<ApiResponse<Class>>('/classes', data);
-    if (!response.data.data) {
-      throw new Error('Failed to create class');
-    }
-    return response.data.data;
-  },
-
-  /**
-   * Updates an existing class.
-   */
-  updateClass: async (id: string, data: ClassUpdateInput): Promise<Class> => {
-    const response = await api.put<ApiResponse<Class>>(`/classes/${id}`, data);
-    if (!response.data.data) {
-      throw new Error('Failed to update class');
-    }
-    return response.data.data;
-  },
-
-  /**
-   * Deletes a class by its ID.
-   */
-  deleteClass: async (id: string): Promise<void> => {
-    await api.delete(`/classes/${id}`);
-  },
-
-  // === Stream Endpoints ===
-
-  /**
-   * Fetches all streams for a specific class.
-   */
-  getStreamsByClass: async (classId: string): Promise<Stream[]> => {
-    const response = await api.get<ApiResponse<Stream[]>>(`/classes/${classId}/streams`);
-    return response.data.data || [];
-  },
-
-  /**
-   * Creates a new stream within a class.
-   */
-  createStream: async (data: StreamCreateInput): Promise<Stream> => {
-    const response = await api.post<ApiResponse<Stream>>('/streams', data);
-    if (!response.data.data) {
-      throw new Error('Failed to create stream');
-    }
-    return response.data.data;
-  },
-
-  /**
-   * Updates an existing stream.
-   */
-  updateStream: async (id: string, data: StreamUpdateInput): Promise<Stream> => {
-    const response = await api.put<ApiResponse<Stream>>(`/streams/${id}`, data);
+  getById: async (id: string): Promise<Class> => {
+    const response = await api.get<ApiResponse<Class>>(`/academic/classes/${id}`);
     return response.data.data!;
   },
 
-  /**
-   * Deletes a stream by its ID.
-   */
-  deleteStream: async (id: string): Promise<void> => {
-    await api.delete(`/streams/${id}`);
+  create: async (data: Partial<Class>): Promise<Class> => {
+    const response = await api.post<ApiResponse<Class>>('/academic/classes', data);
+    return response.data.data!;
+  },
+
+  update: async (id: string, data: Partial<Class>): Promise<Class> => {
+    const response = await api.put<ApiResponse<Class>>(`/academic/classes/${id}`, data);
+    return response.data.data!;
+  },
+
+  delete: async (id: string): Promise<void> => {
+    await api.delete(`/academic/classes/${id}`);
+  },
+
+  getStudents: async (id: string): Promise<any[]> => {
+    const response = await api.get(`/academic/classes/${id}/students`);
+    return response.data.data;
+  },
+
+  getStreams: async (id: string): Promise<any[]> => {
+    const response = await api.get(`/academic/classes/${id}/streams`);
+    return response.data.data;
   },
 };

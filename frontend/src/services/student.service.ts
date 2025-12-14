@@ -1,5 +1,5 @@
 import { Student, ApiResponse, PaginatedResponse } from '@/types';
-import { studentsApi } from './api.service';
+import { studentsApi } from '@/api';
 
 // --- Student Types ---
 export type StudentCreateInput = Omit<Student, 'id' | 'createdAt' | 'updatedAt' | 'enrollments'>;
