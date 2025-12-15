@@ -13,7 +13,7 @@ export const studentService = {
     page?: number;
     pageSize?: number;
     schoolId?: string;
-    name?: string;
+    search?: string;
     gender?: string;
     hasSpecialNeeds?: boolean;
     classId?: string;

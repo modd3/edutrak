@@ -79,7 +79,7 @@ export default function StudentsList() {
   // Fetch students with filters
   const { data: studentsData, isLoading, isError } = useStudents({
     schoolId,
-    name: search,
+    search: search,
     page,
     pageSize: 20,
   });

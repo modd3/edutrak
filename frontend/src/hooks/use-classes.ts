@@ -33,7 +33,7 @@ export function useClasses(
 ){
 return useQuery({                                                    queryKey: ['classes', params],
    queryFn: () => classService.getAll(params),
-   enabled: !!schoolId,
+   // enabled: !!schoolId,
      });
  }
 

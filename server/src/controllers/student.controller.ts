@@ -26,7 +26,7 @@ export class StudentController {
         search: filters.search as string,
       });
       
-      return ResponseUtil.paginated(res, 'Students retrieved successfully', result.data.students, result.pagination);
+      return ResponseUtil.paginated(res, 'Students retrieved successfully', result.data, result.pagination);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
     }
