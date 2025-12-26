@@ -764,50 +764,92 @@ PostgreSQL Database
 Key Features Implemented
 
 1. User Management
-◇ ✅ User CRUD with role-specific profiles
+◇ ✅ User CRUD with role-specific profiles (Student, Teacher, Guardian, Admin)
 ◇ ✅ Create users with profiles in one transaction
-◇ ✅ Bulk user upload via CSV (Students, Teachers, Parents, Admins)
-◇ ✅ User activation/deactivation
-◇ ✅ Password management (change, reset)
-◇ ✅ User search and filtering
-
+◇ ✅ Bulk user creation via API (Students, Teachers, Parents, Admins)
+◇ ✅ User activation/deactivation with school context
+◇ ✅ Password management (change, reset) with security validation
+◇ ✅ User search and filtering by role, status, school
+◇ ✅ User statistics and analytics per school
+◇ ✅ Email/ID number uniqueness validation per school
 
 2. School Management
-◇ ✅ School CRUD operations
-◇ ✅ Kenyan-specific fields (KNEC code, KEMIS code, counties)
-◇ ✅ School types (Primary, Secondary, TVET, etc.)
-◇ ✅ School details modal with comprehensive info
-
+◇ ✅ School CRUD operations with multi-tenant isolation
+◇ ✅ Kenyan-specific fields (KNEC code, KEMIS code, counties, sub-counties)
+◇ ✅ School types (Primary, Secondary, TVET, Special Needs, Pre-Primary)
+◇ ✅ School characteristics (ownership, boarding status, gender)
+◇ ✅ School details with comprehensive information display
+◇ ✅ School-specific data filtering throughout the application
 
 3. Authentication & Authorization
-◇ ✅ JWT-based authentication
-◇ ✅ Login with email/password
-◇ ✅ Token refresh mechanism
-◇ ✅ Session verification
-◇ ✅ Role-based access control
-
+◇ ✅ JWT-based authentication with access/refresh tokens
+◇ ✅ Login with email/password and credential verification
+◇ ✅ Token refresh mechanism for seamless sessions
+◇ ✅ Session verification and automatic logout
+◇ ✅ Role-based access control (SUPER_ADMIN, ADMIN, TEACHER, STUDENT, PARENT, SUPPORT_STAFF)
+◇ ✅ School-context middleware for data isolation
+◇ ✅ Protected routes with role-based permissions
 
 4. Profile Management
-◇ ✅ Role-specific profiles (Student, Teacher, Guardian)
-◇ ✅ Conditional profile creation based on role
-◇ ✅ Profile details modal with tabs
-◇ ✅ Medical and special needs tracking (students)
-◇ ✅ Professional qualifications (teachers)
+◇ ✅ Role-specific profiles with conditional creation logic
+◇ ✅ Student profiles: Academic info (admission/UPI numbers), personal details, medical conditions, special needs, guardian relationships
+◇ ✅ Teacher profiles: TSC numbers, employment types, qualifications, subject specializations, class assignments
+◇ ✅ Guardian profiles: Relationships, occupations, contact info, ward management
+◇ ✅ Profile validation and data integrity constraints
 
+5. Academic Structure Management
+◇ ✅ Academic Year CRUD with term creation in transactions
+◇ ✅ Term management within academic years (Term 1, 2, 3)
+◇ ✅ Class management with curriculum support (CBC, 8-4-4, TVET, IGCSE, IB)
+◇ ✅ Stream management within classes (North, South, East, West, etc.)
+◇ ✅ Class-teacher and stream-teacher assignments
+◇ ✅ Academic year activation/deactivation with validation
+◇ ✅ School-specific academic data isolation
 
-5. Sequence Generation
+6. Student Management
+◇ ✅ Student CRUD with comprehensive profile management
+◇ ✅ Student enrollment in classes/streams with academic year tracking
+◇ ✅ Student promotion between classes with history tracking
+◇ ✅ Student transfer between schools with audit trail
+◇ ✅ Enrollment status management (Active, Promoted, Transferred, Graduated, Suspended, Dropped Out)
+◇ ✅ Student search and filtering by class, gender, enrollment status
+◇ ✅ Student performance tracking and analytics
+◇ ✅ Special needs and medical condition tracking
+
+7. Teacher Management
+◇ ✅ Teacher CRUD with professional profile management
+◇ ✅ TSC number and employee number generation/validation
+◇ ✅ Employment type tracking (Permanent, Contract, Temporary, BOM, PTA)
+◇ ✅ Subject assignment to teachers by class and term
+◇ ✅ Teacher workload calculation and timetable management
+◇ ✅ Teacher performance analytics and reporting
+◇ ✅ Qualification and specialization tracking
+
+8. Subject Management
+◇ ✅ Subject CRUD with curriculum classification
+◇ ✅ Subject offerings by school with activation/deactivation
+◇ ✅ CBC Learning Areas and 8-4-4 Subject Groups support
+��� ✅ Subject categories (Core, Elective, Optional, Technical, Applied)
+◇ ✅ Class-subject assignments with teacher linkages
+◇ ✅ Subject performance analytics and reporting
+
+9. Assessment & Grading System
+◇ ✅ Assessment definition CRUD (CAT, Midterm, End of Term, Mock, National Exam, Competency-Based)
+◇ ✅ Flexible scoring system supporting both numeric grades (8-4-4) and competency levels (CBC)
+◇ ✅ Assessment results management with teacher attribution
+◇ ✅ Bulk assessment result creation and updates
+◇ ✅ Student term average calculations
+◇ ✅ Class subject statistics and performance analytics
+◇ ✅ Assessment export functionality (CSV format)
+◇ ✅ CBC Strand and competency tracking
+
+10. Sequence Generation
 ◇ ✅ Auto-generate admission numbers (STU-2024-00001)
-◇ ✅ Auto-generate employee numbers
-◇ ✅ School-specific sequences
-◇ ✅ Annual reset capability
-◇ ✅ Preview next number without generating
-
-
-6. Bulk Operations
-◇ ✅ CSV upload for bulk user creation
-◇ ✅ Role-specific templates
-◇ ✅ Validation and error reporting
-◇ ✅ Success/failure summary
+◇ ✅ Auto-generate employee numbers (EMP-2024-0123)
+◇ ✅ School-specific sequences with annual reset capability
+◇ ✅ Thread-safe generation using database transactions
+◇ ✅ Preview functionality without incrementing counters
+◇ ✅ Batch generation for bulk operations
 
 
 Authentication & Authorization
@@ -923,25 +965,65 @@ Frontend Structure
 Directory Layout
 src/
 ├── components/
-│   ├── ui/              # shadcn/ui components
-│   ├── layout/          # Layout components (DashboardLayout, etc.)
-│   ├── schools/         # School-related components
-│   ├── users/           # User-related components
-│   └── shared/          # Shared components
+│   ├── ui/              # shadcn/ui components (40+ components)
+│   ├── layout/          # Layout components (DashboardLayout, Header, Sidebar, ProtectedRoute)
+│   ├── schools/         # School-related components (SchoolFormModal, SchoolDetailsModal)
+│   ├── users/           # User-related components (UserFormModal, UserDetailsModal)
+│   ├── students/        # Student components (StudentFormModal, StudentDetailsModal, StudentEnrollmentModal)
+│   ├── teachers/        # Teacher components (TeacherForm, etc.)
+│   ├── classes/         # Class components (ClassFormModal, ClassDetailsModal, StreamFormModal)
+│   ├── academic/        # Academic components (AcademicYearFormModal, AcademicYearDetailsModal, etc.)
+│   ├── assessments/     # Assessment components (CompetencyBasedForm, GradeBasedForm)
+│   └── shared/          # Shared components (DataTable, EmptyState, LoadingSpinner, PageHeader)
 ├── hooks/
-│   ├── use-schools.ts   # School management hooks
+│   ├── use-auth.ts      # Authentication hooks
 │   ├── use-users.ts     # User management hooks
-│   └── use-auth.ts      # Authentication hooks
+│   ├── use-students.ts  # Student management hooks
+│   ├── use-teachers.ts  # Teacher management hooks
+│   ├── use-schools.ts   # School management hooks
+│   ├── use-classes.ts   # Class management hooks
+│   ├── use-academic.ts  # Academic structure hooks
+│   ├── use-assessments.ts # Assessment hooks
+│   ├── use-subjects.ts  # Subject management hooks
+│   ├── use-school-context.ts # School context provider
+│   └── use-sequences.ts # Sequence generation hooks
 ├── lib/
-│   ├── api.ts           # Axios instance
+│   ├── api.ts           # Axios instance with interceptors
 │   ├── utils.ts         # Utility functions
-│   └── constants.ts     # App constants
+│   ├── constants.ts     # App constants
+│   ├── kenyanData.ts    # Kenyan counties, curricula data
+│   └── grade-calculator.ts # Grade calculation utilities
 ├── pages/
-│   ├── schools/         # School pages
-│   ├── users/           # User pages
-│   └── auth/            # Auth pages
+│   ├── auth/            # Authentication pages (Login)
+│   ├── users/           # User management pages (UsersList)
+│   ├── students/        # Student pages (StudentsList)
+│   ├── teachers/        # Teacher pages (TeachersList, CreateTeacher, etc.)
+│   ├── schools/         # School pages (SchoolsList, CreateSchool, etc.)
+│   ├── classes/         # Class pages (ClassesList, CreateClass)
+│   ├── academic/        # Academic pages (AcademicYear management)
+│   ├── assessments/     # Assessment pages (AssessmentsList, CreateAssessment)
+│   ├── subjects/        # Subject pages (SubjectOfferingsList)
+│   ├── dashboards/      # Dashboard pages
+│   └── Dashboard.tsx    # Main dashboard
+├── services/
+│   ├─�� auth.service.ts  # Authentication API calls
+│   ├── user.service.ts  # User API calls
+│   ├── student.service.ts # Student API calls
+│   ├── teacher.service.ts # Teacher API calls
+│   ├── school.service.ts # School API calls
+│   ├── class.service.ts # Class API calls
+│   ├── assessment.service.ts # Assessment API calls
+│   ├── subject.service.ts # Subject API calls
+│   └── enrollment.service.ts # Enrollment API calls
 ├── types/
-│   └── index.ts         # TypeScript types
+│   └── index.ts         # TypeScript type definitions (100+ types)
+├── providers/
+│   └── ReactQueryProvider.tsx # React Query provider
+├── store/
+│   └── auth-store.ts    # Authentication state management
+├── router/              # React Router configuration
+├── config/
+│   └── sidebarConfig.ts # Sidebar navigation configuration
 └── App.tsx
 
 Component Patterns
@@ -973,33 +1055,64 @@ Backend Structure
 Directory Layout
 src/
 ├── controllers/
-│   ├── auth.controller.ts
-│   ├── user.controller.ts
-│   ├── school.controller.ts
-│   └── subscription.controller.ts
+│   ├── academic.controller.ts      # Academic years, terms, classes, streams
+│   ├── assessment.controller.ts    # Assessment definitions and results
+│   ├── auth.controller.ts          # Authentication endpoints
+│   ├── classSubject.controller.ts  # Class-subject assignments
+│   ├── guardian.controller.ts      # Guardian management
+│   ├── school.controller.ts        # School CRUD operations
+│   ├── sequence.controller.ts      # Sequence generation
+│   ├── student.controller.ts       # Student management and enrollment
+│   ├── studentClass.controller.ts  # Student-class relationships
+│   ├── subject.controller.ts       # Subject management
+│   ├── teacher.controller.ts       # Teacher management
+│   ├── user-creation.controller.ts # User creation with profiles
+│   └── user.controller.ts          # User CRUD operations
 ├── services/
-│   ├── auth.service.ts
-│   ├── user.service.ts
-│   ├── user-creation.service.ts
-│   ├── school.service.ts
-│   ├── subscription.service.ts
-│   └── sequence-generator.service.ts
+│   ├── academic.service.ts         # Academic structure business logic
+│   ├── assessment.service.ts       # Assessment and grading logic
+│   ├── auth.service.ts             # Authentication services
+│   ├── base.service.ts             # Base service with common functionality
+│   ├── class.service.ts            # Class management services
+│   ├── guardian.service.ts         # Guardian services
+│   ├── school.service.ts           # School services
+│   ├── sequence-generator.service.ts # Sequence generation
+│   ├── student.service.ts          # Student services
+│   ├── subject.service.ts          # Subject services
+│   ├── teacher.service.ts          # Teacher services
+│   └── user-creation.service.ts    # User creation with profiles
 ├── middleware/
-│   ├── auth.ts
-│   ├── feature-gate.ts
-│   └── limit-check.ts
+│   ├── auth.middleware.ts          # JWT authentication
+│   ├── errorHandler.ts             # Error handling middleware
+│   ├── requestLogger.ts            # Request logging
+│   ├── school-context.ts           # School context injection
+│   ├── upload.ts                   # File upload handling
+│   └── validation.ts               # Input validation
 ├── routes/
-│   ├── auth.routes.ts
-│   ├── user.routes.ts
-│   ├── school.routes.ts
-│   └── subscription.routes.ts
+│   ├── academic.routes.ts          # Academic endpoints
+│   ├── assessment.routes.ts        # Assessment endpoints
+│   ├── auth.routes.ts              # Authentication routes
+│   ├── guardian.routes.ts          # Guardian routes
+│   ├── index.ts                    # Main router
+│   ├── school.routes.ts            # School routes
+│   ├── sequence.routes.ts          # Sequence routes
+│   ├── student.routes.ts           # Student routes
+│   ├── subject.routes.ts           # Subject routes
+│   ├── teacher.routes.ts           # Teacher routes
+│   └── user.routes.ts              # User routes
 ├── utils/
-│   ├── jwt.ts
-│   ├── hash.ts
-│   └── logger.ts
+│   ├── email.ts                    # Email utilities
+│   ├── hash.ts                     # Password hashing
+│   ├── jwt.ts                      # JWT token management
+│   ├── logger.ts                   # Logging utilities
+│   └── response.ts                 # Response formatting
+├── validation/                     # Zod validation schemas
 ├── database/
-│   └── client.ts
-└── index.ts
+│   └── client.ts                   # Prisma client
+├── types/                          # TypeScript type definitions
+├── dtos/                           # Data transfer objects
+├── app.ts                          # Express app configuration
+└── server.ts                       # Server startup
 
 Service Layer Pattern
 export class UserService {
@@ -1262,48 +1375,54 @@ Error Handling
 
 Future Roadmap
 
-Phase 1: Core SaaS Features (Weeks 1-20)
-◇ [x] User & School Management
-◇ [x] Profile Management
-◇ [x] Sequence Generation
-◇ [x] Bulk Operations
-◇ [ ] Subscription System
-◇ [ ] Payment Integration (M-Pesa, Stripe)
-◇ [ ] Feature Gates & Limits
-◇ [ ] Billing Dashboard
+Phase 1: Core SaaS Features ✅ COMPLETED
+◇ [x] User & School Management (Full CRUD, multi-tenant)
+◇ [x] Profile Management (Role-specific profiles with validation)
+◇ [x] Sequence Generation (Thread-safe, school-specific)
+◇ [x] Bulk Operations (API-based bulk creation)
+◇ [x] Authentication & Authorization (JWT, role-based access)
+◇ [x] Academic Structure (Years, Terms, Classes, Streams)
+◇ [x] Student Management (Enrollment, promotion, transfer tracking)
+◇ [x] Teacher Management (TSC validation, subject assignments)
+◇ [x] Subject Management (Curriculum support, school offerings)
+◇ [x] Assessment & Grading (CBC + 8-4-4, bulk entry, analytics)
+◇ [ ] Subscription System (Payment integration, feature gates)
+◇ [ ] Billing Dashboard (Usage tracking, invoicing)
 
+Phase 2: Enhanced Academic Features (Next Priority)
+◇ [x] Class & Stream Management (Full CRUD with teacher assignments)
+◇ [x] Subject Management (Learning areas, subject groups)
+◇ [x] Grade Entry & Reports (Assessment results, term averages)
+◇ [x] Assessment Management (Flexible scoring, bulk operations)
+◇ [ ] Timetable System (Class scheduling, teacher workloads)
+◇ [ ] Attendance Tracking (Daily attendance, reports)
+◇ [ ] Student Performance Analytics (Advanced reporting)
+◇ [ ] Parent Access (Grade viewing, notifications)
 
-Phase 2: Academic Features (Months 4-6)
-◇ [x] Class & Stream Management
-◇ [x] Subject Management
-◇ [ ] Timetable System
-◇ [ ] Attendance Tracking
-◇ [x] Grade Entry & Reports
-◇ [x] Assessment Management
+Phase 3: Communication & Engagement (Months 7-9)
+��� [ ] SMS Notifications (via Africa's Talking for Kenya)
+◇ [ ] Email Notifications (Grade reports, announcements)
+◇ [ ] Parent Portal (Web access for guardians)
+◇ [ ] In-app Messaging (Teacher-parent communication)
+◇ [ ] Mobile App (React Native for teachers/parents)
+◇ [ ] Push Notifications (Real-time updates)
 
-
-Phase 3: Communication (Months 7-9)
-◇ [ ] SMS Notifications (via Africa's Talking)
-◇ [ ] Email Notifications
-◇ [ ] Parent Portal
-◇ [ ] Mobile App (React Native)
-◇ [ ] In-app Messaging
-
-
-Phase 4: Finance (Months 10-12)
-◇ [ ] Fee Management
-◇ [ ] Payment Tracking
-◇ [ ] Receipt Generation
-◇ [ ] Financial Reports
-◇ [ ] Budget Management
-
+Phase 4: Finance & Administration (Months 10-12)
+◇ [ ] Fee Management (Fee structures, payment plans)
+◇ [ ] Payment Integration (M-Pesa, card payments)
+◇ [ ] Receipt Generation (Automated receipts)
+◇ [ ] Financial Reports (Revenue tracking, outstanding fees)
+◇ [ ] Budget Management (School budgeting tools)
+◇ [ ] Payroll System (Teacher salary management)
 
 Phase 5: Advanced Features (Year 2)
-◇ [ ] Custom Report Builder
-◇ [ ] API Access (for Enterprise)
-◇ [ ] Integrations (Google Classroom, etc.)
-◇ [ ] Multi-language Support
-◇ [ ] Advanced Analytics
+◇ [ ] Custom Report Builder (Drag-and-drop reporting)
+◇ [ ] API Access (Enterprise integrations)
+◇ [ ] Google Classroom Integration (Assignment sync)
+◇ [ ] Multi-language Support (Swahili, Arabic)
+◇ [ ] Advanced Analytics (Predictive insights, trends)
+◇ [ ] Mobile Data Collection (Offline-capable surveys)
+◇ [ ] Custom Workflows (Configurable approval processes)
 
 
 Important Implementation Notes
@@ -1461,9 +1580,9 @@ Project Type: Commercial SaaS
  Secondary Markets: East Africa
 
 Document Version
-Version: 1.0.0
- Last Updated: November 2024
- Next Review: After Phase 1 completion
+Version: 1.1.0
+ Last Updated: December 2024
+ Next Review: After Phase 2 completion
 
 How to Use This Document
 
