@@ -27,7 +27,7 @@ Organize the `frontend/src` directory by feature domains to ensure scalability a
 ```
 /frontend/src
 ├── api/                # Axios instance and API service definitions
-│   ├── apiClient.ts
+│   ├── api.ts
 │   ├── academic.service.ts
 │   ├── assessment.service.ts
 │   ├── auth.service.ts
@@ -84,7 +84,7 @@ Organize the `frontend/src` directory by feature domains to ensure scalability a
 
 ### Step 2: Authentication & Core Layout
 
-1.  **Create `apiClient.ts`**:
+1.  **Create `api.ts`**:
     -   Create an Axios instance.
     -   Add an interceptor to attach the JWT token from Zustand to the `Authorization` header of every request.
     -   Add another interceptor to handle 401 errors by logging the user out.

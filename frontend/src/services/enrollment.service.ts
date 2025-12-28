@@ -1,4 +1,4 @@
-import apiClient from '@/lib/api-client';
+import api from '@/lib/api-client';
 import { StudentClass, ApiResponse, PaginatedResponse, Student } from '@/types';
 
 // --- Enrollment Types ---
@@ -10,7 +10,7 @@ export const enrollmentService = {
    * Enrolls a single student into a class.
    */
   enrollStudent: async (data: EnrollmentCreateInput): Promise<StudentClass> => {
-    const response = await apiClient.post<ApiResponse<StudentClass>>('/enrollments', data);
+    const response = await api.post<ApiResponse<StudentClass>>('/enrollments', data);
     if (!response.data.data) {
       throw new Error('Failed to enroll student');
     }
@@ -21,7 +21,7 @@ export const enrollmentService = {
    * Fetches all enrollments for a specific student.
    */
   getStudentEnrollments: async (studentId: string): Promise<StudentClass[]> => {
-    const response = await apiClient.get<ApiResponse<StudentClass[]>>(`/students/${studentId}/enrollments`);
+    const response = await api.get<ApiResponse<StudentClass[]>>(`/students/${studentId}/enrollments`);
     return response.data.data || [];
   },
 
@@ -37,7 +37,7 @@ export const enrollmentService = {
       status?: string;
     }
   ): Promise<PaginatedResponse<StudentClass>> => {
-    const response = await apiClient.get(`/classes/${classId}/enrollments`, { params });
+    const response = await api.get(`/classes/${classId}/enrollments`, { params });
     return response.data;
   },
 
@@ -45,7 +45,7 @@ export const enrollmentService = {
    * Updates an existing enrollment record.
    */
   updateEnrollment: async (enrollmentId: string, data: EnrollmentUpdateInput): Promise<StudentClass> => {
-    const response = await apiClient.put<ApiResponse<StudentClass>>(`/enrollments/${enrollmentId}`, data);
+    const response = await api.put<ApiResponse<StudentClass>>(`/enrollments/${enrollmentId}`, data);
     if (!response.data.data) {
       throw new Error('Failed to update enrollment');
     }
@@ -56,7 +56,7 @@ export const enrollmentService = {
    * Promotes a student or a group of students to a new class.
    */
   promoteStudents: async (data: { enrollmentIds: string[]; newClassId: string; academicYearId: string }): Promise<{ count: number }> => {
-    const response = await apiClient.post('/enrollments/promote', data);
+    const response = await api.post('/enrollments/promote', data);
     return response.data.data!;
   },
 };

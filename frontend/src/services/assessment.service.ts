@@ -1,4 +1,4 @@
-import apiClient from '@/lib/api-client';
+import api from '@/api';
 import { Assessment, ApiResponse, PaginatedResponse } from '@/types';
 
 export type AssessmentCreateInput = {
@@ -29,7 +29,7 @@ export type BulkAssessmentInput = {
 export const assessmentService = {
   // Assessment Definitions
   createDefinition: async (data: Omit<AssessmentCreateInput, 'studentId' | 'marksObtained' | 'competencyLevel' | 'grade' | 'remarks' | 'assessedBy' | 'assessedDate'>): Promise<Assessment> => {
-    const response = await apiClient.post<ApiResponse<Assessment>>('/assessments/definitions', data);
+    const response = await api.post<ApiResponse<Assessment>>('/assessments/definitions', data);
     if (!response.data.data) {
       throw new Error('Failed to create assessment definition');
     }
@@ -37,7 +37,7 @@ export const assessmentService = {
   },
 
   getDefinitionById: async (id: string): Promise<Assessment> => {
-    const response = await apiClient.get<ApiResponse<Assessment>>(`/assessments/definitions/${id}`);
+    const response = await api.get<ApiResponse<Assessment>>(`/assessments/definitions/${id}`);
     if (!response.data.data) {
       throw new Error('Assessment definition not found');
     }
@@ -45,7 +45,7 @@ export const assessmentService = {
   },
 
   updateDefinition: async (id: string, data: Partial<Omit<AssessmentCreateInput, 'studentId' | 'marksObtained' | 'competencyLevel' | 'grade' | 'remarks' | 'assessedBy' | 'assessedDate'>>): Promise<Assessment> => {
-    const response = await apiClient.put<ApiResponse<Assessment>>(`/assessments/definitions/${id}`, data);
+    const response = await api.put<ApiResponse<Assessment>>(`/assessments/definitions/${id}`, data);
     if (!response.data.data) {
       throw new Error('Failed to update assessment definition');
     }
@@ -53,11 +53,11 @@ export const assessmentService = {
   },
 
   deleteDefinition: async (id: string): Promise<void> => {
-    await apiClient.delete(`/assessments/definitions/${id}`);
+    await api.delete(`/assessments/definitions/${id}`);
   },
 
   getClassSubjectDefinitions: async (classSubjectId: string): Promise<PaginatedResponse<Assessment>> => {
-    const response = await apiClient.get<PaginatedResponse<Assessment>>(`/assessments/definitions/class-subject/${classSubjectId}`);
+    const response = await api.get<PaginatedResponse<Assessment>>(`/assessments/definitions/class-subject/${classSubjectId}`);
     return response.data;
   },
 
@@ -71,12 +71,12 @@ export const assessmentService = {
     pageSize?: number;
   }): Promise<PaginatedResponse<Assessment>> => {
     // Assuming this means "get all assessment results"
-    const response = await apiClient.get<PaginatedResponse<Assessment>>('/assessments/results', { params });
+    const response = await api.get<PaginatedResponse<Assessment>>('/assessments/results', { params });
     return response.data;
   },
 
   getById: async (id: string): Promise<Assessment> => {
-    const response = await apiClient.get<ApiResponse<Assessment>>(`/assessments/results/${id}`);
+    const response = await api.get<ApiResponse<Assessment>>(`/assessments/results/${id}`);
     if (!response.data.data) {
       throw new Error('Assessment result not found');
     }
@@ -84,7 +84,7 @@ export const assessmentService = {
   },
 
   create: async (data: AssessmentCreateInput): Promise<Assessment> => {
-    const response = await apiClient.post<ApiResponse<Assessment>>('/assessments/results', data);
+    const response = await api.post<ApiResponse<Assessment>>('/assessments/results', data);
     if (!response.data.data) {
       throw new Error('Failed to create assessment result');
     }
@@ -92,7 +92,7 @@ export const assessmentService = {
   },
 
   update: async (id: string, data: AssessmentUpdateInput): Promise<Assessment> => {
-    const response = await apiClient.put<ApiResponse<Assessment>>(`/assessments/results/${id}`, data);
+    const response = await api.put<ApiResponse<Assessment>>(`/assessments/results/${id}`, data);
     if (!response.data.data) {
       throw new Error('Failed to update assessment result');
     }
@@ -100,11 +100,11 @@ export const assessmentService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/assessments/results/${id}`);
+    await api.delete(`/assessments/results/${id}`);
   },
 
   bulkCreate: async (data: BulkAssessmentInput): Promise<Assessment[]> => {
-    const response = await apiClient.post<ApiResponse<Assessment[]>>('/assessments/results/bulk', data);
+    const response = await api.post<ApiResponse<Assessment[]>>('/assessments/results/bulk', data);
     if (!response.data.data) {
       throw new Error('Failed to bulk create assessment results');
     }
@@ -118,12 +118,12 @@ export const assessmentService = {
     page?: number;
     limit?: number;
   }): Promise<PaginatedResponse<Assessment>> => {
-    const response = await apiClient.get<PaginatedResponse<Assessment>>(`/assessments/students/${studentId}/results`, { params });
+    const response = await api.get<PaginatedResponse<Assessment>>(`/assessments/students/${studentId}/results`, { params });
     return response.data;
   },
 
   getDefinitionResults: async (assessmentDefId: string): Promise<Assessment[]> => {
-    const response = await apiClient.get<ApiResponse<Assessment[]>>(`/assessments/definitions/${assessmentDefId}/results`);
+    const response = await api.get<ApiResponse<Assessment[]>>(`/assessments/definitions/${assessmentDefId}/results`);
     return response.data.data || [];
   },
 
@@ -140,27 +140,27 @@ export const assessmentService = {
     if (!params.classId) { // Should be classSubjectId
         throw new Error('classSubjectId is required for class subject statistics');
     }
-    const response = await apiClient.get(`/assessments/statistics/class-subject/${params.classId}`, { params: { termId: params.termId } });
+    const response = await api.get(`/assessments/statistics/class-subject/${params.classId}`, { params: { termId: params.termId } });
     return response.data.data;
   },
 
   getStudentTermAverage: async (studentId: string, termId: string): Promise<any> => {
-    const response = await apiClient.get(`/assessments/students/${studentId}/average/term/${termId}`);
+    const response = await api.get(`/assessments/students/${studentId}/average/term/${termId}`);
     return response.data;
   },
 
   generateStudentTermReport: async (studentId: string, termId: string): Promise<any> => {
-    const response = await apiClient.get(`/assessments/students/${studentId}/reports/term/${termId}`);
+    const response = await api.get(`/assessments/students/${studentId}/reports/term/${termId}`);
     return response.data;
   },
   
   getClassAssessmentAnalytics: async (classId: string, params?: {termId?: string, academicYearId?: string}) => {
-    const response = await apiClient.get(`/assessments/analytics/class/${classId}`, { params });
+    const response = await api.get(`/assessments/analytics/class/${classId}`, { params });
     return response.data;
   },
 
   exportAssessmentResults: async (assessmentDefId: string, format: string = 'csv'): Promise<any> => {
-    const response = await apiClient.get(`/assessments/export/definition/${assessmentDefId}`, { params: { format } });
+    const response = await api.get(`/assessments/export/definition/${assessmentDefId}`, { params: { format } });
     return response.data;
   },
 };

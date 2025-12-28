@@ -231,7 +231,7 @@ export default function TermsList() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="">All Years</SelectItem>
-            {academicYears.map((year) => (
+            {academicYears.map((year: any) => (
               <SelectItem key={year.id} value={year.id}>
                 {year.year}
               </SelectItem>
