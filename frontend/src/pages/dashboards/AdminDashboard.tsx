@@ -1,8 +1,16 @@
-import { Users, GraduationCap, BookOpen, TrendingUp } from 'lucide-react';
+import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, Users2 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { StudentEnrollmentModal } from '@/components/students/StudentEnrollmentModal';
+import { AssignTeacherToSubjectDialog } from '@/components/teachers/AssignTeacherToSubjectDialog';
+import { useState } from 'react';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [showTeacherDialog, setShowTeacherDialog] = useState(false);
 
   const stats = [
     {
@@ -124,6 +132,94 @@ export function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Student Enrollment & Teacher Assignment Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Student Enrollment Card */}
+        <div className="bg-gradient-to-br from-blue-50 to-blue-100 rounded-lg shadow p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Student Enrollment</h2>
+              <p className="text-sm text-gray-600">Enroll students in classes for the academic year</p>
+            </div>
+            <div className="bg-blue-600 p-3 rounded-lg">
+              <UserPlus className="text-white" size={24} />
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="bg-white rounded-lg p-4">
+              <p className="text-2xl font-bold text-blue-600">Manage Student Placements</p>
+              <p className="text-xs text-gray-600 mt-2">Assign students to classes and streams</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowEnrollModal(true)}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <UserPlus className="mr-2 h-4 w-4" />
+                Enroll Student
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/students')}
+                className="flex-1"
+              >
+                View All Students
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Teacher Subject Assignment Card */}
+        <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg shadow p-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Teacher Assignments</h2>
+              <p className="text-sm text-gray-600">Assign teachers to subjects and classes</p>
+            </div>
+            <div className="bg-green-600 p-3 rounded-lg">
+              <Users2 className="text-white" size={24} />
+            </div>
+          </div>
+          
+          <div className="space-y-3">
+            <div className="bg-white rounded-lg p-4">
+              <p className="text-2xl font-bold text-green-600">Manage Teacher Workload</p>
+              <p className="text-xs text-gray-600 mt-2">Assign subjects to classes for terms</p>
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                onClick={() => setShowTeacherDialog(true)}
+                className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Users2 className="mr-2 h-4 w-4" />
+                Assign Teacher
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/teachers')}
+                className="flex-1"
+              >
+                View Teachers
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Modals */}
+      <StudentEnrollmentModal 
+        open={showEnrollModal}
+        onOpenChange={setShowEnrollModal}
+      />
+      
+      <AssignTeacherToSubjectDialog 
+        open={showTeacherDialog}
+        onOpenChange={setShowTeacherDialog}
+      />
     </div>
   );
 }

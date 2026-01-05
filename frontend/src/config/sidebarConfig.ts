@@ -16,6 +16,9 @@ import {
     type LucideIcon,
     Lock,
     CalendarFoldIcon,
+    BookMarked,
+    UserCheck,
+    TestTubes,
   } from 'lucide-react';
   import { UserRole } from '../store/auth-store';
   
@@ -121,6 +124,12 @@ import {
       },
       {
         title: 'Subjects',
+        href: '/subjects',
+        icon: BookMarked,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
+        title: 'Class Subjects',
         href: '/classes/subjects',
         icon: BookOpen,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
@@ -143,6 +152,12 @@ import {
         title: 'All Assessments',
         href: '/assessments',
         icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
+        title: 'Assessment Definitions',
+        href: '/assessments/definitions',
+        icon: TestTubes,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
       {
@@ -215,6 +230,12 @@ import {
         title: 'Users List',
         href: '/users',
         icon: Users,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Guardians',
+        href: '/guardians',
+        icon: UserCheck,
         roles: ['SUPER_ADMIN', 'ADMIN'],
       },
       {

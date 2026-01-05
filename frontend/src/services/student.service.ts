@@ -18,7 +18,17 @@ export const studentService = {
     hasSpecialNeeds?: boolean;
     classId?: string;
   }): Promise<PaginatedResponse<Student>> => {
-    const response = await api.get('/students', { params });
+    // Map pageSize to limit for API compatibility
+    const apiParams = {
+      page: params?.page || 1,
+      limit: params?.pageSize || 20,
+      schoolId: params?.schoolId,
+      search: params?.search,
+      gender: params?.gender,
+      hasSpecialNeeds: params?.hasSpecialNeeds,
+      classId: params?.classId,
+    };
+    const response = await api.get<PaginatedResponse<Student>>('/students', { params: apiParams });
     return response.data;
   },
 

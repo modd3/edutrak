@@ -69,6 +69,28 @@ export function useAssignSubjects() {
   });
 }
 
+export function useAssignTeacherToSubject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: {
+      teacherId: string;
+      classId: string;
+      subjectId: string;
+      termId: string;
+      academicYearId: string;
+    }) => teacherService.assignSubjectToClass(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['teachers'] });
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      toast.success('Teacher assigned to subject successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to assign teacher to subject');
+    },
+  });
+}
+
 export function useTeacherWorkload(teacherId: string) {
   return useQuery({
     queryKey: ['teachers', teacherId, 'workload'],

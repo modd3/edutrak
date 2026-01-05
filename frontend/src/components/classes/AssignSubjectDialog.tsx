@@ -5,10 +5,10 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { useTeachers } from '@/hooks/use-teachers';
 import { useSubjects } from '@/hooks/use-subjects';
 import { useAssignSubject } from '@/hooks/use-class-subjects';
 import {
@@ -20,7 +20,8 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { useAuthStore } from '@/store/auth-store';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Info } from 'lucide-react';
 
 interface AssignSubjectDialogProps {
   classId: string;
@@ -29,12 +30,9 @@ interface AssignSubjectDialogProps {
 export function AssignSubjectDialog({ classId }: AssignSubjectDialogProps) {
   const [open, setOpen] = useState(false);
   const [selectedSubject, setSelectedSubject] = useState<string>('');
-  const [selectedTeacher, setSelectedTeacher] = useState<string>('');
   const [isCompulsory, setIsCompulsory] = useState(false);
   
-  const { user } = useAuthStore();
   const { data: subjects } = useSubjects();
-  const { data: teachers } = useTeachers({ schoolId: user?.schoolId });
   const { mutate: assignSubject, isPending } = useAssignSubject();
 
   const handleAssign = () => {
@@ -43,13 +41,12 @@ export function AssignSubjectDialog({ classId }: AssignSubjectDialogProps) {
     assignSubject({
       classId,
       subjectId: selectedSubject,
-      teacherId: selectedTeacher || undefined,
+      teacherId: undefined,
       isCompulsory,
     }, {
       onSuccess: () => {
         setOpen(false);
         setSelectedSubject('');
-        setSelectedTeacher('');
         setIsCompulsory(false);
       },
     });
@@ -60,16 +57,23 @@ export function AssignSubjectDialog({ classId }: AssignSubjectDialogProps) {
       <DialogTrigger asChild>
         <Button>
           <Plus className="mr-2 h-4 w-4" />
-          Assign Subject
+          Add Subject
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle>Assign Subject to Class</DialogTitle>
+          <DialogTitle>Add Subject to Class</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          <Alert>
+            <Info className="h-4 w-4" />
+            <AlertDescription className="text-xs">
+              Select a subject to add to this class. You can assign teachers to subjects separately.
+            </AlertDescription>
+          </Alert>
+
           <div className="space-y-2">
-            <Label>Subject</Label>
+            <Label>Subject *</Label>
             <Select
               value={selectedSubject}
               onValueChange={setSelectedSubject}
@@ -78,31 +82,17 @@ export function AssignSubjectDialog({ classId }: AssignSubjectDialogProps) {
                 <SelectValue placeholder="Select subject" />
               </SelectTrigger>
               <SelectContent>
-                {subjects?.data.map((subject) => (
-                  <SelectItem key={subject.id} value={subject.id}>
-                    {subject.name} ({subject.code})
+                {!subjects?.data || subjects.data.length === 0 ? (
+                  <SelectItem value="none" disabled>
+                    No subjects available
                   </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>Subject Teacher (Optional)</Label>
-            <Select
-              value={selectedTeacher}
-              onValueChange={setSelectedTeacher}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select teacher" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="">None</SelectItem>
-                {teachers?.data.map((teacher) => (
-                  <SelectItem key={teacher.id} value={teacher.id}>
-                    {teacher.user.firstName} {teacher.user.lastName}
-                  </SelectItem>
-                ))}
+                ) : (
+                  subjects.data.map((subject: any) => (
+                    <SelectItem key={subject.id} value={subject.id}>
+                      {subject.name} ({subject.code})
+                    </SelectItem>
+                  ))
+                )}
               </SelectContent>
             </Select>
           </div>
@@ -113,17 +103,28 @@ export function AssignSubjectDialog({ classId }: AssignSubjectDialogProps) {
               checked={isCompulsory}
               onCheckedChange={(checked) => setIsCompulsory(!!checked)}
             />
-            <Label htmlFor="isCompulsory">Compulsory Subject</Label>
+            <Label htmlFor="isCompulsory" className="font-normal cursor-pointer">
+              This is a compulsory subject
+            </Label>
           </div>
+        </div>
 
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+            disabled={isPending}
+          >
+            Cancel
+          </Button>
           <Button
             onClick={handleAssign}
             disabled={!selectedSubject || isPending}
-            className="w-full"
           >
-            {isPending ? 'Assigning...' : 'Assign Subject'}
+            {isPending ? 'Adding...' : 'Add Subject'}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

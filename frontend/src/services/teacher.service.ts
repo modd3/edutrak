@@ -39,6 +39,17 @@ export const teacherService = {
     await api.post(`/teachers/${teacherId}/subjects`, { subjectIds });
   },
 
+  assignSubjectToClass: async (data: {
+    teacherId: string;
+    classId: string;
+    subjectId: string;
+    termId: string;
+    academicYearId: string;
+  }): Promise<any> => {
+    const response = await api.post('/teachers/assign-subject', data);
+    return response.data?.data || response.data;
+  },
+
   getWorkload: async (teacherId: string): Promise<any> => {
     const response = await api.get(`/teachers/${teacherId}/workload`);
     return response.data.data;

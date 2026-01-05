@@ -24,8 +24,8 @@ import {
 import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useStudents, useUpdateStudent } from '@/hooks/use-students';
-import { Student, EnrollmentStatus } from '@/types';
+import { useStudents } from '@/hooks/use-students';
+import { Student } from '@/types';
 import { StudentDetailsModal } from '@/components/students/StudentDetailsModal';
 import { StudentFormModal } from '@/components/students/StudentFormModal';
 import { StudentEnrollmentModal } from '@/components/students/StudentEnrollmentModal';
@@ -63,7 +63,6 @@ const ENROLLMENT_STATUS_COLORS = {
 
 export default function StudentsList() {
   const { schoolId } = useSchoolContext();
-  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
@@ -80,7 +79,7 @@ export default function StudentsList() {
   const { data: studentsData, isLoading, isError } = useStudents({
     schoolId,
     search: search,
-    page,
+    page: 1,
     pageSize: 20,
   });
 
@@ -101,10 +100,8 @@ export default function StudentsList() {
     },
   });
 
+  // Extract students from paginated response
   const students = studentsData?.data || [];
-
-  console.log(students);
-  console.log('Students data: ', studentsData);
   
   // Filter students by gender and status
   const filteredStudents = students.filter((student: Student) => {
@@ -118,8 +115,7 @@ export default function StudentsList() {
       (statusFilter === 'inactive' && !hasActiveEnrollment);
     
     return matchesGender && matchesStatus;
-  });
-
+  })
   const handleDeleteClick = (student: Student) => {
     setSelectedStudent(student);
     setShowDeleteDialog(true);

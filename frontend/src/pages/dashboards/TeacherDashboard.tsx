@@ -1,8 +1,14 @@
-import { BookOpen, ClipboardCheck, Users, Calendar } from 'lucide-react';
+import { BookOpen, ClipboardCheck, Users, Calendar, Users2 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { AssignTeacherToSubjectDialog } from '@/components/teachers/AssignTeacherToSubjectDialog';
+import { useNavigate } from 'react-router-dom';
 
 export function TeacherDashboard() {
   const { user } = useAuthStore();
+  const navigate = useNavigate();
+  const [showTeacherDialog, setShowTeacherDialog] = useState(false);
 
   const myClasses = [
     { name: 'Form 3 North', subject: 'Mathematics', students: 42, period: 'Period 1 (8:00 AM)' },
@@ -142,6 +148,62 @@ export function TeacherDashboard() {
           </button>
         </div>
       </div>
+
+      {/* Subject Assignment Section */}
+      <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-lg shadow p-6">
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-1">My Subject Assignments</h2>
+            <p className="text-sm text-gray-600">Manage your subject assignments across classes</p>
+          </div>
+          <div className="bg-purple-600 p-3 rounded-lg">
+            <Users2 className="text-white" size={24} />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-sm text-gray-600 mb-1">Assigned Classes</p>
+            <p className="text-3xl font-bold text-purple-600">6</p>
+            <p className="text-xs text-gray-500 mt-1">Classes this year</p>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-sm text-gray-600 mb-1">Total Students</p>
+            <p className="text-3xl font-bold text-purple-600">245</p>
+            <p className="text-xs text-gray-500 mt-1">Across all classes</p>
+          </div>
+          
+          <div className="bg-white rounded-lg p-4">
+            <p className="text-sm text-gray-600 mb-1">Terms Assigned</p>
+            <p className="text-3xl font-bold text-purple-600">4</p>
+            <p className="text-xs text-gray-500 mt-1">Academic terms</p>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mt-4">
+          <Button 
+            onClick={() => setShowTeacherDialog(true)}
+            className="flex-1 bg-purple-600 hover:bg-purple-700 text-white"
+          >
+            <Users2 className="mr-2 h-4 w-4" />
+            Request Subject Assignment
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => navigate('/teachers/assignments')}
+            className="flex-1"
+          >
+            View All Assignments
+          </Button>
+        </div>
+      </div>
+
+      {/* Modal */}
+      <AssignTeacherToSubjectDialog 
+        open={showTeacherDialog}
+        onOpenChange={setShowTeacherDialog}
+      />
     </div>
   );
 }

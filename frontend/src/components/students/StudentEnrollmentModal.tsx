@@ -62,9 +62,7 @@ export function StudentEnrollmentModal({
   const watchedClassId = form.watch('classId');
 
   // Fetch streams when class is selected
-  const { data: streamsData } = useClassStreams(watchedClassId, {
-    enabled: !!watchedClassId,
-  });
+  const { data: streamsData } = useClassStreams(watchedClassId);
 
   const classes = classesData?.data || [];
   const streams = streamsData || [];
@@ -73,11 +71,13 @@ export function StudentEnrollmentModal({
   const { mutate: enrollStudent, isPending: isEnrolling } = useMutation({
     mutationFn: async (data: EnrollmentFormData) => {
       const response = await api.post('/students/enroll', {
-        ...data,
+        studentId: data.studentId,
+        classId: data.classId,
+        streamId: data.streamId === 'none' ? undefined : data.streamId,
+        academicYearId: data.academicYearId,
         schoolId,
-        status: 'ACTIVE',
       });
-      return response.data;
+      return response.data?.data || response.data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['students'] });
@@ -86,6 +86,7 @@ export function StudentEnrollmentModal({
       form.reset();
     },
     onError: (error: any) => {
+      console.error('Enrollment error:', error);
       toast.error(error.response?.data?.message || 'Failed to enroll student');
     },
   });
