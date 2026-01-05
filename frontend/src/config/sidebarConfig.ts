@@ -192,29 +192,17 @@ import {
     ],
   },
   {
-    title: 'Academic',
-    href: '/academic',
+    title: 'Academic Year',
+    href: '/academic-year',
     icon: Calendar,
-    roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+    roles: ['SUPER_ADMIN', 'ADMIN'],
     children: [
       {
-        title: 'Academic Years',
-        href: '/academic/years',
-        icon: Calendar,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
-      },
-      {
-        title: 'Terms',
-        href: '/academic/terms',
+        title: 'Set-Up Calendar',
+        href: '/academic-year',
         icon: CalendarFoldIcon,
         roles: ['SUPER_ADMIN', 'ADMIN'],
-      },
-      {
-        title: 'Streams',
-        href: '/classes/streams',
-        icon: Home,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
-      },
+      }
     ]
   },
   {

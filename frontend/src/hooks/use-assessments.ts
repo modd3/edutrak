@@ -2,6 +2,75 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { assessmentService, AssessmentCreateInput, AssessmentUpdateInput, BulkAssessmentInput } from '@/services/assessment.service';
 import { toast } from 'sonner';
 
+// ===== Assessment Definitions =====
+
+export function useAssessmentDefinitions(params?: {
+  page?: number;
+  pageSize?: number;
+  search?: string;
+}) {
+  return useQuery({
+    queryKey: ['assessmentDefinitions', params],
+    queryFn: () => assessmentService.getAll(params),
+  });
+}
+
+export function useAssessmentDefinition(id: string) {
+  return useQuery({
+    queryKey: ['assessmentDefinitions', id],
+    queryFn: () => assessmentService.getDefinitionById(id),
+    enabled: !!id,
+  });
+}
+
+export function useCreateAssessmentDefinition() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => assessmentService.createDefinition(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessmentDefinitions'] });
+      toast.success('Assessment definition created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to create assessment definition');
+    },
+  });
+}
+
+export function useUpdateAssessmentDefinition() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
+      assessmentService.updateDefinition(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessmentDefinitions'] });
+      toast.success('Assessment definition updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to update assessment definition');
+    },
+  });
+}
+
+export function useDeleteAssessmentDefinition() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => assessmentService.deleteDefinition(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessmentDefinitions'] });
+      toast.success('Assessment definition deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to delete assessment definition');
+    },
+  });
+}
+
+// ===== Assessment Results =====
+
 export function useAssessments(params?: {
   classId?: string;
   subjectId?: string;
@@ -12,7 +81,7 @@ export function useAssessments(params?: {
 }) {
   return useQuery({
     queryKey: ['assessments', params],
-    queryFn: () => assessmentService.getAll(params), // Now gets all results
+    queryFn: () => assessmentService.getAll(params),
   });
 }
 
@@ -28,13 +97,28 @@ export function useCreateAssessment() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: AssessmentCreateInput) => assessmentService.create(data), // Creates an assessment result
+    mutationFn: (data: AssessmentCreateInput) => assessmentService.create(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['assessments'] });
       toast.success('Assessment created successfully');
     },
     onError: (error: any) => {
       toast.error(error.message || 'Failed to create assessment');
+    },
+  });
+}
+
+export function useCreateAssessmentResult() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: any) => assessmentService.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      toast.success('Assessment result recorded successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.message || 'Failed to record assessment result');
     },
   });
 }

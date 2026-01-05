@@ -1,48 +1,37 @@
-import { Users, GraduationCap, BookOpen, TrendingUp, Calendar, FileText, UserCog, School } from 'lucide-react';
+import { Users, GraduationCap, BookOpen, TrendingUp } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
-import { useAcademicStatistics } from '@/hooks/use-academic';
-import { useUserStatistics } from '@/hooks/use-users';
-import { Link } from 'react-router-dom';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
 
-  // Fetch real statistics
-  const { data: academicStats } = useAcademicStatistics();
-  const { data: userStats } = useUserStatistics();
-
   const stats = [
     {
       title: 'Total Students',
-      value: userStats?.students?.toString() || '0',
+      value: '1,234',
       change: '+12%',
       icon: GraduationCap,
       color: 'bg-blue-500',
-      link: '/students',
     },
     {
       title: 'Teachers',
-      value: userStats?.teachers?.toString() || '0',
+      value: '89',
       change: '+5%',
-      icon: UserCog,
+      icon: Users,
       color: 'bg-green-500',
-      link: '/teachers',
     },
     {
       title: 'Classes',
-      value: academicStats?.totalClasses?.toString() || '0',
+      value: '45',
       change: '+3',
       icon: BookOpen,
       color: 'bg-purple-500',
-      link: '/classes',
     },
     {
-      title: 'Assessments',
-      value: academicStats?.totalAssessments?.toString() || '0',
-      change: '+8%',
-      icon: FileText,
+      title: 'Avg. Performance',
+      value: '78%',
+      change: '+4%',
+      icon: TrendingUp,
       color: 'bg-orange-500',
-      link: '/assessments',
     },
   ];
 
@@ -117,22 +106,22 @@ export function AdminDashboard() {
           <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <Link to="/users/bulk-create" className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors block text-center">
-            <Users className="mx-auto mb-2 text-blue-600" size={24} />
-            <p className="text-sm font-medium">Bulk Create Users</p>
-          </Link>
-          <Link to="/students/enrollments" className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors block text-center">
-            <GraduationCap className="mx-auto mb-2 text-green-600" size={24} />
-            <p className="text-sm font-medium">Manage Enrollments</p>
-          </Link>
-          <Link to="/teachers/assignments" className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors block text-center">
-            <UserCog className="mx-auto mb-2 text-purple-600" size={24} />
-            <p className="text-sm font-medium">Teacher Assignments</p>
-          </Link>
-          <Link to="/assessments/grade-entry" className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors block text-center">
-            <FileText className="mx-auto mb-2 text-orange-600" size={24} />
-            <p className="text-sm font-medium">Enter Grades</p>
-          </Link>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <GraduationCap className="mx-auto mb-2 text-blue-600" size={24} />
+            <p className="text-sm font-medium">Add Student</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <Users className="mx-auto mb-2 text-green-600" size={24} />
+            <p className="text-sm font-medium">Add Teacher</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <BookOpen className="mx-auto mb-2 text-purple-600" size={24} />
+            <p className="text-sm font-medium">Create Class</p>
+          </button>
+          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+            <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
+            <p className="text-sm font-medium">View Reports</p>
+          </button>
         </div>
       </div>
     </div>

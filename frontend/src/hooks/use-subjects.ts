@@ -50,6 +50,43 @@ export function useCreateSubject() {
   });
 }
 
+/**
+ * Hook to update a core subject.
+ */
+export function useUpdateSubject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: SubjectUpdateInput }) =>
+      subjectService.updateSubject(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [SUBJECTS_KEY] });
+      toast.success('Subject updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update subject');
+    },
+  });
+}
+
+/**
+ * Hook to delete a core subject.
+ */
+export function useDeleteSubject() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => subjectService.deleteSubject(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [SUBJECTS_KEY] });
+      toast.success('Subject deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete subject');
+    },
+  });
+}
+
 // === Subject Offering Hooks (School-Specific) ===
 
 /**

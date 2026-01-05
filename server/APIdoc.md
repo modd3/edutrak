@@ -47,7 +47,7 @@ src/
 - `GET /api/schools/:id/statistics` - Get school statistics
 
 ### Users & Authentication
-- `POST /api/users/login` - User login
+- `POST /api/auth/login` - User login
 - `POST /api/users` - Create new user
 - `GET /api/users` - Get all users (with filters)
 - `GET /api/users/:id` - Get user by ID

@@ -102,6 +102,9 @@ export default function StudentsList() {
   });
 
   const students = studentsData?.data || [];
+
+  console.log(students);
+  console.log('Students data: ', studentsData);
   
   // Filter students by gender and status
   const filteredStudents = students.filter((student: Student) => {

@@ -37,7 +37,7 @@ export const studentService = {
    * Creates a new student.
    */
   create: async (data: Partial<Student>): Promise<Student> => {
-    const response = await api.post<ApiResponse<Student>>('/students', data);
+    const response = await api.post<ApiResponse<Student>>('/users', data);
     if (!response.data.data) {
       throw new Error('Failed to create student');
     }
