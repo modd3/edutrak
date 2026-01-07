@@ -41,10 +41,10 @@ export function StudentEnrollmentModal({
   const { schoolId } = useSchoolContext();
   const queryClient = useQueryClient();
   
-  const { data: activeYearData } = useActiveAcademicYear();
-  const activeAcademicYear = activeYearData?.data;
+  const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
+  const activeAcademicYear = activeYearData?.data || activeYearData;
 
-  const { data: classesData } = useClasses({
+  const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses({
     schoolId,
     academicYearId: activeAcademicYear?.id,
   });
@@ -62,10 +62,10 @@ export function StudentEnrollmentModal({
   const watchedClassId = form.watch('classId');
 
   // Fetch streams when class is selected
-  const { data: streamsData } = useClassStreams(watchedClassId);
+  const { data: streamsData, isLoading: isLoadingStreams } = useClassStreams(watchedClassId);
 
-  const classes = classesData?.data || [];
-  const streams = streamsData || [];
+  const classes = Array.isArray(classesData) ? classesData : classesData?.data?.data || [];
+  const streams = Array.isArray(streamsData) ? streamsData : streamsData?.data || [];
 
   // Enroll mutation
   const { mutate: enrollStudent, isPending: isEnrolling } = useMutation({
@@ -130,6 +130,22 @@ export function StudentEnrollmentModal({
           </DialogDescription>
         </DialogHeader>
 
+        {(yearError || classesError) && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              {yearError?.message || classesError?.message || 'Failed to load enrollment data'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {!activeAcademicYear && !isLoadingYear && (
+          <Alert variant="destructive">
+            <AlertDescription>
+              No active academic year found. Please set an active academic year first.
+            </AlertDescription>
+          </Alert>
+        )}
+
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Student Info */}
           {student && (
@@ -182,19 +198,23 @@ export function StudentEnrollmentModal({
               name="classId"
               control={form.control}
               render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
+                <Select 
+                  onValueChange={field.onChange} 
+                  value={field.value}
+                  disabled={isLoadingClasses || !activeAcademicYear}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select class" />
+                    <SelectValue placeholder={isLoadingClasses ? "Loading classes..." : "Select class"} />
                   </SelectTrigger>
                   <SelectContent>
                     {classes.length === 0 ? (
                       <SelectItem value="none" disabled>
-                        No classes available
+                        {isLoadingClasses ? "Loading classes..." : "No classes available"}
                       </SelectItem>
                     ) : (
                       classes.map((cls: any) => (
                         <SelectItem key={cls.id} value={cls.id}>
-                          {cls.name} - {cls.level}
+                          {cls.name} {cls.level ? `- ${cls.level}` : ''}
                         </SelectItem>
                       ))
                     )}
@@ -215,21 +235,25 @@ export function StudentEnrollmentModal({
                 name="streamId"
                 control={form.control}
                 render={({ field }) => (
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={isLoadingStreams}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select stream (optional)" />
+                      <SelectValue placeholder={isLoadingStreams ? "Loading streams..." : "Select stream (optional)"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">-- No Stream --</SelectItem>
                       {streams.length === 0 ? (
                         <SelectItem value="no-streams" disabled>
-                          No streams in this class
+                          {isLoadingStreams ? "Loading streams..." : "No streams in this class"}
                         </SelectItem>
                       ) : (
                         streams.map((stream: any) => (
                           <SelectItem key={stream.id} value={stream.id}>
                             {stream.name}
-                            {stream.capacity && ` (Capacity: ${stream.capacity})`}
+                            {stream.capacity ? ` (Capacity: ${stream.capacity})` : ''}
                           </SelectItem>
                         ))
                       )}
@@ -258,13 +282,13 @@ export function StudentEnrollmentModal({
             type="button" 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
-            disabled={isEnrolling}
+            disabled={isEnrolling || isLoadingYear || isLoadingClasses}
           >
             Cancel
           </Button>
           <Button 
             onClick={form.handleSubmit(onSubmit)} 
-            disabled={isEnrolling || !activeAcademicYear}
+            disabled={isEnrolling || !activeAcademicYear || isLoadingYear || isLoadingClasses || classes.length === 0}
           >
             {isEnrolling ? 'Enrolling...' : 'Enroll Student'}
           </Button>

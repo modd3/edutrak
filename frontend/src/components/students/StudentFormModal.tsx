@@ -558,7 +558,7 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
                           <SelectValue placeholder="Select county" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">-- Select County --</SelectItem>
+                          <SelectItem value="none">-- Select County --</SelectItem>
                           {KENYAN_COUNTIES.map((county) => (
                             <SelectItem key={county} value={county}>
                               {county}

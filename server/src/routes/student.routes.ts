@@ -23,10 +23,9 @@ router.get(
     studentController.getStudentById.bind(studentController)
   );
   
-router.post('/enroll', authorize('ADMIN', 'SUPER_ADMIN'), studentController.enrollStudent);
-router.post('/promote', authorize('ADMIN', 'SUPER_ADMIN'), studentController.promoteStudent);
-router.post('/transfer', authorize('ADMIN', 'SUPER_ADMIN'), studentController.transferStudent);
-
+router.post('/enroll', authorize('ADMIN', 'SUPER_ADMIN'), studentController.enrollStudent.bind(studentController));
+router.post('/promote', authorize('ADMIN', 'SUPER_ADMIN'), studentController.promoteStudent.bind(studentController));
+router.post('/transfer', authorize('ADMIN', 'SUPER_ADMIN'), studentController.transferStudent.bind(studentController));
 // Student access
 router.get('/class/:classId', studentController.getStudentsByClass);
 router.get('/admission/:admissionNo', studentController.getStudentByAdmissionNo);

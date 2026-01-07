@@ -8,6 +8,7 @@ export const teacherService = {
     search?: string;
   }): Promise<PaginatedResponse<Teacher>> => {
     const response = await api.get<PaginatedResponse<Teacher>>('/teachers', { params });
+    console.log("Teacher Service getAll response: ", response);
     return response.data;
   },
 
