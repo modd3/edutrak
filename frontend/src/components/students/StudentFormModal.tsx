@@ -12,17 +12,22 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Student } from '@/types';
-import { useCreateStudent, useUpdateStudent } from '@/hooks/use-students';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { usePreviewSequence } from '@/hooks/use-sequences';
-import { GraduationCap, Sparkles, RefreshCw } from 'lucide-react';
+import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import api from '@/api';
 
-const studentSchema = z.object({
-  admissionNo: z.string().min(1, 'Admission number is required'),
+// Student form schema
+const studentFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
+  email: z.string().email('Invalid email address'),
+  phone: z.string().optional(),
+  idNumber: z.string().nullable().optional().transform(e => e === "" ? null : e),
+  password: z.string().min(8, 'Password must be at least 8 characters').optional().or(z.literal('')),
+  admissionNo: z.string().min(1, 'Admission number is required'),
   gender: z.enum(['MALE', 'FEMALE']),
   dob: z.string().optional(),
   birthCertNo: z.string().optional(),
@@ -37,7 +42,7 @@ const studentSchema = z.object({
   allergies: z.string().optional(),
 });
 
-type StudentFormData = z.infer<typeof studentSchema>;
+type StudentFormData = z.infer<typeof studentFormSchema>;
 
 interface StudentFormModalProps {
   open: boolean;
@@ -57,28 +62,23 @@ const KENYAN_COUNTIES = [
 ];
 
 export function StudentFormModal({ open, onOpenChange, mode, student }: StudentFormModalProps) {
-  const { schoolId } = useSchoolContext();
   const [autoGenerateAdmission, setAutoGenerateAdmission] = useState(mode === 'create');
-  
-  const { mutate: createStudent, isPending: isCreating } = useCreateStudent();
-  const { mutate: updateStudent, isPending: isUpdating } = useUpdateStudent();
-  
-  const isLoading = isCreating || isUpdating;
-
-  // Preview admission number
-  const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
-    'ADMISSION_NUMBER',
-    schoolId,
-    { enabled: autoGenerateAdmission && mode === 'create' && open }
-  );
+  const [showPassword, setShowPassword] = useState(false);
+  const { schoolId, schoolName } = useSchoolContext();
+  const [isLoading, setIsLoading] = useState(false);
+  const [watchHasSpecialNeeds, setWatchHasSpecialNeeds] = useState(false);
 
   const form = useForm<StudentFormData>({
-    resolver: zodResolver(studentSchema),
+    resolver: zodResolver(studentFormSchema),
     defaultValues: {
-      admissionNo: '',
       firstName: '',
       lastName: '',
       middleName: '',
+      email: '',
+      phone: '',
+      idNumber: '',
+      password: '',
+      admissionNo: '',
       gender: 'MALE',
       dob: '',
       birthCertNo: '',
@@ -94,41 +94,38 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
     },
   });
 
-  const watchHasSpecialNeeds = form.watch('hasSpecialNeeds');
+  // Get preview for auto-generated admission number
+  const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
+    'ADMISSION_NUMBER',
+    schoolId,
+    { enabled: autoGenerateAdmission && mode === 'create' && open }
+  );
 
-  // Reset form on create mode
+  // Watch special needs checkbox
+  const hasSpecialNeedsValue = form.watch('hasSpecialNeeds');
+  useEffect(() => {
+    setWatchHasSpecialNeeds(hasSpecialNeedsValue);
+  }, [hasSpecialNeedsValue]);
+
+  // Reset form when opening in create mode
   useEffect(() => {
     if (open && mode === 'create') {
-      form.reset({
-        admissionNo: '',
-        firstName: '',
-        lastName: '',
-        middleName: '',
-        gender: 'MALE',
-        dob: '',
-        birthCertNo: '',
-        upiNumber: '',
-        kemisUpi: '',
-        nationality: 'Kenyan',
-        county: '',
-        subCounty: '',
-        hasSpecialNeeds: false,
-        specialNeedsType: '',
-        medicalCondition: '',
-        allergies: '',
-      });
-      setAutoGenerateAdmission(true);
+      resetForm();
     }
-  }, [open, mode, form]);
+  }, [open, mode]);
 
-  // Populate form in edit mode
+  // Populate form when student data changes (edit mode)
   useEffect(() => {
     if (mode === 'edit' && student && open) {
       form.reset({
-        admissionNo: student.admissionNo,
-        firstName: student.firstName,
-        lastName: student.lastName,
+        firstName: student.firstName || '',
+        lastName: student.lastName || '',
         middleName: student.middleName || '',
+        email: student.user?.email || '',
+        phone: student.user?.phone || '',
+        idNumber: student.user?.idNumber || '',
+        password: '',
+        admissionNo: student.admissionNo,
         gender: student.gender,
         dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
         birthCertNo: student.birthCertNo || '',
@@ -146,7 +143,7 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
     }
   }, [mode, student, open, form]);
 
-  // Auto-fill admission number
+  // Set admission number when preview changes
   useEffect(() => {
     if (autoGenerateAdmission && mode === 'create' && previewAdmission?.preview) {
       form.setValue('admissionNo', previewAdmission.preview, {
@@ -155,37 +152,140 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
     }
   }, [previewAdmission, autoGenerateAdmission, mode, form]);
 
+  const resetForm = () => {
+    form.reset({
+      firstName: '',
+      lastName: '',
+      middleName: '',
+      email: '',
+      phone: '',
+      idNumber: '',
+      password: '',
+      admissionNo: '',
+      gender: 'MALE',
+      dob: '',
+      birthCertNo: '',
+      upiNumber: '',
+      kemisUpi: '',
+      nationality: 'Kenyan',
+      county: '',
+      subCounty: '',
+      hasSpecialNeeds: false,
+      specialNeedsType: '',
+      medicalCondition: '',
+      allergies: '',
+    });
+    setShowPassword(false);
+    setAutoGenerateAdmission(mode === 'create');
+  };
+
+  useEffect(() => {
+    if (!open) {
+      resetForm();
+    }
+  }, [open]);
+
   const onSubmit = async (data: StudentFormData) => {
-    // Validate admission number
-    if (!data.admissionNo) {
-      if (autoGenerateAdmission && previewAdmission?.preview) {
-        data.admissionNo = previewAdmission.preview;
-      } else {
-        toast.error('Admission number is required');
+    try {
+      setIsLoading(true);
+
+      // Validate student form
+      const isValid = await form.trigger();
+      if (!isValid) {
+        const errors = Object.values(form.formState.errors);
+        if (errors.length > 0) {
+          toast.error(`${errors[0].message}`);
+        } else {
+          toast.error('Please fill in all required fields');
+        }
         return;
       }
-    }
 
-    const requestBody = {
-      ...data,
-      schoolId,
-      dob: data.dob ? new Date(data.dob) : undefined,
-      nationality: data.nationality || 'Kenyan',
-    };
+      // Ensure admission number is set
+      if (!data.admissionNo) {
+        if (autoGenerateAdmission && previewAdmission?.preview) {
+          data.admissionNo = previewAdmission.preview;
+        } else {
+          toast.error('Admission number is required');
+          return;
+        }
+      }
 
-    if (mode === 'create') {
-      createStudent(requestBody, {
-        onSuccess: () => {
-          onOpenChange(false);
-          form.reset();
-        },
-      });
-    } else if (student) {
-      updateStudent({ id: student.id, data: requestBody }, {
-        onSuccess: () => {
-          onOpenChange(false);
-        },
-      });
+      // Prepare request body
+      const requestBody = {
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        email: data.email,
+        phone: data.phone,
+        idNumber: data.idNumber === '' ? null : data.idNumber,
+        role: 'STUDENT',
+        schoolId,
+        password: data.password || undefined,
+        admissionNo: data.admissionNo,
+        gender: data.gender,
+        dob: data.dob ? new Date(data.dob) : undefined,
+        birthCertNo: data.birthCertNo,
+        upiNumber: data.upiNumber,
+        kemisUpi: data.kemisUpi,
+        nationality: data.nationality || 'Kenyan',
+        county: data.county && data.county !== '' ? data.county : undefined,
+        subCounty: data.subCounty,
+        hasSpecialNeeds: data.hasSpecialNeeds,
+        specialNeedsType: data.specialNeedsType,
+        medicalCondition: data.medicalCondition,
+        allergies: data.allergies,
+      };
+
+      if (mode === 'create') {
+        await api.post('/users', requestBody);
+        toast.success('Student created successfully');
+        onOpenChange(false);
+        resetForm();
+        // Optionally refresh the list
+        window.location.reload();
+      } else if (student) {
+        // For edit, update user and student separately
+        if (student.user) {
+          await api.put(`/users/${student.user.id}`, {
+            firstName: data.firstName,
+            lastName: data.lastName,
+            middleName: data.middleName,
+            email: data.email,
+            phone: data.phone,
+            idNumber: data.idNumber === '' ? null : data.idNumber,
+            ...(data.password && { password: data.password }),
+          });
+        }
+
+        await api.put(`/students/${student.id}`, {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          middleName: data.middleName,
+          admissionNo: data.admissionNo,
+          gender: data.gender,
+          dob: data.dob ? new Date(data.dob) : undefined,
+          birthCertNo: data.birthCertNo,
+          upiNumber: data.upiNumber,
+          kemisUpi: data.kemisUpi,
+          nationality: data.nationality || 'Kenyan',
+          county: data.county && data.county !== '' ? data.county : undefined,
+          subCounty: data.subCounty,
+          hasSpecialNeeds: data.hasSpecialNeeds,
+          specialNeedsType: data.specialNeedsType,
+          medicalCondition: data.medicalCondition,
+          allergies: data.allergies,
+        });
+
+        toast.success('Student updated successfully');
+        onOpenChange(false);
+        window.location.reload();
+      }
+    } catch (error: any) {
+      toast.error(error.response?.data?.message || 'Failed to save student');
+      console.error('Error:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -199,16 +299,157 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
-              ? 'Fill in the student details below to register.'
-              : 'Update student information.'}
+              ? 'Fill in the student details and personal information.'
+              : 'Update student information and profile.'}
           </DialogDescription>
         </DialogHeader>
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            {/* Basic Information */}
+            {/* Personal Information */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Basic Information</h3>
+              <h3 className="text-sm font-semibold">Personal Information</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>First Name *</Label>
+                  <Input {...form.register('firstName')} placeholder="John" />
+                  {form.formState.errors.firstName && (
+                    <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Last Name *</Label>
+                  <Input {...form.register('lastName')} placeholder="Doe" />
+                  {form.formState.errors.lastName && (
+                    <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Middle Name</Label>
+                  <Input {...form.register('middleName')} placeholder="Optional" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input {...form.register('email')} type="email" placeholder="student@example.com" />
+                  {form.formState.errors.email && (
+                    <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Phone</Label>
+                  <Input {...form.register('phone')} placeholder="+254712345678" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>ID Number</Label>
+                  <Input {...form.register('idNumber')} placeholder="12345678" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gender *</Label>
+                  <Controller
+                    name="gender"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Select onValueChange={field.onChange} value={field.value}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select gender" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="MALE">Male</SelectItem>
+                          <SelectItem value="FEMALE">Female</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {form.formState.errors.gender && (
+                    <p className="text-sm text-destructive">{form.formState.errors.gender.message}</p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Date of Birth</Label>
+                  <Input 
+                    {...form.register('dob')} 
+                    type="date" 
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Birth Certificate Number</Label>
+                  <Input {...form.register('birthCertNo')} placeholder="123456" />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Nationality</Label>
+                  <Input {...form.register('nationality')} placeholder="Kenyan" defaultValue="Kenyan" />
+                </div>
+
+                {mode === 'create' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Password *</Label>
+                    <div className="relative">
+                      <Input
+                        {...form.register('password')}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter secure password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {form.formState.errors.password && (
+                      <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                )}
+
+                {mode === 'edit' && (
+                  <div className="space-y-2 md:col-span-2">
+                    <Label>Update Password (Optional)</Label>
+                    <div className="relative">
+                      <Input
+                        {...form.register('password')}
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Leave blank to keep current password"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                    {form.formState.errors.password && (
+                      <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Academic Information */}
+            <div className="space-y-4">
+              <h3 className="text-sm font-semibold flex items-center gap-2">
+                <GraduationCap className="h-4 w-4" />
+                Academic Information
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between">
@@ -261,70 +502,17 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
                     />
                   )}
                   
-                  {form.formState.errors.admissionNo && (
+                  {previewAdmission && autoGenerateAdmission && (
+                    <p className="text-xs text-muted-foreground">
+                      Next available: {previewAdmission.preview}
+                    </p>
+                  )}
+                  
+                  {form.formState.errors.admissionNo && !autoGenerateAdmission && (
                     <p className="text-sm text-destructive">
                       {form.formState.errors.admissionNo.message}
                     </p>
                   )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>First Name *</Label>
-                  <Input {...form.register('firstName')} placeholder="John" />
-                  {form.formState.errors.firstName && (
-                    <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Middle Name</Label>
-                  <Input {...form.register('middleName')} placeholder="Optional" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Last Name *</Label>
-                  <Input {...form.register('lastName')} placeholder="Doe" />
-                  {form.formState.errors.lastName && (
-                    <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p>
-                  )}
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Gender *</Label>
-                  <Controller
-                    name="gender"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MALE">Male</SelectItem>
-                          <SelectItem value="FEMALE">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Date of Birth</Label>
-                  <Input 
-                    {...form.register('dob')} 
-                    type="date" 
-                    max={new Date().toISOString().split('T')[0]}
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Birth Certificate No.</Label>
-                  <Input {...form.register('birthCertNo')} placeholder="123456" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>Nationality</Label>
-                  <Input {...form.register('nationality')} placeholder="Kenyan" defaultValue="Kenyan" />
                 </div>
               </div>
             </div>
@@ -365,12 +553,12 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
                     name="county"
                     control={form.control}
                     render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select county" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">-- Select County --</SelectItem>
+                          <SelectItem value="">-- Select County --</SelectItem>
                           {KENYAN_COUNTIES.map((county) => (
                             <SelectItem key={county} value={county}>
                               {county}
@@ -391,9 +579,9 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
 
             <Separator />
 
-            {/* Special Needs */}
+            {/* Special Needs & Medical */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Special Needs & Medical</h3>
+              <h3 className="text-sm font-semibold">Special Needs & Medical Information</h3>
               
               <div className="space-y-2">
                 <Controller
@@ -426,15 +614,21 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
               </div>
 
               {watchHasSpecialNeeds && (
-                <div className="space-y-2 ml-6">
-                  <Label>Special Needs Type *</Label>
-                  <Input
-                    {...form.register('specialNeedsType')}
-                    placeholder="e.g., Visual impairment, Hearing impairment, Learning disability"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Examples: Visual, Hearing, Physical, Learning disabilities, Autism, ADHD, etc.
-                  </p>
+                <div className="space-y-2 ml-6 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-lg border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                    <div className="flex-1">
+                      <Label>Special Needs Type *</Label>
+                      <Input
+                        {...form.register('specialNeedsType')}
+                        placeholder="e.g., Visual impairment, Hearing impairment, Learning disability"
+                        className="mt-2"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Examples: Visual, Hearing, Physical, Learning disabilities, Autism, ADHD, etc.
+                      </p>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -465,17 +659,12 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
           </form>
         </ScrollArea>
 
-        <DialogFooter>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => onOpenChange(false)} 
-            disabled={isLoading}
-          >
+        <DialogFooter className="space-x-2">
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancel
           </Button>
           <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
-            {isLoading ? 'Saving...' : mode === 'create' ? 'Register Student' : 'Save Changes'}
+            {isLoading ? 'Saving...' : mode === 'create' ? 'Register Student' : 'Update Student'}
           </Button>
         </DialogFooter>
       </DialogContent>
