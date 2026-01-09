@@ -1,7 +1,7 @@
 // src/pages/students/StudentsList.tsx
 import { useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { MoreHorizontal, PlusCircle, Edit, Trash, Eye, UserPlus, Upload } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Edit, Trash, Eye, UserPlus, Upload, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -71,6 +71,8 @@ export default function StudentsList() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showEnrollModal, setShowEnrollModal] = useState(false);
+  const [enrollmentMode, setEnrollmentMode] = useState<'create' | 'edit'>('create');
+  const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
 
   const queryClient = useQueryClient();
@@ -131,10 +133,22 @@ export default function StudentsList() {
     setShowDetailsModal(true);
   };
 
-  const handleEnrollClick = (student: Student) => {
-    setSelectedStudent(student);
-    setShowEnrollModal(true);
-  };
+  const handleEnrollClick = (student: Student, mode: 'create' | 'edit' = 'create') => {
+  setSelectedStudent(student);
+  setEnrollmentMode(mode);
+  
+  if (mode === 'edit') {
+    // Find the active enrollment
+    const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
+    if (activeEnrollment) {
+      setSelectedEnrollment(activeEnrollment);
+    }
+  } else {
+    setSelectedEnrollment(null);
+  }
+  
+  setShowEnrollModal(true);
+};
 
   const confirmDelete = () => {
     if (selectedStudent) {
@@ -228,50 +242,56 @@ export default function StudentsList() {
       },
     },
     {
-      id: 'actions',
-      header: 'Actions',
-      cell: ({ row }) => {
-        const student = row.original;
-        const hasActiveEnrollment = student.enrollments?.some(e => e.status === 'ACTIVE');
-        
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-8 w-8 p-0">
-                <span className="sr-only">Open menu</span>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => handleStudentClick(student)}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEditClick(student)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Student
-              </DropdownMenuItem>
-              {!hasActiveEnrollment && (
-                <DropdownMenuItem onClick={() => handleEnrollClick(student)}>
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  Enroll in Class
-                </DropdownMenuItem>
-              )}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDeleteClick(student)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete Student
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
-      },
-    },
+  id: 'actions',
+  header: 'Actions',
+  cell: ({ row }) => {
+    const student = row.original;
+    const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
+    const hasActiveEnrollment = !!activeEnrollment;
+    
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="ghost" className="h-8 w-8 p-0">
+            <span className="sr-only">Open menu</span>
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={() => handleStudentClick(student)}>
+            <Eye className="mr-2 h-4 w-4" />
+            View Details
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => handleEditClick(student)}>
+            <Edit className="mr-2 h-4 w-4" />
+            Edit Student
+          </DropdownMenuItem>
+          {hasActiveEnrollment ? (
+            <DropdownMenuItem onClick={() => handleEnrollClick(student, 'edit')}>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit Enrollment
+            </DropdownMenuItem>
+          ) : (
+            <DropdownMenuItem onClick={() => handleEnrollClick(student, 'create')}>
+              <UserPlus className="mr-2 h-4 w-4" />
+              Enroll in Class
+            </DropdownMenuItem>
+          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem
+            className="text-destructive"
+            onClick={() => handleDeleteClick(student)}
+          >
+            <Trash className="mr-2 h-4 w-4" />
+            Delete Student
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  },
+}
   ];
 
   if (isLoading) {
@@ -386,12 +406,14 @@ export default function StudentsList() {
 
       {/* Enroll Student Modal */}
       {selectedStudent && (
-        <StudentEnrollmentModal
-          open={showEnrollModal}
-          onOpenChange={setShowEnrollModal}
-          student={selectedStudent}
-        />
-      )}
+  <StudentEnrollmentModal
+    open={showEnrollModal}
+    onOpenChange={setShowEnrollModal}
+    student={selectedStudent}
+    enrollment={enrollmentMode === 'edit' ? selectedEnrollment : undefined}
+    mode={enrollmentMode}
+  />
+)}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

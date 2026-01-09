@@ -296,6 +296,43 @@ export class StudentService extends BaseService {
     return enrollment;
   }
 
+async updateEnrollment(
+  enrollmentId: string,
+  data: {
+    streamId?: string;
+    classId?: string;
+    selectedSubjects?: string[];
+  },
+  schoolId?: string,
+  isSuperAdmin: boolean = false
+) {
+  // Validate access
+  const hasAccess = await this.validateSchoolAccess(
+    enrollmentId,
+    'studentClass',  // Need to add this validation method
+    schoolId,
+    isSuperAdmin
+  );
+
+  if (!hasAccess) {
+    throw new Error('Enrollment not found or access denied');
+  }
+
+  const enrollment = await this.prisma.studentClass.update({
+    where: { id: enrollmentId },
+    data,
+    include: {
+      student: true,
+      class: true,
+      stream: true,
+      academicYear: true,
+    },
+  });
+
+  logger.info('Enrollment updated successfully', { enrollmentId });
+  return enrollment;
+}
+
   async updateEnrollmentStatus(enrollmentId: string, status: EnrollmentStatus) {
     const enrollment = await this.prisma.studentClass.update({
       where: { id: enrollmentId },

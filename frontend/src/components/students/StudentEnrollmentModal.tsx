@@ -2,7 +2,7 @@
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,8 +15,9 @@ import { useSchoolContext } from '@/hooks/use-school-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/api';
 import { toast } from 'sonner';
-import { UserPlus, Info } from 'lucide-react';
+import { UserPlus, Info, Pencil } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Input } from '@/components/ui/input';
 
 const enrollmentSchema = z.object({
   studentId: z.string().min(1, 'Student is required'),
@@ -31,12 +32,16 @@ interface StudentEnrollmentModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   student?: Student;
+  enrollment?: any; // For edit mode
+  mode?: 'create' | 'edit';
 }
 
 export function StudentEnrollmentModal({ 
   open, 
   onOpenChange, 
-  student 
+  student,
+  enrollment,
+  mode = 'create'
 }: StudentEnrollmentModalProps) {
   const { schoolId } = useSchoolContext();
   const queryClient = useQueryClient();
@@ -63,12 +68,14 @@ export function StudentEnrollmentModal({
 
   // Fetch streams when class is selected
   const { data: streamsData, isLoading: isLoadingStreams } = useClassStreams(watchedClassId);
+  console.log("StreamsData: ", streamsData);
+  console.log("StreamsData hook: ", useClassStreams(watchedClassId));
 
   const classes = Array.isArray(classesData) ? classesData : classesData?.data?.data || [];
   const streams = Array.isArray(streamsData) ? streamsData : streamsData?.data || [];
 
-  // Enroll mutation
-  const { mutate: enrollStudent, isPending: isEnrolling } = useMutation({
+  // Enroll mutation (create)
+  const { mutate: createEnrollment, isPending: isCreating } = useMutation({
     mutationFn: async (data: EnrollmentFormData) => {
       const response = await api.post('/students/enroll', {
         studentId: data.studentId,
@@ -91,42 +98,94 @@ export function StudentEnrollmentModal({
     },
   });
 
-  // Set student ID when modal opens
+  // Update enrollment mutation (edit)
+  const { mutate: updateEnrollment, isPending: isUpdating } = useMutation({
+    mutationFn: async ({ enrollmentId, data }: { enrollmentId: string; data: Partial<EnrollmentFormData> }) => {
+      const response = await api.put(`/students/enrollments/${enrollmentId}`, {
+        classId: data.classId,
+        streamId: data.streamId === 'none' ? undefined : data.streamId,
+        // Note: academicYearId and studentId typically cannot be changed
+      });
+      return response.data?.data || response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Enrollment updated successfully');
+      onOpenChange(false);
+      form.reset();
+    },
+    onError: (error: any) => {
+      console.error('Update enrollment error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update enrollment');
+    },
+  });
+
+  // Set form values when modal opens
   useEffect(() => {
     if (open && student) {
       form.setValue('studentId', student.id);
+      
+      if (mode === 'edit' && enrollment) {
+        // Pre-fill form with existing enrollment data
+        form.setValue('classId', enrollment.class?.id || enrollment.classId || '');
+        form.setValue('streamId', enrollment.stream?.id || enrollment.streamId || '');
+        form.setValue('academicYearId', enrollment.academicYear?.id || enrollment.academicYearId || '');
+      } else {
+        // Reset for create mode
+        form.setValue('classId', '');
+        form.setValue('streamId', '');
+        form.setValue('academicYearId', activeAcademicYear?.id || '');
+      }
     }
-  }, [open, student, form]);
+  }, [open, student, enrollment, mode, form, activeAcademicYear]);
 
   // Set academic year when it loads
   useEffect(() => {
-    if (activeAcademicYear?.id) {
+    if (activeAcademicYear?.id && !enrollment) {
       form.setValue('academicYearId', activeAcademicYear.id);
     }
-  }, [activeAcademicYear, form]);
+  }, [activeAcademicYear, form, enrollment]);
 
   // Reset stream when class changes
   useEffect(() => {
-    form.setValue('streamId', '');
-  }, [watchedClassId, form]);
+    if (mode === 'create') {
+      form.setValue('streamId', '');
+    }
+  }, [watchedClassId, form, mode]);
 
   const onSubmit = async (data: EnrollmentFormData) => {
-    enrollStudent({
-      ...data,
-      streamId: data.streamId || undefined,
-    });
+    if (mode === 'create') {
+      createEnrollment(data);
+    } else if (mode === 'edit' && enrollment) {
+      updateEnrollment({
+        enrollmentId: enrollment.id,
+        data: {
+          classId: data.classId,
+          streamId: data.streamId,
+          academicYearId: data.academicYearId,
+        }
+      });
+    }
   };
+
+  const isLoading = mode === 'create' ? isCreating : isUpdating;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <UserPlus className="h-5 w-5" />
-            Enroll Student
+            {mode === 'create' ? (
+              <UserPlus className="h-5 w-5" />
+            ) : (
+              <Pencil className="h-5 w-5" />
+            )}
+            {mode === 'create' ? 'Enroll Student' : 'Edit Enrollment'}
           </DialogTitle>
           <DialogDescription>
-            Assign student to a class and stream for the current academic year.
+            {mode === 'create' 
+              ? 'Assign student to a class and stream for the current academic year.'
+              : 'Update student enrollment details.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -159,6 +218,20 @@ export function StudentEnrollmentModal({
             </Alert>
           )}
 
+          {/* Current Enrollment Info (Edit mode) */}
+          {mode === 'edit' && enrollment && (
+            <Alert variant="outline">
+              <AlertDescription className="text-sm">
+                <strong>Current Enrollment:</strong> {enrollment.class?.name}
+                {enrollment.stream && ` - ${enrollment.stream.name}`}
+                <br />
+                <strong>Academic Year:</strong> {enrollment.academicYear?.year}
+                <br />
+                <strong>Status:</strong> {enrollment.status}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Academic Year */}
           <div className="space-y-2">
             <Label>Academic Year</Label>
@@ -170,9 +243,9 @@ export function StudentEnrollmentModal({
                   <Select 
                     onValueChange={field.onChange} 
                     value={field.value}
-                    disabled
+                    disabled={mode === 'edit'} // Can't change academic year in edit mode
                   >
-                    <SelectTrigger className="bg-muted">
+                    <SelectTrigger className={mode === 'edit' ? 'bg-muted' : ''}>
                       <SelectValue placeholder="Select academic year" />
                     </SelectTrigger>
                     <SelectContent>
@@ -187,7 +260,9 @@ export function StudentEnrollmentModal({
               )}
             />
             <p className="text-xs text-muted-foreground">
-              Students are enrolled in the active academic year
+              {mode === 'edit' 
+                ? 'Academic year cannot be changed'
+                : 'Students are enrolled in the active academic year'}
             </p>
           </div>
 
@@ -228,7 +303,7 @@ export function StudentEnrollmentModal({
           </div>
 
           {/* Stream Selection */}
-          {watchedClassId && (
+          {(watchedClassId || (mode === 'edit' && enrollment?.streamId)) && (
             <div className="space-y-2">
               <Label>Stream (Optional)</Label>
               <Controller
@@ -237,7 +312,7 @@ export function StudentEnrollmentModal({
                 render={({ field }) => (
                   <Select 
                     onValueChange={field.onChange} 
-                    value={field.value}
+                    value={field.value || ''}
                     disabled={isLoadingStreams}
                   >
                     <SelectTrigger>
@@ -268,13 +343,15 @@ export function StudentEnrollmentModal({
           )}
 
           {/* Info Alert */}
-          <Alert>
-            <Info className="h-4 w-4" />
-            <AlertDescription className="text-xs">
-              The student will be enrolled with <strong>ACTIVE</strong> status. 
-              You can modify subjects and other details after enrollment.
-            </AlertDescription>
-          </Alert>
+          {mode === 'create' && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription className="text-xs">
+                The student will be enrolled with <strong>ACTIVE</strong> status. 
+                You can modify subjects and other details after enrollment.
+              </AlertDescription>
+            </Alert>
+          )}
         </form>
 
         <DialogFooter>
@@ -282,15 +359,15 @@ export function StudentEnrollmentModal({
             type="button" 
             variant="outline" 
             onClick={() => onOpenChange(false)} 
-            disabled={isEnrolling || isLoadingYear || isLoadingClasses}
+            disabled={isLoading || isLoadingYear || isLoadingClasses}
           >
             Cancel
           </Button>
           <Button 
             onClick={form.handleSubmit(onSubmit)} 
-            disabled={isEnrolling || !activeAcademicYear || isLoadingYear || isLoadingClasses || classes.length === 0}
+            disabled={isLoading || !activeAcademicYear || isLoadingYear || isLoadingClasses || classes.length === 0}
           >
-            {isEnrolling ? 'Enrolling...' : 'Enroll Student'}
+            {isLoading ? 'Saving...' : mode === 'create' ? 'Enroll Student' : 'Update Enrollment'}
           </Button>
         </DialogFooter>
       </DialogContent>

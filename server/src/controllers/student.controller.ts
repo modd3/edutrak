@@ -114,6 +114,32 @@ export class StudentController {
     }
   }
 
+  async updateEnrollment(req: RequestWithUser, res: Response): Promise<Response> {
+  try {
+    const { enrollmentId } = req.params;
+    const { streamId, classId, selectedSubjects } = req.body;
+
+    if (!enrollmentId) {
+      return ResponseUtil.error(res, 'Enrollment ID is required', 400);
+    }
+
+    const studentService = this.getService(req);
+    const enrollment = await studentService.updateEnrollment(
+      enrollmentId,
+      { streamId, classId, selectedSubjects },
+      req.schoolId,
+      req.isSuperAdmin || false
+    );
+
+    return ResponseUtil.success(res, 'Enrollment updated successfully', enrollment);
+  } catch (error: any) {
+    if (error.code === 'P2025') {
+      return ResponseUtil.notFound(res, 'Enrollment');
+    }
+    return ResponseUtil.error(res, error.message, 400);
+  }
+}
+
   async updateEnrollmentStatus(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { enrollmentId } = req.params;

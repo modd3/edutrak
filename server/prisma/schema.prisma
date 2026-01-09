@@ -238,6 +238,7 @@ model Stream {
   school          School         @relation(fields: [schoolId], references: [id])
   streamTeacher   Teacher?       @relation("StreamTeacher", fields: [streamTeacherId], references: [id])
   students        StudentClass[]
+  classSubjects   ClassSubject[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -277,8 +278,9 @@ model SubjectOffering {
 model ClassSubject {
   id              String                 @id @default(uuid())
   classId         String
+  streamId        String?
   subjectId       String
-  teacherId       String
+  teacherId       String?
   termId          String
   academicYearId  String
   subjectCategory SubjectCategory
@@ -286,13 +288,14 @@ model ClassSubject {
   assessments     AssessmentDefinition[]
   academicYear    AcademicYear           @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
   class           Class                  @relation(fields: [classId], references: [id])
+  stream          Stream?                @relation(fields: [streamId], references: [id])
   school          School?                @relation(fields: [schoolId], references: [id])
   subject         Subject                @relation(fields: [subjectId], references: [id])
   teacherProfile  Teacher                @relation("TeacherClassSubjects", fields: [teacherId], references: [id])
   term            Term                   @relation("TermClassSubjects", fields: [termId], references: [id])
   strands         ClassSubjectStrand[]
 
-  @@unique([classId, subjectId, termId, academicYearId])
+  @@unique([classId, streamId, subjectId, termId, academicYearId])
   @@index([teacherId])
   @@index([schoolId, academicYearId])
   @@index([schoolId, classId])

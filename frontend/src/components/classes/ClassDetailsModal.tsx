@@ -71,13 +71,17 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
   const [showStreamModal, setShowStreamModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedStream, setSelectedStream] = useState<any>(null);
-  const { data: streamsData } = useClassStreams(classData.id);
+  const { data: streamsData, isLoading, isError } = useClassStreams(classData.id);
   const { mutate: deleteStream, isPending: isDeletingStream } = useDeleteStream();
 
+  console.log("Streams Data: ", streamsData);
+  console.log("Class Streams hook call: ", useClassStreams(classData.id));
+  console.log("Class Data: ", classData);
+  if (isLoading) return <p>Loading streams...</p>;
+  if (isError) return <p>Error loading streams.</p>;
   const streams = streamsData.data || [];
-  console.log(streams, ': streams');
-  console.log('data: ', streamsData)
-
+  console.log("Streams: ", streams);
+  
   const basicInfo = [
     { label: 'Class Name', value: classData.name, icon: GraduationCap },
     { label: 'Level', value: classData.level, icon: BookOpen },

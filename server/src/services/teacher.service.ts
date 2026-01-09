@@ -63,9 +63,22 @@ export class TeacherService extends BaseService {
     specialization?: string;
     dateJoined?: Date;
     schoolId?: string;
+    role?: string; // Added optional role type
   }, createdBy: { userId: string; role: Role }) {
     
-    const { email, password, firstName, lastName, middleName, phone, idNumber, schoolId, ...teacherData } = data;
+    // FIX: Destructure 'role' here to remove it from teacherData
+    const { 
+      email, 
+      password, 
+      firstName, 
+      lastName, 
+      middleName, 
+      phone, 
+      idNumber, 
+      schoolId, 
+      role, // Extracted so it is NOT in teacherData
+      ...teacherData 
+    } = data as any; // Cast to any to handle extra properties safely
 
     return await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
@@ -84,11 +97,12 @@ export class TeacherService extends BaseService {
       });
 
       const employeeNumber = await sequenceGenerator.generateEmployeeNumber(schoolId);
+      
       const teacher = await tx.teacher.create({
         data: {
           id: uuidv4(),
           employeeNumber,
-          ...teacherData,
+          ...teacherData, // Now this is clean and contains only teacher fields
           user: { connect: { id: user.id } },
         },
         include: {
