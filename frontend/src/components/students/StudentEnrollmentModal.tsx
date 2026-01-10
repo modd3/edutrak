@@ -13,6 +13,7 @@ import { useClasses } from '@/hooks/use-classes';
 import { useClassStreams } from '@/hooks/use-classes';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useUpdateEnrollment } from '@/hooks/use-students';
 import api from '@/api';
 import { toast } from 'sonner';
 import { UserPlus, Info, Pencil } from 'lucide-react';
@@ -53,6 +54,8 @@ export function StudentEnrollmentModal({
     schoolId,
     academicYearId: activeAcademicYear?.id,
   });
+
+  const { mutate: updateEnrollment, isPending: isUpdating } = useUpdateEnrollment();
 
   const form = useForm<EnrollmentFormData>({
     resolver: zodResolver(enrollmentSchema),
@@ -99,7 +102,7 @@ export function StudentEnrollmentModal({
   });
 
   // Update enrollment mutation (edit)
-  const { mutate: updateEnrollment, isPending: isUpdating } = useMutation({
+  const updateEnrollmentMutation = useMutation({
     mutationFn: async ({ enrollmentId, data }: { enrollmentId: string; data: Partial<EnrollmentFormData> }) => {
       const response = await api.put(`/students/enrollments/${enrollmentId}`, {
         classId: data.classId,

@@ -95,6 +95,31 @@ export function useEnrollStudent() {
   });
 }
 
+export function useUpdateEnrollment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({enrollmentId, data}: {
+      enrollmentId: string;
+      data: {
+        studentId: string;
+        classId: string;
+        subjectIds?: string[];
+        streamId?: string;
+        academicYearId: string;
+        schoolId: string;
+      }
+    }) => studentService.updateEnrollment(data, enrollmentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Student enrollment updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update enrollment');
+    },
+  });
+}
+
 export function usePromoteStudents() {
   const queryClient = useQueryClient();
 

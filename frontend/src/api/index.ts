@@ -122,6 +122,9 @@ export const studentsApi = {
   
     enroll: (data: any) =>
       api.post('/students/enroll', data),
+
+    updateEnrollment: (id: string ,data: any) =>
+      api.put(`/students/enrollment/${id}`, data),
   
     promote: (data: any) =>
       api.post('/students/promote', data),

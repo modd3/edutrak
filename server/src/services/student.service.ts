@@ -270,6 +270,7 @@ export class StudentService extends BaseService {
     classId: string;
     streamId?: string;
     academicYearId: string;
+    status?: EnrollmentStatus;
     selectedSubjects?: string[];
   }) {
     const enrollment = await this.prisma.studentClass.create({

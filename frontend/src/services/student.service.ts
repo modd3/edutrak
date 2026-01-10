@@ -1,6 +1,6 @@
 // src/services/student.service.ts (Enhanced)
-import { Student, ApiResponse, PaginatedResponse } from '@/types';
-import api from '@/api';
+import { Student, ApiResponse, PaginatedResponse, EnrollmentStatus } from '@/types';
+import api, { studentsApi } from '@/api';
 
 export type StudentCreateInput = Omit<Student, 'id' | 'createdAt' | 'updatedAt' | 'enrollments'>;
 export type StudentUpdateInput = Partial<StudentCreateInput>;
@@ -81,9 +81,28 @@ export const studentService = {
     streamId?: string;
     academicYearId: string;
     schoolId: string;
-    status?: string;
+    //status?: EnrollmentStatus;
+    selectedSubjects?: string[];
   }): Promise<any> => {
-    const response = await api.post('/students/enroll', data);
+    const response = await studentsApi.enroll(data);
+    console.log("Enrolled student: ", response.data.data)
+    return response.data.data;
+  },
+
+  /**
+   * Updates a student enrollment
+   */
+  updateEnrollment: async (data: {
+    studentId: string;
+    classId: string;
+    streamId?: string;
+    academicYearId: string;
+    schoolId: string;
+    //status?: EnrollmentStatus;
+    selectedSubjects?: string[];
+  }, enrollmentId: string): Promise<any> => {
+    const response = await studentsApi.updateEnrollment(enrollmentId, data);
+    console.log("Updated enrollment: ", response.data.data)
     return response.data.data;
   },
 
@@ -96,7 +115,8 @@ export const studentService = {
     toClassId: string;
     academicYearId: string;
   }): Promise<any> => {
-    const response = await api.post('/students/promote', data);
+    const response = await studentsApi.promote(data);
+    console.log("Promoted students: ", response.data.data)
     return response.data.data;
   },
 
