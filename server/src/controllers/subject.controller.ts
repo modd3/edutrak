@@ -9,7 +9,7 @@ const subjectService = new SubjectService();
 export class SubjectController {
   async createSubject(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, code, category, curriculum } = req.body;
+      const { name, code, category, curriculum, learningArea, subjectGroup, description } = req.body;
       
       if (!name || !code || !category || !curriculum) {
         return ResponseUtil.validationError(res, 'Required fields: name, code, category, curriculum');

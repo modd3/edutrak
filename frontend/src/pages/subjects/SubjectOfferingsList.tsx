@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { PlusCircle, Trash2, BookOpen } from 'lucide-react';
+import { PlusCircle, Trash2, BookOpen, ToggleLeft, ToggleRight } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -13,11 +13,12 @@ import {
 
 import { 
   useSubjectOfferings, 
-  useDeleteSubjectOffering,
-  useCreateSubjectOffering,
-  useCoreSubjects 
+  useRemoveSubjectFromSchool,
+  useAddSubjectToSchool,
+  useToggleSubjectOffering,
+  useSubjects
 } from '@/hooks/use-subjects';
-import { SubjectOffering, CurriculumLevel } from '@/types';
+import { SubjectOffering } from '@/types';
 import { useAuthStore } from '@/store/auth-store';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -25,47 +26,29 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// Define Curriculum Levels for selection (based on your schema enum)
-const CURRICULUM_LEVELS: { [key in CurriculumLevel]: string } = {
-    PRE_PRIMARY: 'Pre-Primary',
-    LOWER_PRIMARY: 'Lower Primary',
-    UPPER_PRIMARY: 'Upper Primary',
-    LOWER_SECONDARY: 'Lower Secondary',
-    UPPER_SECONDARY: 'Upper Secondary',
-    TVET: 'TVET',
-    SPECIAL_NEEDS: 'Special Needs',
-};
-
-// --- Add Offering Form Components ---
-
 const addOfferingSchema = z.object({
   subjectId: z.string().min(1, 'Please select a core subject'),
-  level: z.nativeEnum(CurriculumLevel, {
-    errorMap: () => ({ message: "Please select a curriculum level" }),
-  }),
 });
 
 type AddOfferingFormData = z.infer<typeof addOfferingSchema>;
 
 function AddSubjectOfferingDialog({ schoolId }: { schoolId: string }) {
   const [isOpen, setIsOpen] = useState(false);
-  const { data: coreSubjectsData, isLoading: isLoadingCore } = useCoreSubjects({ pageSize: 100 });
-  const { mutate: createOffering, isPending: isCreating } = useCreateSubjectOffering(schoolId);
+  const { data: coreSubjectsData, isLoading: isLoadingCore } = useSubjects({ pageSize: 100 });
+  const { mutate: addOffering, isPending: isCreating } = useAddSubjectToSchool(schoolId);
   
   const { register, handleSubmit, reset, setValue, formState: { errors } } = useForm<AddOfferingFormData>({
     resolver: zodResolver(addOfferingSchema),
   });
 
   const onSubmit = (data: AddOfferingFormData) => {
-    createOffering({
-        ...data,
-        schoolId, // Pass the active school ID
-        isCompulsory: false, // Default to false, can be edited later
+    addOffering({
+      subjectId: data.subjectId,
     }, {
-        onSuccess: () => {
-            reset();
-            setIsOpen(false);
-        }
+      onSuccess: () => {
+        reset();
+        setIsOpen(false);
+      }
     });
   };
 
@@ -74,19 +57,19 @@ function AddSubjectOfferingDialog({ schoolId }: { schoolId: string }) {
       <DialogTrigger asChild>
         <Button>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add Subject to Catalog
+          Add Subject to School
         </Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Add New Subject Offering</DialogTitle>
+          <DialogTitle>Add Subject to School</DialogTitle>
           <DialogDescription>
-            Select a core subject and the educational level it is taught at in this school.
+            Select a subject from the global catalog to add to your school's offerings.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="space-y-2">
-            <Label htmlFor="subjectId">Core Subject</Label>
+            <Label htmlFor="subjectId">Subject</Label>
             {isLoadingCore ? (
                 <Skeleton className="h-10 w-full" />
             ) : (
@@ -106,24 +89,9 @@ function AddSubjectOfferingDialog({ schoolId }: { schoolId: string }) {
             {errors.subjectId && <p className="text-sm text-destructive">{errors.subjectId.message}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="level">Curriculum Level</Label>
-            <Select onValueChange={(val) => setValue('level', val as CurriculumLevel)} disabled={isCreating}>
-                <SelectTrigger id="level">
-                    <SelectValue placeholder="Select level" />
-                </SelectTrigger>
-                <SelectContent>
-                    {Object.entries(CURRICULUM_LEVELS).map(([key, value]) => (
-                        <SelectItem key={key} value={key}>{value}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
-            {errors.level && <p className="text-sm text-destructive">{errors.level.message}</p>}
-          </div>
-
           <DialogFooter className="pt-4">
             <Button type="submit" disabled={isCreating}>
-              {isCreating ? 'Adding...' : 'Add Offering'}
+              {isCreating ? 'Adding...' : 'Add Subject'}
             </Button>
           </DialogFooter>
         </form>
@@ -132,13 +100,9 @@ function AddSubjectOfferingDialog({ schoolId }: { schoolId: string }) {
   );
 }
 
-// --- Main Page Component ---
-
 export default function SubjectOfferingsList() {
-  // NOTE: You must implement a way to get the active school ID, 
-  // e.g., from the authenticated user's context or a global store.
   const { user } = useAuthStore();
-  const schoolId = user?.schoolId || 'placeholder-school-id'; 
+  const schoolId = user?.schoolId || ''; 
 
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedOffering, setSelectedOffering] = useState<SubjectOffering | null>(null);
@@ -149,16 +113,21 @@ export default function SubjectOfferingsList() {
     isError 
   } = useSubjectOfferings(schoolId, { pageSize: 100 });
   
-  const { mutate: deleteOffering, isPending: isDeleting } = useDeleteSubjectOffering(schoolId);
+  const { mutate: removeOffering, isPending: isDeleting } = useRemoveSubjectFromSchool(schoolId);
+  const { mutate: toggleOffering } = useToggleSubjectOffering(schoolId);
 
   const handleDeleteClick = (offering: SubjectOffering) => {
     setSelectedOffering(offering);
     setShowDeleteDialog(true);
   };
 
+  const handleToggleClick = (offering: SubjectOffering) => {
+    toggleOffering(offering.id);
+  };
+
   const confirmDelete = () => {
     if (selectedOffering) {
-      deleteOffering(selectedOffering.id, {
+      removeOffering(selectedOffering.subject.id, {
         onSuccess: () => {
           setShowDeleteDialog(false);
           setSelectedOffering(null);
@@ -179,21 +148,21 @@ export default function SubjectOfferingsList() {
       cell: ({ row }) => row.original.subject.code,
     },
     {
-      accessorKey: 'level',
-      header: 'Curriculum Level',
+      accessorKey: 'subject.category',
+      header: 'Category',
       cell: ({ row }) => {
-        const level = row.getValue('level') as CurriculumLevel;
-        return <Badge variant="secondary">{CURRICULUM_LEVELS[level]}</Badge>;
+        const category = row.original.subject.category;
+        return <Badge variant="outline">{category}</Badge>;
       },
     },
     {
-      accessorKey: 'isCompulsory',
-      header: 'Compulsory',
+      accessorKey: 'isActive',
+      header: 'Status',
       cell: ({ row }) => {
-        const isCompulsory = row.getValue('isCompulsory') as boolean;
+        const isActive = row.getValue('isActive') as boolean;
         return (
-          <Badge variant={isCompulsory ? 'default' : 'outline'}>
-            {isCompulsory ? 'Yes' : 'No'}
+          <Badge variant={isActive ? 'default' : 'secondary'}>
+            {isActive ? 'Active' : 'Inactive'}
           </Badge>
         );
       },
@@ -203,14 +172,29 @@ export default function SubjectOfferingsList() {
       cell: ({ row }) => {
         const offering = row.original;
         return (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => handleDeleteClick(offering)}
-            className="hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <div className="flex gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => handleToggleClick(offering)}
+              title={offering.isActive ? 'Deactivate' : 'Activate'}
+            >
+              {offering.isActive ? (
+                <ToggleRight className="h-4 w-4 text-green-600" />
+              ) : (
+                <ToggleLeft className="h-4 w-4 text-gray-400" />
+              )}
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => handleDeleteClick(offering)}
+              className="hover:text-destructive"
+              title="Remove from school"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
         );
       },
     },
@@ -233,7 +217,12 @@ export default function SubjectOfferingsList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold">School Subject Catalog</h1>
+        <div>
+          <h1 className="text-3xl font-bold">School Subject Catalog</h1>
+          <p className="text-muted-foreground mt-2">
+            Manage the subjects offered at your school. Subjects are added from the global catalog.
+          </p>
+        </div>
         <AddSubjectOfferingDialog schoolId={schoolId} />
       </div>
       
@@ -244,7 +233,7 @@ export default function SubjectOfferingsList() {
                   No subjects have been added to this school yet.
               </h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                  Click 'Add Subject to Catalog' to begin defining what is taught.
+                  Click 'Add Subject to School' to begin adding subjects from the global catalog.
               </p>
           </div>
       )}
@@ -253,11 +242,10 @@ export default function SubjectOfferingsList() {
         <DataTable
           columns={columns}
           data={offeringsData?.data || []}
-          searchKey="subject.name" // Search on the name nested in the subject object
+          searchKey="subject.name"
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
@@ -266,7 +254,11 @@ export default function SubjectOfferingsList() {
               Are you sure you want to remove the subject "
               <strong className="font-semibold text-primary">
                 {selectedOffering?.subject.name}
-              </strong>" from this school's catalog? This will prevent new classes from offering it.
+              </strong>" from this school's offerings?
+              <br />
+              <span className="text-destructive">
+                This will prevent new classes from being assigned this subject.
+              </span>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

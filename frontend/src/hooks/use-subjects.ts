@@ -12,9 +12,6 @@ const OFFERINGS_KEY = 'subjectOfferings';
 
 // === Core Subject Hooks ===
 
-/**
- * Hook to fetch paginated core subjects (for selection).
- */
 export function useSubjects(params?: {
   page?: number;
   pageSize?: number;
@@ -30,10 +27,6 @@ export function useSubjects(params?: {
   });
 }
 
-/**
- * Hook to create a new core subject.
- * Typically used by Super Admins to define a new subject globally.
- */
 export function useCreateSubject() {
   const queryClient = useQueryClient();
 
@@ -45,14 +38,12 @@ export function useCreateSubject() {
       toast.success('Subject created successfully');
     },
     onError: (error: any) => {
+      console.error('Create subject error:', error);
       toast.error(error.response?.data?.message || 'Failed to create subject');
     },
   });
 }
 
-/**
- * Hook to update a core subject.
- */
 export function useUpdateSubject() {
   const queryClient = useQueryClient();
 
@@ -64,14 +55,12 @@ export function useUpdateSubject() {
       toast.success('Subject updated successfully');
     },
     onError: (error: any) => {
+      console.error('Update subject error:', error);
       toast.error(error.response?.data?.message || 'Failed to update subject');
     },
   });
 }
 
-/**
- * Hook to delete a core subject.
- */
 export function useDeleteSubject() {
   const queryClient = useQueryClient();
 
@@ -89,13 +78,10 @@ export function useDeleteSubject() {
 
 // === Subject Offering Hooks (School-Specific) ===
 
-/**
- * Hook to fetch subjects offered by the active school.
- * @param schoolId - The ID of the currently active school.
- */
 export function useSubjectOfferings(schoolId: string, params?: {
   page?: number;
   pageSize?: number;
+  isActive?: boolean;
 }) {
   return useQuery({
     queryKey: [OFFERINGS_KEY, schoolId, params],
@@ -104,15 +90,12 @@ export function useSubjectOfferings(schoolId: string, params?: {
   });
 }
 
-/**
- * Hook to create a new subject offering (enables a subject for a school).
- */
-export function useCreateSubjectOffering(schoolId: string) {
+export function useAddSubjectToSchool(schoolId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: SubjectOfferingCreateInput) => 
-      subjectService.createSubjectOffering(data),
+    mutationFn: (data: Omit<SubjectOfferingCreateInput, 'schoolId'>) => 
+      subjectService.addSubjectToSchool({ ...data, schoolId }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [OFFERINGS_KEY, schoolId] });
       toast.success('Subject added to school offerings');
@@ -123,20 +106,58 @@ export function useCreateSubjectOffering(schoolId: string) {
   });
 }
 
-/**
- * Hook to delete a subject offering (removes a subject from a school's catalog).
- */
-export function useDeleteSubjectOffering(schoolId: string) {
+export function useRemoveSubjectFromSchool(schoolId: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => subjectService.deleteSubjectOffering(id),
+    mutationFn: (subjectId: string) => subjectService.removeSubjectFromSchool(schoolId, subjectId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: [OFFERINGS_KEY, schoolId] });
-      toast.success('Subject offering removed successfully');
+      toast.success('Subject removed from school offerings');
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to remove subject offering');
     },
+  });
+}
+
+export function useToggleSubjectOffering(schoolId: string) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => subjectService.toggleSubjectOffering(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [OFFERINGS_KEY, schoolId] });
+      toast.success('Subject offering status updated');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update subject offering');
+    },
+  });
+}
+
+// === Curriculum-specific hooks ===
+
+export function useSubjectsByCurriculum(curriculum: string) {
+  return useQuery({
+    queryKey: [SUBJECTS_KEY, 'curriculum', curriculum],
+    queryFn: () => subjectService.getSubjectsByCurriculum(curriculum),
+    enabled: !!curriculum,
+  });
+}
+
+export function useCBCSubjectsByLearningArea(learningArea: string) {
+  return useQuery({
+    queryKey: [SUBJECTS_KEY, 'cbc', learningArea],
+    queryFn: () => subjectService.getCBCSubjectsByLearningArea(learningArea),
+    enabled: !!learningArea,
+  });
+}
+
+export function use844SubjectsByGroup(subjectGroup: string) {
+  return useQuery({
+    queryKey: [SUBJECTS_KEY, '844', subjectGroup],
+    queryFn: () => subjectService.get844SubjectsByGroup(subjectGroup),
+    enabled: !!subjectGroup,
   });
 }

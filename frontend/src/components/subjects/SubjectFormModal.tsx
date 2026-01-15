@@ -1,4 +1,3 @@
-// src/components/subjects/SubjectFormModal.tsx
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -26,13 +25,14 @@ import { Subject } from '@/types';
 import { useCreateSubject, useUpdateSubject } from '@/hooks/use-subjects';
 import { toast } from 'sonner';
 
+// Update schema to match Prisma schema
 const subjectSchema = z.object({
   code: z.string().min(1, 'Subject code is required').max(10),
   name: z.string().min(1, 'Subject name is required'),
-  category: z.enum(['CORE', 'ELECTIVE', 'COMPETENCY']),
+  category: z.enum(['CORE', 'ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED']),
   learningArea: z.string().optional(),
   subjectGroup: z.string().optional(),
-  curriculum: z.array(z.enum(['8_4_4', 'CBC'])).min(1, 'Select at least one curriculum'),
+  curriculum: z.array(z.string()).min(1, 'Select at least one curriculum'),
   description: z.string().optional(),
 });
 
@@ -45,19 +45,34 @@ interface SubjectFormModalProps {
   subject?: Subject;
 }
 
+// Update to match Prisma enums
 const CURRICULA = [
-  { value: '8_4_4', label: '8-4-4' },
   { value: 'CBC', label: 'CBC (Competency Based)' },
+  { value: 'EIGHT_FOUR_FOUR', label: '8-4-4' },
+  { value: 'TVET', label: 'TVET' },
+  { value: 'IGCSE', label: 'IGCSE' },
+  { value: 'IB', label: 'International Baccalaureate' },
 ];
 
+// Update to match Prisma enums
 const LEARNING_AREAS = [
-  'Languages',
-  'Mathematics',
-  'Science',
-  'Social Studies',
-  'Expressive Arts',
-  'Physical Education',
-  'Emerging',
+  { value: 'LANGUAGES', label: 'Languages' },
+  { value: 'MATHEMATICS', label: 'Mathematics' },
+  { value: 'SCIENCE_TECHNOLOGY', label: 'Science & Technology' },
+  { value: 'SOCIAL_STUDIES', label: 'Social Studies' },
+  { value: 'RELIGIOUS_EDUCATION', label: 'Religious Education' },
+  { value: 'CREATIVE_ARTS', label: 'Creative Arts' },
+  { value: 'PHYSICAL_HEALTH_EDUCATION', label: 'Physical Health Education' },
+  { value: 'PRE_TECHNICAL_STUDIES', label: 'Pre-Technical Studies' },
+];
+
+// Update to match Prisma enums
+const SUBJECT_GROUPS = [
+  { value: 'LANGUAGES', label: 'Languages' },
+  { value: 'SCIENCES', label: 'Sciences' },
+  { value: 'HUMANITIES', label: 'Humanities' },
+  { value: 'TECHNICAL_APPLIED', label: 'Technical & Applied' },
+  { value: 'BUSINESS_STUDIES', label: 'Business Studies' },
 ];
 
 export function SubjectFormModal({
@@ -78,43 +93,71 @@ export function SubjectFormModal({
       category: 'CORE',
       curriculum: ['CBC'],
       description: '',
+      learningArea: '',
+      subjectGroup: '',
     },
   });
 
+  // Reset form when modal opens/closes or subject changes
   useEffect(() => {
-    if (subject && mode === 'edit') {
+    if (open && mode === 'edit' && subject) {
       form.reset({
         code: subject.code,
         name: subject.name,
-        category: subject.category as 'CORE' | 'ELECTIVE' | 'COMPETENCY',
+        category: subject.category as SubjectFormData['category'],
         learningArea: subject.learningArea || '',
         subjectGroup: subject.subjectGroup || '',
-        curriculum: (subject.curriculum as any[]) || ['CBC'],
+        curriculum: Array.isArray(subject.curriculum) 
+          ? subject.curriculum 
+          : subject.curriculum ? [subject.curriculum] : ['CBC'],
         description: subject.description || '',
       });
-    } else {
-      form.reset();
+    } else if (open && mode === 'create') {
+      form.reset({
+        code: '',
+        name: '',
+        category: 'CORE',
+        curriculum: ['CBC'],
+        description: '',
+        learningArea: '',
+        subjectGroup: '',
+      });
     }
-  }, [subject, mode, open, form]);
+  }, [open, mode, subject, form]);
 
   const onSubmit = (data: SubjectFormData) => {
+    // Transform curriculum from array to enum values if needed
+    const submitData = {
+      ...data,
+      // Ensure curriculum is properly formatted for backend
+      curriculum: data.curriculum,
+    };
+
+    console.log('Submitting subject:', submitData);
+
     if (mode === 'create') {
-      createSubject(data, {
+      createSubject(submitData, {
         onSuccess: () => {
-          form.reset();
           onOpenChange(false);
+        },
+        onError: (error: any) => {
+          console.error('Create subject error:', error);
+          toast.error(error.response?.data?.message || 'Failed to create subject');
         },
       });
     } else if (subject) {
-      updateSubject(
-        { id: subject.id, data },
-        {
-          onSuccess: () => {
-            form.reset();
-            onOpenChange(false);
-          },
-        }
-      );
+      updateSubject({
+        id: subject.id,
+        data: submitData
+      }, {
+        onSuccess: () => {
+          onOpenChange(false);
+        },
+        onError: (error: any) => {
+          console.error('Update subject error:', error);
+          toast.error(error.response?.data?.message || 'Failed to update subject');
+        },
+      });
     }
   };
 
@@ -171,33 +214,61 @@ export function SubjectFormModal({
               <Select
                 value={form.watch('category')}
                 onValueChange={(value) =>
-                  form.setValue('category', value as 'CORE' | 'ELECTIVE' | 'COMPETENCY')
+                  form.setValue('category', value as SubjectFormData['category'])
                 }
+                disabled={isLoading}
               >
                 <SelectTrigger id="category">
-                  <SelectValue />
+                  <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="CORE">Core</SelectItem>
                   <SelectItem value="ELECTIVE">Elective</SelectItem>
-                  <SelectItem value="COMPETENCY">Competency</SelectItem>
+                  <SelectItem value="OPTIONAL">Optional</SelectItem>
+                  <SelectItem value="TECHNICAL">Technical</SelectItem>
+                  <SelectItem value="APPLIED">Applied</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div>
-              <Label htmlFor="learningArea">Learning Area</Label>
+              <Label htmlFor="learningArea">Learning Area (CBC)</Label>
               <Select
                 value={form.watch('learningArea') || ''}
                 onValueChange={(value) => form.setValue('learningArea', value)}
+                disabled={isLoading}
               >
                 <SelectTrigger id="learningArea">
                   <SelectValue placeholder="Select learning area" />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="none">-- Learning Area --</SelectItem>
                   {LEARNING_AREAS.map((area) => (
-                    <SelectItem key={area} value={area}>
-                      {area}
+                    <SelectItem key={area.value} value={area.value}>
+                      {area.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="subjectGroup">Subject Group (8-4-4)</Label>
+              <Select
+                value={form.watch('subjectGroup') || ''}
+                onValueChange={(value) => form.setValue('subjectGroup', value)}
+                disabled={isLoading}
+              >
+                <SelectTrigger id="subjectGroup">
+                  <SelectValue placeholder="Select subject group" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="group">-- Select Group --</SelectItem>
+                  {SUBJECT_GROUPS.map((group) => (
+                    <SelectItem key={group.value} value={group.value}>
+                      {group.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -212,11 +283,11 @@ export function SubjectFormModal({
                 <div key={curr.value} className="flex items-center">
                   <Checkbox
                     id={curr.value}
-                    checked={form.watch('curriculum').includes(curr.value as any)}
+                    checked={form.watch('curriculum').includes(curr.value)}
                     onCheckedChange={(checked) => {
                       const current = form.watch('curriculum');
                       if (checked) {
-                        form.setValue('curriculum', [...current, curr.value as any]);
+                        form.setValue('curriculum', [...current, curr.value]);
                       } else {
                         form.setValue(
                           'curriculum',

@@ -23,8 +23,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CURRICULUM_LABELS: Record<string, string> = {
-  '8_4_4': '8-4-4',
   CBC: 'CBC',
+  EIGHT_FOUR_FOUR: '8-4-4',
+  TVET: 'TVET',
+  IGCSE: 'IGCSE',
+  IB: 'IB',
 };
 
 export function SubjectDetailsModal({
@@ -62,17 +65,23 @@ export function SubjectDetailsModal({
           <Separator />
 
           <div>
-            <h4 className="font-semibold text-sm text-gray-600 mb-2">
-              Curriculum Levels
-            </h4>
-            <div className="flex gap-2">
-              {subject.curriculum?.map((curr) => (
-                <Badge key={curr} variant="secondary">
-                  {CURRICULUM_LABELS[curr] || curr}
-                </Badge>
-              ))}
-            </div>
-          </div>
+  <h4 className="font-semibold text-sm text-gray-600 mb-2">
+    Curriculum Levels
+  </h4>
+  <div className="flex flex-wrap gap-2">
+    {Array.isArray(subject.curriculum) 
+      ? subject.curriculum.map((curr) => (
+          <Badge key={curr} variant="secondary">
+            {CURRICULUM_LABELS[curr] || curr}
+          </Badge>
+        ))
+      : subject.curriculum && (
+          <Badge variant="secondary">
+            {CURRICULUM_LABELS[subject.curriculum] || subject.curriculum}
+          </Badge>
+        )}
+  </div>
+</div>
 
           {subject.subjectGroup && (
             <>

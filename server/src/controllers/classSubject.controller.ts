@@ -1,43 +1,81 @@
+// src/controllers/class-subject.controller.ts
 import { Request, Response } from 'express';
-import prisma from '../database/client';
-import { ResponseUtil } from '../utils/response';
-import { error } from 'console';
+import { ClassSubjectService } from '../services/class-subject.service';
+import { ResponseUtil} from '../utils/response'; // Assuming you have these helpers
 
-export const assignClassSubject = async (req: Request, res: Response) => {
-  try {
-    const { classId, subjectId, teacherId, academicYearId, termId } = req.body;
+const service = new ClassSubjectService();
 
-    const existing = await prisma.classSubject.findFirst({
-      where: { classId, subjectId, academicYearId, termId },
-    });
+export class ClassSubjectController {
+  
+  // POST /api/class-subjects
+  async assignSubject(req: Request, res: Response) {
+    try {
+      const { 
+        classId, 
+        subjectId, 
+        academicYearId, 
+        termId, 
+        streamId, 
+        teacherId, 
+        subjectCategory 
+      } = req.body;
 
-    if (existing) return ResponseUtil.error(res, 'This subject already assigned to this class and term', 400);
+      const schoolId = req.user?.schoolId; // Assumes auth middleware attaches user
 
-    const mapping = await prisma.classSubject.create({
-      data: {
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const result = await service.assignSubjectToClass({
         classId,
         subjectId,
-        teacherId,
         academicYearId,
         termId,
-      },
-    });
+        streamId,
+        teacherId,
+        schoolId,
+        subjectCategory
+      });
 
-    return ResponseUtil.success(res, 'Subject assigned successfully', mapping);
-  } catch (err) {
-    return ResponseUtil.serverError(res, 'Error assigning class subject');
+      return ResponseUtil.success(res, 'Subject assigned to class successfully', result);
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 500);
+    }
   }
-};
 
-export const getClassSubjects = async (req: Request, res: Response) => {
-  try {
-    const { classId } = req.params;
-    const mappings = await prisma.classSubject.findMany({
-      where: { classId: String(classId) },
-      include: { subject: true, teacherProfile: true, term: true },
-    });
-    return ResponseUtil.success(res, 'Class subjects fetched', mappings);
-  } catch (err) {
-    return ResponseUtil.serverError(res, 'Error fetching class subjects');
+  // PATCH /api/class-subjects/:id/teacher
+  async assignTeacher(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { teacherId } = req.body;
+
+      if (!teacherId) return ResponseUtil.error(res, 'Teacher ID is required', 400);
+
+      const result = await service.assignTeacher(id, teacherId);
+
+      return ResponseUtil.success(res, 'Teacher assigned successfully', result);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
   }
-};
+
+  // GET /api/classes/:classId/subjects
+  async getByClass(req: Request, res: Response) {
+    try {
+      const { classId } = req.params;
+      const { academicYearId, termId } = req.query;
+
+      if (!academicYearId || !termId) {
+        return ResponseUtil.error(res, 'Academic Year and Term are required', 400);
+      }
+
+      const result = await service.getClassSubjects(
+        classId, 
+        academicYearId as string, 
+        termId as string
+      );
+
+      return ResponseUtil.success(res, 'Class subjects fetched successfully', result);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+}

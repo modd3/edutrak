@@ -3,7 +3,9 @@ import express from 'express';
 import AcademicController from '../controllers/academic.controller';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
 import { authenticate, authorize } from '../middleware/auth.middleware';
+import { ClassSubjectController } from '@/controllers/classSubject.controller';
 
+const controller = new ClassSubjectController();
 const router = express.Router();
 
 // Apply authentication and school context to all routes
@@ -41,5 +43,26 @@ router.delete('/streams/:id', authorize('ADMIN', 'SUPER_ADMIN'), AcademicControl
 router.get('/statistics', AcademicController.getAcademicStatistics);
 router.get('/classes/:classId/performance', AcademicController.getClassPerformance);
 router.get('/overview', AcademicController.getAcademicOverview);
+
+// Assign a subject to a class (Admin/Super Admin only)
+router.post(
+  '/class-subject', 
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  controller.assignSubject
+);
+
+// Assign a teacher to a specific class subject
+router.patch(
+  '/class-subject/:id/teacher', 
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  controller.assignTeacher
+);
+
+// Get subjects for a specific class (Teachers needs this too)
+router.get(
+  '/class-subject/class/:classId', 
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  controller.getByClass
+);
 
 export default router;

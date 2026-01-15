@@ -354,6 +354,7 @@ export class TeacherService extends BaseService {
     termId: string;
     academicYearId: string;
     subjectCategory: SubjectCategory;
+    streamId?: string;
     strandIds?: string[];
   }) {
     const assignment = await this.prisma.classSubject.create({
@@ -365,6 +366,7 @@ export class TeacherService extends BaseService {
         termId: data.termId,
         academicYearId: data.academicYearId,
         subjectCategory: data.subjectCategory,
+        streamId: data.streamId,
         ...(data.strandIds && data.strandIds.length > 0 && {
           strands: {
             create: data.strandIds.map(strandId => ({
@@ -376,6 +378,7 @@ export class TeacherService extends BaseService {
       },
       include: {
         class: true,
+        stream: true,
         subject: true,
         teacherProfile: {
           include: {

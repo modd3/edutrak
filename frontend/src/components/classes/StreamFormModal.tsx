@@ -1,8 +1,8 @@
-// src/components/classes/StreamFormModal.tsx
-import { useForm, Controller } from 'react-hook-form';
+// src/components/streams/StreamFormModal.tsx
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,10 +13,11 @@ import { useCreateStream, useUpdateStream } from '@/hooks/use-academic';
 import { useTeachers } from '@/hooks/use-teachers';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { Users } from 'lucide-react';
+import { toast } from 'sonner';
 
 const streamSchema = z.object({
-  name: z.string().min(1, 'Stream name is required'),
-  capacity: z.string().optional(),
+  name: z.string().min(1, 'Stream name is required').max(50),
+  capacity: z.coerce.number().int().positive().optional(),
   classId: z.string().min(1, 'Class is required'),
   streamTeacherId: z.string().optional(),
 });
@@ -27,16 +28,16 @@ interface StreamFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'create' | 'edit';
-  classId: string;
-  streamData?: Stream | null;
+  stream?: Stream;
+  classId?: string; // For creating new streams within a class
 }
 
 export function StreamFormModal({ 
   open, 
   onOpenChange, 
   mode, 
-  classId,
-  streamData 
+  stream, 
+  classId 
 }: StreamFormModalProps) {
   const { schoolId } = useSchoolContext();
   const { mutate: createStream, isPending: isCreating } = useCreateStream();
@@ -45,62 +46,114 @@ export function StreamFormModal({
   
   const isLoading = isCreating || isUpdating;
   const teachers = teachersData?.data || [];
+  const [debugInfo, setDebugInfo] = useState<string>('');
 
   const form = useForm<StreamFormData>({
     resolver: zodResolver(streamSchema),
     defaultValues: {
       name: '',
-      capacity: '',
-      classId: classId,
+      capacity: undefined,
+      classId: classId || '',
       streamTeacherId: '',
     },
   });
 
+  // Debug: Log current form values
   useEffect(() => {
-    if (open && mode === 'create') {
-      form.reset({
-        name: '',
-        capacity: '',
-        classId: classId,
-        streamTeacherId: '',
-      });
-    }
-  }, [open, mode, classId, form]);
+    const subscription = form.watch((value) => {
+      setDebugInfo(JSON.stringify(value, null, 2));
+    });
+    return () => subscription.unsubscribe();
+  }, [form.watch]);
 
+  // Reset form when modal opens/closes or when stream data changes
   useEffect(() => {
-    if (mode === 'edit' && streamData && open) {
-      form.reset({
-        name: streamData.name,
-        capacity: streamData.capacity?.toString() || '',
-        classId: streamData.classId,
-        streamTeacherId: streamData.streamTeacherId || '',
-      });
+    if (open) {
+      console.log('StreamFormModal opened:', { mode, stream, classId });
+      
+      if (mode === 'edit' && stream) {
+        console.log('Setting form for edit mode:', {
+          name: stream.name,
+          capacity: stream.capacity,
+          classId: stream.classId,
+          streamTeacherId: stream.streamTeacherId,
+          hasStreamTeacher: !!stream.streamTeacherId,
+        });
+        
+        // Use setTimeout to ensure form reset happens after render
+        setTimeout(() => {
+          form.reset({
+            name: stream.name,
+            capacity: stream.capacity || undefined,
+            classId: stream.classId,
+            streamTeacherId: stream.streamTeacherId || '',
+          });
+        }, 0);
+      } else if (mode === 'create') {
+        console.log('Setting form for create mode:', { classId });
+        form.reset({
+          name: '',
+          capacity: undefined,
+          classId: classId || '',
+          streamTeacherId: '',
+        });
+      }
     }
-  }, [mode, streamData, open, form]);
+  }, [open, mode, stream, classId]);
 
   const onSubmit = async (data: StreamFormData) => {
+    console.log('Form submitted:', data);
+    console.log('Original stream data:', stream);
+    
     const requestBody = {
       ...data,
-      classId,
-      schoolId,
-      capacity: data.capacity ? parseInt(data.capacity) : undefined,
-      streamTeacherId: data.streamTeacherId || null,
+      // Remove undefined values and handle "none" selection
+      capacity: data.capacity || null,
+      // Ensure streamTeacherId is null if empty string or "none"
+      streamTeacherId: data.streamTeacherId && data.streamTeacherId !== 'none' ? data.streamTeacherId : null,
     };
+
+    console.log('Request body:', requestBody);
 
     if (mode === 'create') {
       createStream(requestBody, {
         onSuccess: () => {
+          toast.success('Stream created successfully');
           onOpenChange(false);
           form.reset();
         },
+        onError: (error: any) => {
+          console.error('Create stream error:', error);
+          toast.error(error.response?.data?.message || 'Failed to create stream');
+        },
       });
-    } else if (streamData) {
-      updateStream({ id: streamData.id, data: requestBody }, {
+    } else if (stream) {
+      updateStream({ 
+        id: stream.id, 
+        data: requestBody 
+      }, {
         onSuccess: () => {
+          toast.success('Stream updated successfully');
           onOpenChange(false);
+        },
+        onError: (error: any) => {
+          console.error('Update stream error:', error);
+          toast.error(error.response?.data?.message || 'Failed to update stream');
         },
       });
     }
+  };
+
+  // Get stream teacher display value
+  const getStreamTeacherDisplay = () => {
+    const teacherId = form.watch('streamTeacherId');
+    console.log("Teacher Id for strem: ", teacherId);
+    if (!teacherId || teacherId === 'none') return '-- Select stream teacher --';
+    
+    const teacher = teachers.find((t: any) => t.id === teacherId);
+    return teacher 
+      ? `${teacher.user?.firstName} ${teacher.user?.lastName}`
+      : '-- Select stream teacher --';
   };
 
   return (
@@ -108,13 +161,13 @@ export function StreamFormModal({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
+            <Users className="h-6 w-6" />
             {mode === 'create' ? 'Create New Stream' : 'Edit Stream'}
           </DialogTitle>
           <DialogDescription>
             {mode === 'create'
-              ? 'Fill in the stream details below.'
-              : 'Update stream information.'}
+              ? 'Create a new stream within a class. Stream teachers manage specific sections.'
+              : 'Update stream information and teacher assignment.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -123,66 +176,118 @@ export function StreamFormModal({
             <Label>Stream Name *</Label>
             <Input 
               {...form.register('name')} 
-              placeholder="e.g., North, South, East, West, A, B" 
+              placeholder="e.g., North, South, East, West" 
+              disabled={isLoading}
             />
             {form.formState.errors.name && (
               <p className="text-sm text-destructive">{form.formState.errors.name.message}</p>
             )}
-            <p className="text-xs text-muted-foreground">
-              Common names: North, South, East, West, or letters A, B, C, etc.
-            </p>
           </div>
 
           <div className="space-y-2">
             <Label>Capacity (Optional)</Label>
             <Input 
+              type="number"
               {...form.register('capacity')} 
-              type="number" 
-              placeholder="e.g., 40"
+              placeholder="Maximum number of students" 
+              disabled={isLoading}
               min="1"
+              max="100"
             />
             <p className="text-xs text-muted-foreground">
-              Maximum number of students in this stream (leave empty for unlimited)
+              Leave empty for unlimited capacity
             </p>
           </div>
 
+          {mode === 'create' && !classId && (
+            <div className="space-y-2">
+              <Label>Class *</Label>
+              <Select 
+                onValueChange={(value) => form.setValue('classId', value)}
+                value={form.watch('classId')}
+                disabled={isLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {/* You would need to fetch classes here */}
+                  <SelectItem value="placeholder">Loading classes...</SelectItem>
+                </SelectContent>
+              </Select>
+              {form.formState.errors.classId && (
+                <p className="text-sm text-destructive">{form.formState.errors.classId.message}</p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label>Stream Teacher (Optional)</Label>
-            <Controller
-              name="streamTeacherId"
-              control={form.control}
-              render={({ field }) => (
-                <Select onValueChange={field.onChange} value={field.value}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select stream teacher" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">-- No Stream Teacher --</SelectItem>
-                    {teachers.map((teacher: any) => (
-                      <SelectItem key={teacher.id} value={teacher.id}>
-                        {teacher.user?.firstName} {teacher.user?.lastName} - {teacher.tscNumber}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            />
+            <Select 
+              onValueChange={(value) => {
+                console.log('Stream teacher selected:', value);
+                form.setValue('streamTeacherId', value === 'none' ? '' : value);
+              }}
+              value={form.watch('streamTeacherId') || 'none'}
+              disabled={isLoading}
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Assign stream teacher">
+                  {getStreamTeacherDisplay()}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">-- No stream teacher --</SelectItem>
+                {teachers.map((teacher: any) => (
+                  <SelectItem key={teacher.id} value={teacher.id}>
+                    {teacher.user?.firstName} {teacher.user?.lastName} 
+                    {teacher.tscNumber && ` - ${teacher.tscNumber}`}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Stream teacher manages only this specific stream section
+            </p>
           </div>
-        </form>
 
-        <DialogFooter>
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => onOpenChange(false)} 
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
-            {isLoading ? 'Saving...' : mode === 'create' ? 'Create Stream' : 'Save Changes'}
-          </Button>
-        </DialogFooter>
+          {/* Debug section - only show in development */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mt-4 p-2 border rounded bg-gray-50">
+              <p className="text-xs font-mono text-gray-600">
+                <strong>Debug:</strong> {debugInfo}
+              </p>
+              <p className="text-xs font-mono text-gray-600 mt-1">
+                <strong>Current stream teacher ID:</strong> {form.watch('streamTeacherId') || 'empty'}
+              </p>
+              <p className="text-xs font-mono text-gray-600">
+                <strong>Original stream teacher ID:</strong> {stream?.streamTeacherId || 'none'}
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={() => {
+                console.log('Cancel clicked');
+                onOpenChange(false);
+              }} 
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading 
+                ? 'Saving...' 
+                : mode === 'create' 
+                  ? 'Create Stream' 
+                  : 'Save Changes'
+              }
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

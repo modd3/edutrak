@@ -41,8 +41,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const CURRICULUM_LABELS: Record<string, string> = {
-  8_4_4: '8-4-4',
   CBC: 'CBC',
+  EIGHT_FOUR_FOUR: '8-4-4',
+  TVET: 'TVET',
+  IGCSE: 'IGCSE',
+  IB: 'IB',
 };
 
 export function SubjectsList() {
@@ -112,18 +115,25 @@ export function SubjectsList() {
       ),
     },
     {
-      accessorKey: 'curriculum',
-      header: 'Curriculum',
-      cell: ({ row }) => (
-        <div className="flex gap-1">
-          {row.original.curriculum?.map((curr) => (
-            <Badge key={curr} variant="secondary" className="text-xs">
-              {CURRICULUM_LABELS[curr] || curr}
-            </Badge>
-          ))}
-        </div>
-      ),
-    },
+  accessorKey: 'curriculum',
+  header: 'Curriculum',
+  cell: ({ row }) => {
+    const curriculum = row.original.curriculum;
+    const curriculumArray = Array.isArray(curriculum) 
+      ? curriculum 
+      : curriculum ? [curriculum] : [];
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {curriculumArray?.map((curr) => (
+          <Badge key={curr} variant="secondary" className="text-xs">
+            {CURRICULUM_LABELS[curr] || curr}
+          </Badge>
+        ))}
+      </div>
+    );
+  },
+},
     {
       accessorKey: 'learningArea',
       header: 'Learning Area',

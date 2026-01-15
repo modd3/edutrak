@@ -1,25 +1,48 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/api';
+import api, { classSubjectsApi, subjectsApi,} from '@/api'; // Adjust path as needed
 import { toast } from 'sonner';
-import { ClassSubject, PaginatedResponse } from '@/types';
 
-interface ClassSubjectInput {
-  classId: string;
-  subjectId: string;
-  teacherId?: string;
-  isCompulsory: boolean;
+// --- Types (Move these to @/types if preferred) ---
+export interface Subject {
+  id: string;
+  name: string;
+  code: string;
+  category: string;
 }
 
-export function useClassSubjects(classId: string) {
+export interface Teacher {
+  id: string;
+  userId: string;
+  user: {
+    firstName: string;
+    lastName: string;
+  };
+}
+
+export interface AssignSubjectPayload {
+  classId: string;
+  subjectId: string;
+  academicYearId: string;
+  termId: string;
+  teacherId?: string;
+  streamId?: string;
+  subjectCategory: string;
+}
+
+// --- Hooks ---
+
+export function useSubjects() {
   return useQuery({
-    queryKey: ['classes', classId, 'subjects'],
-    queryFn: async () => {
-      const response = await api.get<PaginatedResponse<ClassSubject>>(
-        `/classes/${classId}/subjects`
-      );
-      return response.data;
-    },
-    enabled: !!classId,
+    queryKey: ['subjects'],
+    queryFn: () => subjectsApi.getAll(),
+  });
+}
+
+export function useClassSubjects(classId: string, academicYearId: string, termId: string) {
+  return useQuery({
+    queryKey: ['class-subjects', classId, academicYearId, termId],
+    queryFn: () => classSubjectsApi.getByClass(classId, { academicYearId, termId }),
+    enabled: !!classId && !!academicYearId && !!termId,
   });
 }
 
@@ -27,15 +50,13 @@ export function useAssignSubject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (data: ClassSubjectInput) => {
-      const response = await api.post<ClassSubject>('/class-subjects', data);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['classes', data.classId, 'subjects'] 
-      });
+    mutationFn: (data: AssignSubjectPayload) => classSubjectsApi.assign(data),
+    onSuccess: (_, variables) => {
       toast.success('Subject assigned successfully');
+      // Invalidate the list so it refreshes
+      queryClient.invalidateQueries({
+        queryKey: ['class-subjects', variables.classId]
+      });
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to assign subject');
@@ -43,45 +64,18 @@ export function useAssignSubject() {
   });
 }
 
-export function useUpdateClassSubject() {
+export function useAssignSubjectTeacher() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ 
-      id, 
-      data 
-    }: { 
-      id: string; 
-      data: Partial<ClassSubjectInput>;
-    }) => {
-      const response = await api.patch<ClassSubject>(`/class-subjects/${id}`, data);
-      return response.data;
-    },
-    onSuccess: (data) => {
-      queryClient.invalidateQueries({ 
-        queryKey: ['classes', data.classId, 'subjects'] 
-      });
-      toast.success('Subject assignment updated successfully');
-    },
-    onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to update subject assignment');
-    },
-  });
-}
-
-export function useRemoveClassSubject() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (id: string) => {
-      await api.delete(`/class-subjects/${id}`);
-    },
-    onSuccess: (_, id) => {
+    mutationFn: ({ id, teacherId }: { id: string; teacherId: string }) => 
+      classSubjectsApi.assignTeacher(id, teacherId),
+    onSuccess: () => {
+      toast.success('Teacher assigned successfully');
       queryClient.invalidateQueries({ queryKey: ['class-subjects'] });
-      toast.success('Subject removed successfully');
     },
     onError: (error: any) => {
-      toast.error(error.response?.data?.message || 'Failed to remove subject');
+      toast.error(error.response?.data?.message || 'Failed to assign teacher');
     },
   });
 }

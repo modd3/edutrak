@@ -230,7 +230,7 @@ export function useUpdateClass() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateClassData> }) => {
-      const response = await api.put(`/academic/classes/${id}`, data);
+      const response = await api.patch(`/academic/classes/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
@@ -281,7 +281,7 @@ export function useUpdateStream() {
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<CreateStreamData> }) => {
-      const response = await api.put(`/academic/streams/${id}`, data);
+      const response = await api.patch(`/academic/streams/${id}`, data);
       return response.data;
     },
     onSuccess: () => {
