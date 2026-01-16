@@ -189,15 +189,15 @@ export const classSubjectsApi = {
     teacherId?: string;
     streamId?: string; // Optional
     subjectCategory: string; // 'CORE' | 'ELECTIVE' etc.
-  }) => api.post('/academic/class-subjects', data),
+  }) => api.post('/academic/class-subject', data),
 
   // Assign/Update a teacher for an existing class subject
   assignTeacher: (classSubjectId: string, teacherId: string) =>
-    api.patch(`/academic/class-subjects/${classSubjectId}/teacher`, { teacherId }),
+    api.patch(`/academic/class-subject/${classSubjectId}/teacher`, { teacherId }),
 
   // Get subjects for a specific class
   getByClass: (classId: string, params: { academicYearId: string; termId: string }) =>
-    api.get(`/academic/class-subjects/class/${classId}`, { params }),
+    api.get(`/academic/class-subject/class/${classId}`, { params }),
 };
 
 export const assessmentsApi = {

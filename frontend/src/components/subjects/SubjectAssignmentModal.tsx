@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -27,13 +27,15 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { useSubjects, useAssignSubject } from '@/hooks/use-class-subjects';
-import { useTeachers } from '@/hooks/use-teachers'; // Assuming you have this, or use teachersApi directly
+import { useTeachers } from '@/hooks/use-teachers';
 import { Loader2 } from 'lucide-react';
+import { Term } from '@/types';
 
 const formSchema = z.object({
   subjectId: z.string().min(1, 'Subject is required'),
   teacherId: z.string().optional(),
   subjectCategory: z.string().min(1, 'Category is required'),
+  termId: z.string().min(1, 'Term is required'), // Add termId to schema
 });
 
 interface SubjectAssignmentModalProps {
@@ -41,7 +43,7 @@ interface SubjectAssignmentModalProps {
   onOpenChange: (open: boolean) => void;
   classId: string;
   academicYearId: string;
-  termId: string; // You'll need to pass the active term ID
+  terms: Term[]; // Add terms prop
 }
 
 export function SubjectAssignmentModal({
@@ -49,11 +51,11 @@ export function SubjectAssignmentModal({
   onOpenChange,
   classId,
   academicYearId,
-  termId,
+  terms,
 }: SubjectAssignmentModalProps) {
   // Queries
   const { data: subjectsData, isLoading: loadingSubjects } = useSubjects();
-  const { data: teachersData, isLoading: loadingTeachers } = useTeachers(); // You might need to create this hook wrapping teachersApi.getAll
+  const { data: teachersData, isLoading: loadingTeachers } = useTeachers();
   
   // Mutation
   const { mutate: assignSubject, isPending } = useAssignSubject();
@@ -62,28 +64,77 @@ export function SubjectAssignmentModal({
     resolver: zodResolver(formSchema),
     defaultValues: {
       subjectCategory: 'CORE',
+      termId: '', // Initialize with empty
     },
   });
+
+  // Set default term when modal opens
+  useEffect(() => {
+    if (open && terms.length > 0) {
+      // Find active term based on current date
+      const today = new Date();
+      const activeTerm = terms.find(term => {
+        const startDate = new Date(term.startDate);
+        const endDate = new Date(term.endDate);
+        return today >= startDate && today <= endDate;
+      });
+      
+      // Set to active term if found, otherwise first term
+      form.setValue('termId', activeTerm?.id || terms[0].id);
+    }
+  }, [open, terms, form]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
     assignSubject({
       classId,
       academicYearId,
-      termId,
+      termId: values.termId, // Use selected termId
       subjectId: values.subjectId,
       teacherId: values.teacherId === "none" ? undefined : values.teacherId,
       subjectCategory: values.subjectCategory,
-      streamId: undefined, // Pass streamId if you want to assign to a specific stream only
+      streamId: undefined,
     }, {
       onSuccess: () => {
-        form.reset();
+        form.reset({
+          subjectCategory: 'CORE',
+          termId: terms.length > 0 ? terms[0].id : '',
+        });
         onOpenChange(false);
       }
     });
   };
 
-  const subjects = subjectsData?.data?.subjects || []; // Adjust based on actual API response structure
-  const teachers = teachersData?.data || []; // Adjust based on actual API response structure
+  const subjects = subjectsData?.data?.subjects || [];
+  const teachers = teachersData?.data || [];
+
+  // Helper function to get term display name
+  const getTermDisplayName = (term: Term) => {
+    const termNumber = term.termNumber || term.name?.split('_')[1] || 'N/A';
+    return `Term ${termNumber}`;
+  };
+
+  // Helper function to get term date range
+  const getTermDateRange = (term: Term) => {
+    const startDate = new Date(term.startDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    const endDate = new Date(term.endDate).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+    return `${startDate} - ${endDate}`;
+  };
+
+  // Check if term is active (current date within term range)
+  const isTermActive = (term: Term) => {
+    const today = new Date();
+    const startDate = new Date(term.startDate);
+    const endDate = new Date(term.endDate);
+    return today >= startDate && today <= endDate;
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,12 +142,50 @@ export function SubjectAssignmentModal({
         <DialogHeader>
           <DialogTitle>Assign Subject to Class</DialogTitle>
           <DialogDescription>
-            Add a subject to this class and optionally assign a teacher.
+            Add a subject to this class and optionally assign a teacher for a specific term.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            {/* Term Selection */}
+            <FormField
+              control={form.control}
+              name="termId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Term</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a term" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {terms.map((term) => (
+                        <SelectItem key={term.id} value={term.id}>
+                          <div className="flex flex-col">
+                            <div className="flex items-center gap-2">
+                              <span>{getTermDisplayName(term)}</span>
+                              {isTermActive(term) && (
+                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
+                                  Active
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {getTermDateRange(term)}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Subject Selection */}
             <FormField
               control={form.control}

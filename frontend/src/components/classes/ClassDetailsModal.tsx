@@ -1,5 +1,5 @@
 // src/components/classes/ClassDetailsModal.tsx
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Class, Stream } from '@/types';
+import { Class, Stream, Term } from '@/types';
 import {
   GraduationCap,
   Users,
@@ -25,7 +25,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Separator } from '@/components/ui/separator';
 import { ClassFormModal } from './ClassFormModal';
 import { StreamFormModal } from './StreamFormModal';
-import { SubjectAssignmentModal } from '../subjects/SubjectAssignmentModal'; // Import the SubjectAssignmentModal
+import { SubjectAssignmentModal } from '../subjects/SubjectAssignmentModal';
 import { useClassStreams, useDeleteStream } from '@/hooks/use-academic';
 import {
   AlertDialog,
@@ -67,10 +67,34 @@ const formatDate = (date: string | Date) => {
   });
 };
 
+// Helper function to find active term based on current date
+const findActiveTerm = (terms: Term[]): Term | null => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0); // Reset time part for accurate comparison
+
+  for (const term of terms) {
+    const startDate = new Date(term.startDate);
+    const endDate = new Date(term.endDate);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999); // Include the entire end date
+
+    if (today >= startDate && today <= endDate) {
+      return term;
+    }
+  }
+  return null;
+};
+
+// Helper function to get term display name
+const getTermDisplayName = (term: Term): string => {
+  const termNumber = term.termNumber || term.name?.split('_')[1] || 'N/A';
+  return `Term ${termNumber}`;
+};
+
 export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetailsModalProps) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showStreamModal, setShowStreamModal] = useState(false);
-  const [showSubjectModal, setShowSubjectModal] = useState(false); // State for subject modal
+  const [showSubjectModal, setShowSubjectModal] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   
@@ -78,14 +102,23 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
   const { data: streamsData, isLoading: isLoadingStreams, isError } = useClassStreams(classData.id);
   const { mutate: deleteStream, isPending: isDeletingStream } = useDeleteStream();
 
-  console.log("ClassDetailsModal - Streams Data: ", streamsData);
-  console.log("ClassDetailsModal - Class Data: ", classData);
+  console.log("ClassDetailsModal - Academic Year Data: ", classData.academicYear);
+  console.log("ClassDetailsModal - Terms: ", classData.academicYear?.terms);
   console.log("ClassDetailsModal - Class Teacher firstname Data: ", classData.classTeacher?.firstName);
   
   const streams = streamsData?.data || [];
   console.log("ClassDetailsModal - Streams array: ", streams);
 
-  // Basic class information
+  // Find active term based on current date
+  const activeTerm = useMemo(() => {
+    const terms = classData.academicYear?.terms || [];
+    return findActiveTerm(terms);
+  }, [classData.academicYear?.terms]);
+
+  // Check if we have any terms at all
+  const hasTerms = (classData.academicYear?.terms?.length || 0) > 0;
+
+  // Basic class information - add active term info
   const basicInfo = [
     { label: 'Class Name', value: classData.name, icon: GraduationCap },
     { label: 'Level', value: classData.level, icon: BookOpen },
@@ -102,6 +135,13 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
     { 
       label: 'Academic Year', 
       value: classData.academicYear?.year?.toString() || 'N/A', 
+      icon: Calendar 
+    },
+    { 
+      label: 'Current Term', 
+      value: activeTerm 
+        ? `${getTermDisplayName(activeTerm)} (${formatDate(activeTerm.startDate)} - ${formatDate(activeTerm.endDate)})`
+        : 'No active term detected',
       icon: Calendar 
     },
     { 
@@ -160,9 +200,15 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                 {classData.academicYear?.isActive && (
                   <Badge variant="default">Active Year</Badge>
                 )}
+                {activeTerm && (
+                  <Badge variant="success">
+                    {getTermDisplayName(activeTerm)} Active
+                  </Badge>
+                )}
               </div>
               <p className="text-sm text-muted-foreground">
                 {classData.school?.name} • Academic Year: {classData.academicYear?.year}
+                {activeTerm && ` • Current Term: ${getTermDisplayName(activeTerm)}`}
               </p>
             </div>
 
@@ -190,6 +236,55 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                       </div>
                     </div>
                   ))}
+                </div>
+
+                {/* Terms Information */}
+                <div className="mt-6">
+                  <h3 className="text-lg font-semibold mb-3">Academic Terms</h3>
+                  {hasTerms ? (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {classData.academicYear?.terms?.map((term: Term) => {
+                        const isActive = activeTerm?.id === term.id;
+                        const isPast = new Date(term.endDate) < new Date();
+                        const isFuture = new Date(term.startDate) > new Date();
+                        
+                        return (
+                          <Card key={term.id} className={isActive ? 'border-primary border-2' : ''}>
+                            <CardHeader className="pb-2">
+                              <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">
+                                  {getTermDisplayName(term)}
+                                </CardTitle>
+                                {isActive && (
+                                  <Badge variant="default" className="ml-2">Active</Badge>
+                                )}
+                                {isPast && (
+                                  <Badge variant="outline" className="ml-2">Past</Badge>
+                                )}
+                                {isFuture && (
+                                  <Badge variant="secondary" className="ml-2">Upcoming</Badge>
+                                )}
+                              </div>
+                            </CardHeader>
+                            <CardContent>
+                              <div className="space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Starts:</span>
+                                  <span>{formatDate(term.startDate)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">Ends:</span>
+                                  <span>{formatDate(term.endDate)}</span>
+                                </div>
+                              </div>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No terms defined for this academic year.</p>
+                  )}
                 </div>
 
                 <Separator />
@@ -341,9 +436,23 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                     <CardDescription>Subjects taught in this class</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <p className="text-sm text-muted-foreground">
-                      Subject assignments coming soon...
-                    </p>
+                    {hasTerms ? (
+                      <div>
+                        {activeTerm ? (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Click "Assign Subject" to add subjects to this class for {getTermDisplayName(activeTerm)}.
+                          </p>
+                        ) : (
+                          <p className="text-sm text-muted-foreground mb-2">
+                            Click "Assign Subject" to add subjects to this class. You can select which term to assign the subject to.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No terms available for this academic year. Please add terms first.
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -382,13 +491,15 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
       />
 
       {/* Subject Assignment Modal */}
-      <SubjectAssignmentModal
-        open={showSubjectModal}
-        onOpenChange={setShowSubjectModal}
-        classId={classData.id}
-        academicYearId={classData.academicYear?.id || ''}
-        termId={classData.academicYear?.activeTermId || ''} // You might need to get this from your data
-      />
+      {hasTerms && (
+        <SubjectAssignmentModal
+          open={showSubjectModal}
+          onOpenChange={setShowSubjectModal}
+          classId={classData.id}
+          academicYearId={classData.academicYear?.id || ''}
+          termId={activeTerm?.id || classData.academicYear?.terms?.[0]?.id || ''}
+        />
+      )}
 
       {/* Delete Stream Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
