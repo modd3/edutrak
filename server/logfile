@@ -1,4 +1,0 @@
-2025-12-27 07:38:48.053 UTC [28030] FATAL:  lock file "postmaster.pid" already exists
-2025-12-27 07:38:48.053 UTC [28030] HINT:  Is another postmaster (PID 28961) running in data directory "/var/lib/postgresql/14/main"?
-postgres: could not access the server configuration file "/var/lib/postgresql/14/main/postgresql.conf": No such file or directory
-postgres: could not access the server configuration file "/var/lib/postgresql/14/main/postgresql.conf": No such file or directory

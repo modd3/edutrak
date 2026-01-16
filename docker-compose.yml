@@ -1,0 +1,53 @@
+
+version: '3.8'
+
+services:
+  # 1. The Database
+  db:
+    image: postgres:15-alpine
+    container_name: school_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: school_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # 2. The Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: school_backend
+    volumes:
+      - ./backend:/app
+      - /app/node_modules # Don't overwrite container modules with local ones
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: postgresql://postgres:password123@db:5432/school_management
+      JWT_SECRET: your_dev_secret_key
+    depends_on:
+      - db
+
+  # 3. The Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: school_frontend
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_URL=http://localhost:5000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data
