@@ -3,7 +3,7 @@ import express from 'express';
 import AcademicController from '../controllers/academic.controller';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
 import { authenticate, authorize } from '../middleware/auth.middleware';
-import { ClassSubjectController } from '@/controllers/classSubject.controller';
+import { ClassSubjectController } from '../controllers/classSubject.controller';
 
 const controller = new ClassSubjectController();
 const router = express.Router();
