@@ -12,6 +12,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - edutrak_network
 
   # 2. The Backend
   backend:
@@ -24,6 +26,8 @@ services:
       - /app/node_modules
     ports:
       - "4000:4000"
+    networks:
+      - edutrak_network
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/edutrak_db
       JWT_SECRET: your_dev_secret_key
@@ -41,10 +45,17 @@ services:
       - frontend_node_modules:/app/node_modules
     ports:
       - "3000:3000"
+
+    networks:
+      - edutrak_network
     environment:
       - VITE_API_URL=http://localhost:4000/api
     depends_on:
       - backend
+
+networks:
+  edutrak_network:
+    driver: bridge
 
 volumes:
   postgres_data: {}
