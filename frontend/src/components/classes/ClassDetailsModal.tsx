@@ -26,7 +26,8 @@ import { Separator } from '@/components/ui/separator';
 import { ClassFormModal } from './ClassFormModal';
 import { StreamFormModal } from './StreamFormModal';
 import { SubjectAssignmentModal } from '../subjects/SubjectAssignmentModal';
-import { useClassStreams, useDeleteStream } from '@/hooks/use-academic';
+import { useClassStreams, useDeleteStream, useActiveAcademicYear } from '@/hooks/use-academic';
+import {useClassSubjects} from '@/hooks/use-class-subjects';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,14 +70,15 @@ const formatDate = (date: string | Date) => {
 
 // Helper function to find active term based on current date
 const findActiveTerm = (terms: Term[]): Term | null => {
+  if (!terms) return null;
   const today = new Date();
-  today.setHours(0, 0, 0, 0); // Reset time part for accurate comparison
+  today.setHours(0, 0, 0, 0); 
 
   for (const term of terms) {
     const startDate = new Date(term.startDate);
     const endDate = new Date(term.endDate);
     startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999); // Include the entire end date
+    endDate.setHours(23, 59, 59, 999); 
 
     if (today >= startDate && today <= endDate) {
       return term;
@@ -99,26 +101,31 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
   const [selectedStream, setSelectedStream] = useState<Stream | null>(null);
   
   // Fetch streams for this class
-  const { data: streamsData, isLoading: isLoadingStreams, isError } = useClassStreams(classData.id);
+  const { data: streamsData, isLoading: isLoadingStreams } = useClassStreams(classData.id);
   const { mutate: deleteStream, isPending: isDeletingStream } = useDeleteStream();
-
-  console.log("ClassDetailsModal - Academic Year Data: ", classData.academicYear);
-  console.log("ClassDetailsModal - Terms: ", classData.academicYear?.terms);
-  console.log("ClassDetailsModal - Class Teacher firstname Data: ", classData.classTeacher?.firstName);
+  const { data: activeAcademicYear } = useActiveAcademicYear();
   
-  const streams = streamsData?.data || [];
-  console.log("ClassDetailsModal - Streams array: ", streams);
-
-  // Find active term based on current date
+   // Find active term based on current date
   const activeTerm = useMemo(() => {
-    const terms = classData.academicYear?.terms || [];
+    const terms = activeAcademicYear?.terms || [];
     return findActiveTerm(terms);
-  }, [classData.academicYear?.terms]);
+  }, [activeAcademicYear?.terms]);
 
-  // Check if we have any terms at all
-  const hasTerms = (classData.academicYear?.terms?.length || 0) > 0;
+  // Fetch subjects for this class
+  const { data: subjectsData, isLoading: isLoadingSubjects } = useClassSubjects(classData.id, activeAcademicYear?.id || '', activeTerm?.id || '') ;
 
-  // Basic class information - add active term info
+  const streams = streamsData?.data || [];
+  const subjects = subjectsData?.data.data || [];
+  console.log("subjects: ", subjects);
+  console.log("subjectsData: ", subjectsData);
+
+   
+
+  // Safe access to terms
+  const terms = activeAcademicYear?.terms || [];
+  const hasTerms = terms.length > 0;
+
+  // Basic class information
   const basicInfo = [
     { label: 'Class Name', value: classData.name, icon: GraduationCap },
     { label: 'Level', value: classData.level, icon: BookOpen },
@@ -170,6 +177,57 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
     }
   };
 
+  // Log streams and subjects when assign subject button is clicked
+  const handleAssignSubjectClick = () => {
+    console.log('=== Assign Subject Button Clicked ===');
+    console.log('Class Details:', {
+      id: classData.id,
+      name: classData.name,
+      level: classData.level,
+      curriculum: classData.curriculum,
+    });
+    
+    console.log('Available Streams:', streams.map(stream => ({
+      id: stream.id,
+      name: stream.name,
+      capacity: stream.capacity,
+      studentCount: stream._count?.students || 0,
+      teacher: stream.streamTeacher?.user 
+        ? `${stream.streamTeacher.user.firstName} ${stream.streamTeacher.user.lastName}`
+        : 'Not assigned'
+    })));
+    
+    console.log('Existing Subjects:', subjects.map(subject => ({
+      id: subject.id,
+      name: subject.subject?.name || subject.name,
+      code: subject.subject?.code,
+      category: subject.category,
+      teacher: subject.teacher?.user 
+        ? `${subject.teacher.user.firstName} ${subject.teacher.user.lastName}`
+        : 'Not assigned'
+    })));
+    
+    console.log('Academic Terms:', terms.map(term => ({
+      id: term.id,
+      name: term.name,
+      termNumber: term.termNumber,
+      startDate: term.startDate,
+      endDate: term.endDate,
+      displayName: getTermDisplayName(term)
+    })));
+    
+    console.log('Active Term:', activeTerm ? {
+      id: activeTerm.id,
+      name: activeTerm.name,
+      termNumber: activeTerm.termNumber,
+      startDate: activeTerm.startDate,
+      endDate: activeTerm.endDate,
+    } : 'No active term');
+    
+    console.log('=== End Log ===');
+    setShowSubjectModal(true);
+  };
+
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -201,7 +259,7 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                   <Badge variant="default">Active Year</Badge>
                 )}
                 {activeTerm && (
-                  <Badge variant="success">
+                  <Badge variant="success" className="bg-green-100 text-green-800 hover:bg-green-200">
                     {getTermDisplayName(activeTerm)} Active
                   </Badge>
                 )}
@@ -219,7 +277,9 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                   Streams ({streams.length})
                 </TabsTrigger>
                 <TabsTrigger value="students">Students</TabsTrigger>
-                <TabsTrigger value="subjects">Subjects</TabsTrigger>
+                <TabsTrigger value="subjects">
+                  Subjects ({subjects.length})
+                </TabsTrigger>
               </TabsList>
 
               {/* Basic Information Tab */}
@@ -243,7 +303,7 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                   <h3 className="text-lg font-semibold mb-3">Academic Terms</h3>
                   {hasTerms ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                      {classData.academicYear?.terms?.map((term: Term) => {
+                      {terms.map((term: Term) => {
                         const isActive = activeTerm?.id === term.id;
                         const isPast = new Date(term.endDate) < new Date();
                         const isFuture = new Date(term.startDate) > new Date();
@@ -427,8 +487,8 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center justify-between">
-                      <span>Subjects</span>
-                      <Button size="sm" onClick={() => setShowSubjectModal(true)}>
+                      <span>Subjects ({subjects.length})</span>
+                      <Button size="sm" onClick={handleAssignSubjectClick}>
                         <Plus className="h-4 w-4 mr-2" />
                         Assign Subject
                       </Button>
@@ -436,22 +496,55 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
                     <CardDescription>Subjects taught in this class</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    {hasTerms ? (
-                      <div>
-                        {activeTerm ? (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Click "Assign Subject" to add subjects to this class for {getTermDisplayName(activeTerm)}.
-                          </p>
+                    {isLoadingSubjects ? (
+                      <div className="text-center py-4">Loading subjects...</div>
+                    ) : subjects.length === 0 ? (
+                      <div className="text-center py-4">
+                        <p className="text-muted-foreground mb-2">No subjects assigned yet.</p>
+                        {hasTerms ? (
+                          activeTerm ? (
+                            <p className="text-sm text-muted-foreground">
+                              Click "Assign Subject" to add subjects to this class for {getTermDisplayName(activeTerm)}.
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground">
+                              Click "Assign Subject" to add subjects to this class. You can select which term to assign the subject to.
+                            </p>
+                          )
                         ) : (
-                          <p className="text-sm text-muted-foreground mb-2">
-                            Click "Assign Subject" to add subjects to this class. You can select which term to assign the subject to.
+                          <p className="text-sm text-muted-foreground">
+                            No terms available for this academic year. Please add terms first.
                           </p>
                         )}
                       </div>
                     ) : (
-                      <p className="text-sm text-muted-foreground">
-                        No terms available for this academic year. Please add terms first.
-                      </p>
+                      <div className="space-y-3">
+                        <div className="text-sm text-muted-foreground mb-2">
+                          Showing subjects assigned to this class
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {subjects.map((subject: any) => (
+                            <div key={subject.id} className="flex items-center justify-between p-3 border rounded-lg">
+                              <div>
+                                <p className="font-medium">{subject.subject?.name || subject.name}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  {subject.subject?.code} • {subject.category}
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm">
+                                  {subject.teacherProfile?.user 
+                                    ? `${subject.teacherProfile.user.firstName} ${subject.teacherProfile.user.lastName}`
+                                    : 'No teacher'}
+                                </p>
+                                <Badge variant="outline" className="mt-1">
+                                  Term {subject.term?.termNumber || 'N/A'}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -497,7 +590,8 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
           onOpenChange={setShowSubjectModal}
           classId={classData.id}
           academicYearId={classData.academicYear?.id || ''}
-          termId={activeTerm?.id || classData.academicYear?.terms?.[0]?.id || ''}
+          terms={terms}
+          streams={streams}
         />
       )}
 

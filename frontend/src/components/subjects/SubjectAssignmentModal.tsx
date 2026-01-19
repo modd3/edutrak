@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,16 +26,19 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useSubjects, useAssignSubject } from '@/hooks/use-class-subjects';
 import { useTeachers } from '@/hooks/use-teachers';
-import { Loader2 } from 'lucide-react';
-import { Term } from '@/types';
+import { Loader2, Info, CheckCircle } from 'lucide-react';
+import { Term, Stream } from '@/types';
+import { toast } from 'sonner';
 
 const formSchema = z.object({
   subjectId: z.string().min(1, 'Subject is required'),
   teacherId: z.string().optional(),
+  streamId: z.string().optional(),
   subjectCategory: z.string().min(1, 'Category is required'),
-  termId: z.string().min(1, 'Term is required'), // Add termId to schema
+  termId: z.string().min(1, 'Term is required'),
 });
 
 interface SubjectAssignmentModalProps {
@@ -43,7 +46,8 @@ interface SubjectAssignmentModalProps {
   onOpenChange: (open: boolean) => void;
   classId: string;
   academicYearId: string;
-  terms: Term[]; // Add terms prop
+  terms: Term[];
+  streams: Stream[];
 }
 
 export function SubjectAssignmentModal({
@@ -51,142 +55,175 @@ export function SubjectAssignmentModal({
   onOpenChange,
   classId,
   academicYearId,
-  terms,
+  terms = [],
+  streams = [],
 }: SubjectAssignmentModalProps) {
-  // Queries
   const { data: subjectsData, isLoading: loadingSubjects } = useSubjects();
   const { data: teachersData, isLoading: loadingTeachers } = useTeachers();
-  
-  // Mutation
   const { mutate: assignSubject, isPending } = useAssignSubject();
+
+  // Find active term based on current date
+  const activeTerm = useMemo(() => {
+    if (terms.length === 0) return null;
+    const today = new Date();
+    return terms.find(term => {
+      const startDate = new Date(term.startDate);
+      const endDate = new Date(term.endDate);
+      return today >= startDate && today <= endDate;
+    });
+  }, [terms]);
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
+      subjectId: '',
       subjectCategory: 'CORE',
-      termId: '', // Initialize with empty
+      termId: activeTerm?.id || (terms.length > 0 ? terms[0].id : ''),
+      streamId: 'all',
+      teacherId: 'none',
     },
   });
 
-  // Set default term when modal opens
+  const subjects = subjectsData?.data?.data || [];
+  const teachers = teachersData?.data || [];
+
+  
+  // Watch subjectId to auto-set category
+  const selectedSubjectId = form.watch('subjectId');
+  const selectedTermId = form.watch('termId');
+
+
+  // Set initial term to active term or first term
   useEffect(() => {
     if (open && terms.length > 0) {
-      // Find active term based on current date
-      const today = new Date();
-      const activeTerm = terms.find(term => {
-        const startDate = new Date(term.startDate);
-        const endDate = new Date(term.endDate);
-        return today >= startDate && today <= endDate;
-      });
+      const initialTermId = activeTerm?.id || terms[0].id;
+      form.setValue('termId', initialTermId);
       
-      // Set to active term if found, otherwise first term
-      form.setValue('termId', activeTerm?.id || terms[0].id);
     }
-  }, [open, terms, form]);
+  }, [open, terms, activeTerm, form]);
 
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+           
     assignSubject({
       classId,
       academicYearId,
-      termId: values.termId, // Use selected termId
+      termId: values.termId,
       subjectId: values.subjectId,
       teacherId: values.teacherId === "none" ? undefined : values.teacherId,
+      streamId: values.streamId === "all" ? undefined : values.streamId,
       subjectCategory: values.subjectCategory,
-      streamId: undefined,
     }, {
       onSuccess: () => {
+       // toast.success(`Subject assignment successful!`);
         form.reset({
+          subjectId: '',
           subjectCategory: 'CORE',
-          termId: terms.length > 0 ? terms[0].id : '',
+          termId: activeTerm?.id || (terms.length > 0 ? terms[0].id : ''),
+          streamId: 'all',
+          teacherId: 'none',
         });
         onOpenChange(false);
+      },
+      onError: (error) => {
+        toast.error('Subject assignment failed:', error);
       }
     });
   };
 
-  const subjects = subjectsData?.data?.subjects || [];
-  const teachers = teachersData?.data || [];
-
-  // Helper function to get term display name
   const getTermDisplayName = (term: Term) => {
     const termNumber = term.termNumber || term.name?.split('_')[1] || 'N/A';
     return `Term ${termNumber}`;
-  };
-
-  // Helper function to get term date range
-  const getTermDateRange = (term: Term) => {
-    const startDate = new Date(term.startDate).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    const endDate = new Date(term.endDate).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-    return `${startDate} - ${endDate}`;
-  };
-
-  // Check if term is active (current date within term range)
-  const isTermActive = (term: Term) => {
-    const today = new Date();
-    const startDate = new Date(term.startDate);
-    const endDate = new Date(term.endDate);
-    return today >= startDate && today <= endDate;
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Assign Subject to Class</DialogTitle>
+          <DialogTitle>Assign Subject</DialogTitle>
           <DialogDescription>
-            Add a subject to this class and optionally assign a teacher for a specific term.
+            Map a school subject to this class or a specific stream.
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            {/* Term Selection */}
-            <FormField
-              control={form.control}
-              name="termId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Term</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a term" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {terms.map((term) => (
-                        <SelectItem key={term.id} value={term.id}>
-                          <div className="flex flex-col">
-                            <div className="flex items-center gap-2">
-                              <span>{getTermDisplayName(term)}</span>
-                              {isTermActive(term) && (
-                                <span className="text-xs bg-green-100 text-green-800 px-2 py-0.5 rounded-full">
-                                  Active
-                                </span>
-                              )}
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {getTermDateRange(term)}
-                            </span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="termId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      Term
+                      {selectedTermId === activeTerm?.id && (
+                        <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-xs">
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                          Active
+                        </Badge>
+                      )}
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select term" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {terms.map((term) => {
+                          const isActiveTerm = term.id === activeTerm?.id;
+                          return (
+                            <SelectItem key={term.id} value={term.id}>
+                              <div className="flex items-center justify-between">
+                                <span>{getTermDisplayName(term)}</span>
+                                {isActiveTerm && (
+                                  <Badge variant="outline" className="ml-2 bg-green-50 text-green-700 border-green-200 text-xs">
+                                    Active
+                                  </Badge>
+                                )}
+                              </div>
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                    {selectedTermId === activeTerm?.id && (
+                      <div className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                        <Info className="h-3 w-3" />
+                        <span>This term is currently active based on today's date</span>
+                      </div>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
-            {/* Subject Selection */}
+              <FormField
+                control={form.control}
+                name="streamId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Assign To</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select target" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="all">Entire Class</SelectItem>
+                        {streams && streams.length > 0 && streams.map((stream) => (
+                          <SelectItem key={stream.id} value={stream.id}>
+                            {stream.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={form.control}
               name="subjectId"
@@ -207,12 +244,18 @@ export function SubjectAssignmentModal({
                       ))}
                     </SelectContent>
                   </Select>
+                  {/* Visual indicator of the auto-selected category */}
+                  {selectedSubjectId && (
+                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <Info className="h-3 w-3" />
+                      <span>Category: <strong>{form.getValues('subjectCategory')}</strong> (Inherited from Subject)</span>
+                    </div>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
             />
 
-            {/* Teacher Selection */}
             <FormField
               control={form.control}
               name="teacherId"
@@ -239,33 +282,11 @@ export function SubjectAssignmentModal({
               )}
             />
 
-            {/* Category Selection */}
-            <FormField
-              control={form.control}
-              name="subjectCategory"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Category</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="CORE">Core</SelectItem>
-                      <SelectItem value="ELECTIVE">Elective</SelectItem>
-                      <SelectItem value="OPTIONAL">Optional</SelectItem>
-                      <SelectItem value="TECHNICAL">Technical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
             <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              <Button type="button" variant="outline" onClick={() => {
+                console.log('Subject assignment cancelled');
+                onOpenChange(false);
+              }}>
                 Cancel
               </Button>
               <Button type="submit" disabled={isPending}>
