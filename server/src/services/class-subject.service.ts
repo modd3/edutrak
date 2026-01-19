@@ -119,6 +119,7 @@ export class ClassSubjectService {
       },
       include: {
         subject: true,
+        term: true,
         stream: true, // To see if it's a stream-specific assignment
         teacherProfile: {
           include: {
