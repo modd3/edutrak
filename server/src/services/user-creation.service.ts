@@ -249,9 +249,9 @@ export class UserCreationService extends BaseService {
 
         // Student-specific fields
         admissionNo: admissionNo!,
-        upiNumber,
-        kemisUpi: profileData.kemisUpi,
-        gender: profileData.gender,
+        upiNumber: upiNumber || null,
+        kemisUpi: profileData.kemisUpi || null,
+        gender: profileData.gender || null,
         dob: profileData.dob,
         birthCertNo: profileData.birthCertNo,
         nationality: profileData.nationality || 'Kenyan',

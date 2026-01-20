@@ -36,6 +36,8 @@ export function AssessmentsPage() {
   const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
   const activeYear = activeYearData;
 
+  console.log("active Year: ", activeYear);
+
   // Fetch classes for the active academic year
   const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
   const classes = classesData?.data || [];

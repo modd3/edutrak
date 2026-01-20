@@ -37,9 +37,9 @@ const studentProfileSchema = z.object({
   admissionNo: z.string().min(1, 'Admission number is required'),
   gender: z.enum(['MALE', 'FEMALE']),
   dob: z.string().optional().or(z.date().optional()),
-  upiNumber: z.string().optional(),
-  kemisUpi: z.string().optional(),
-  birthCertNo: z.string().optional(),
+  upiNumber: z.string().optional().transform(e => e === "" ? undefined : e),
+  kemisUpi: z.string().optional().transform(e => e === "" ? undefined : e),
+  birthCertNo: z.string().optional().transform(e => e === "" ? undefined : e),
   nationality: z.string().optional().default('Kenyan'),
   county: z.string().optional(),
   subCounty: z.string().optional(),
@@ -110,7 +110,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
   const [autoGenerateEmployee, setAutoGenerateEmployee] = useState(mode === 'create');
   const [showPassword, setShowPassword] = useState(false);
   const [selectedRole, setSelectedRole] = useState<Role>(user?.role as Role || 'STUDENT');
-  
+
   const { mutate: createUser, isPending: isCreating } = useCreateUserWithProfile();
   const { mutate: updateUser, isPending: isUpdating } = useUpdateUserWithProfile();
   const { data: schoolsResponse } = useSchools({ limit: 100 });
@@ -312,10 +312,10 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       delete userData.password;
     }
 
-      // Ensure idNumber is null if empty (extra safety)
-  if (userData.idNumber === '') {
-    userData.idNumber = null;
-  }
+    // Ensure idNumber is null if empty (extra safety)
+    if (userData.idNumber === '') {
+      userData.idNumber = null;
+    }
 
     // Validate and get profile data based on role
     if (selectedRole === 'STUDENT') {
@@ -330,17 +330,17 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         return;
       }
       profileData = studentForm.getValues();
-      
+
       // Ensure admission number is set
-      if (!profileData.admissionNo) {
-        if (autoGenerateAdmission && previewAdmission?.preview) {
-          profileData.admissionNo = previewAdmission.preview;
-        } else {
+      if (autoGenerateAdmission) {
+        profileData.admissionNo = undefined;
+      } else {
+        if (!profileData.admissionNo) {
           toast.error('Admission number is required');
           return;
         }
       }
-      
+
       if (profileData.dob) {
         profileData.dob = new Date(profileData.dob);
       }
@@ -357,17 +357,18 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
         return;
       }
       profileData = teacherForm.getValues();
-      
+
       // Ensure employee number is set (either auto-generated or manual)
-      if (!profileData.employeeNumber) {
-        if (autoGenerateEmployee && previewEmployee?.preview) {
-          profileData.employeeNumber = previewEmployee.preview;
-        } else {
+
+      if (autoGenerateEmployee) {
+        profileData.employeeNumber = undefined;
+      } else {
+        if (!profileData.employeeNumber) {
           toast.error('Employee number is required');
           return;
         }
       }
-      
+
       if (profileData.dateJoined) {
         profileData.dateJoined = new Date(profileData.dateJoined);
       }
@@ -549,7 +550,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                     <Building2 className="h-4 w-4" />
                     School {!isSuperAdmin && <span className="text-xs text-muted-foreground">(Auto-assigned)</span>}
                   </Label>
-                  
+
                   {isSuperAdmin ? (
                     // Super Admin can select any school
                     <Controller
@@ -584,7 +585,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                       </div>
                     </div>
                   )}
-                  
+
                   {!isSuperAdmin && (
                     <p className="text-xs text-muted-foreground">
                       Users will be automatically assigned to your school: <strong>{schoolName}</strong>
@@ -652,7 +653,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                   <div className="flex-1">
                     <p className="text-sm font-medium text-blue-900">School Assignment</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      This user will be automatically assigned to <strong>{schoolName}</strong>. 
+                      This user will be automatically assigned to <strong>{schoolName}</strong>.
                       Only super administrators can assign users to different schools.
                     </p>
                   </div>
@@ -721,13 +722,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                           disabled={mode === 'edit'}
                         />
                       )}
-                      
+
                       {previewAdmission && autoGenerateAdmission && (
                         <p className="text-xs text-muted-foreground">
                           Next available: {previewAdmission.preview}
                         </p>
                       )}
-                      
+
                       {studentForm.formState.errors.admissionNo && !autoGenerateAdmission && (
                         <p className="text-sm text-destructive">
                           {studentForm.formState.errors.admissionNo.message}
@@ -756,9 +757,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
                     <div className="space-y-2">
                       <Label>Date of Birth</Label>
-                      <Input 
-                        {...studentForm.register('dob')} 
-                        type="date" 
+                      <Input
+                        {...studentForm.register('dob')}
+                        type="date"
                         max={new Date().toISOString().split('T')[0]}
                       />
                     </div>
@@ -810,8 +811,8 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                                 }
                               }}
                             />
-                            <Label 
-                              htmlFor="hasSpecialNeeds" 
+                            <Label
+                              htmlFor="hasSpecialNeeds"
                               className="cursor-pointer select-none font-medium"
                             >
                               Has Special Needs?
@@ -875,9 +876,9 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>TSC Number *</Label>
-                      <Input 
-                        {...teacherForm.register('tscNumber')} 
-                        placeholder="TSC123456" 
+                      <Input
+                        {...teacherForm.register('tscNumber')}
+                        placeholder="TSC123456"
                       />
                       {teacherForm.formState.errors.tscNumber && (
                         <p className="text-sm text-destructive">{teacherForm.formState.errors.tscNumber.message}</p>
@@ -942,13 +943,13 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
                           className={mode === 'edit' ? "bg-muted" : ""}
                         />
                       )}
-                      
+
                       {previewEmployee && autoGenerateEmployee && (
                         <p className="text-xs text-muted-foreground">
                           Next available: {previewEmployee.preview}
                         </p>
                       )}
-                      
+
                       {teacherForm.formState.errors.employeeNumber && !autoGenerateEmployee && (
                         <p className="text-sm text-destructive">
                           {teacherForm.formState.errors.employeeNumber.message}

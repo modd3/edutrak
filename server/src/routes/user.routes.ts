@@ -1,10 +1,11 @@
 import { Router } from 'express';
-import * as UserController from '../controllers/user.controller' ;
-import { UserCreationController } from '../controllers/user-creation.controller' ;
-import { 
-  authenticate, 
+import * as UserController from '../controllers/user.controller';
+import { UserCreationController } from '../controllers/user-creation.controller';
+import {
+  authenticate,
   authorize,
-  rateLimit
+  rateLimit,
+  requestLogger
 } from '../middleware/auth.middleware';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
 
@@ -15,6 +16,7 @@ const userCreationController = new UserCreationController();
 router.use(authenticate);
 router.use(validateResourceOwnership);
 router.use(enforceSchoolContext);
+router.use(requestLogger);
 
 
 // User management (Admin only)
@@ -25,10 +27,10 @@ router.post(
   validateResourceOwnership,
   userCreationController.bulkCreateUsers.bind(userCreationController)
 );
-router.get('/', authorize('ADMIN', 'SUPER_ADMIN'),enforceSchoolContext, UserController.getUsers);
+router.get('/', authorize('ADMIN', 'SUPER_ADMIN'), enforceSchoolContext, UserController.getUsers);
 router.get('/stats', authorize('ADMIN', 'SUPER_ADMIN'), enforceSchoolContext, UserController.getUserStatistics);
 
-  
+
 // User profile and management
 router.get('/profile', enforceSchoolContext, UserController.getUserProfile);
 router.get('/:id', UserController.getUserById);

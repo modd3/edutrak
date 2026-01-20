@@ -21,12 +21,6 @@ export function enforceSchoolContext(
   next: NextFunction
 ) {
   const user = req.user;
-  console.log('🔐 enforceSchoolContext middleware:', {
-    hasUser: !!user,
-    userId: user?.userId,
-    role: user?.role,
-    schoolId: user?.schoolId,
-  });
 
   if (!user) {
     return res.status(401).json({
@@ -72,9 +66,9 @@ export function validateResourceOwnership(
   }
 
   // Get schoolId from various sources
-  const resourceSchoolId = 
-    req.body.schoolId || 
-    req.params.schoolId || 
+  const resourceSchoolId =
+    req.body.schoolId ||
+    req.params.schoolId ||
     req.query.schoolId as string;
 
   // If resource specifies a school, validate it matches user's school

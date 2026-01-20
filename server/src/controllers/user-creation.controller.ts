@@ -37,6 +37,7 @@ export class UserCreationController {
 
     } catch (error: any) {
       logger.error('User creation error', { error: error.message });
+      console.log("Error in User Creation: ", error);
       ResponseUtil.error(res, 'Error Creating User!', res.statusCode, error);
     }
   }
