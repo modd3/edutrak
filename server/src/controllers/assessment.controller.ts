@@ -1,576 +1,556 @@
+// src/controllers/assessment.controller.ts
+
 import { Request, Response } from 'express';
 import { AssessmentService } from '../services/assessment.service';
-import { ResponseUtil } from '../utils/response';
-import logger from '../utils/logger';
-import { AssessmentType, CompetencyLevel } from '@prisma/client';
-import { RequestWithUser } from '../middleware/school-context';
+import { GradeEntryService } from '../services/grade-entry.service';
+import { ReportGenerationService } from '../services/report-generation.service';
+import prisma from '../database/client';
+import {
+  createAssessmentDefinitionSchema,
+  updateAssessmentDefinitionSchema,
+  bulkCreateAssessmentsSchema,
+  createAssessmentResultSchema,
+  updateAssessmentResultSchema,
+  gradeEntrySchema,
+  getAssessmentsQuerySchema,
+  getResultsQuerySchema,
+  csvGradeEntryRowSchema,
+} from '../validation/assessment.validation';
+import { z } from 'zod';
 
-// ========== ASSESSMENT DEFINITION CONTROLLERS ==========
+export class AssessmentController {
+  private assessmentService: AssessmentService;
+  private gradeEntryService: GradeEntryService;
+  private reportService: ReportGenerationService;
 
-/**
- * Create a new assessment definition
- */
-export const createAssessmentDefinition = async (req: RequestWithUser, res: Response) => {
+  constructor() {
+    this.assessmentService = new AssessmentService(prisma);
+    this.gradeEntryService = new GradeEntryService(prisma);
+    this.reportService = new ReportGenerationService(prisma);
+  }
+
+  /**
+   * Create new assessment definition
+   * POST /api/assessments
+   */
+  createAssessment = async (req: Request, res: Response): Promise<void> => {
     try {
-        const assessmentService = AssessmentService.withRequest(req);
-        const { name, type, maxMarks, termId, classSubjectId, strandId } = req.body;
+      const data = createAssessmentDefinitionSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+      const userId = req.user!.userId;
 
-    // Validate required fields
-    if (!name || !type || !termId || !classSubjectId) {
-      return ResponseUtil.validationError(
-        res,
-        'name, type, termId, and classSubjectId are required'
+      const assessment = await this.assessmentService.createAssessment(
+        data,
+        schoolId,
+        userId
       );
-    }
 
-    // Validate assessment type
-    if (!Object.values(AssessmentType).includes(type)) {
-      return ResponseUtil.validationError(
-        res,
-        `Invalid assessment type. Must be one of: ${Object.values(AssessmentType).join(', ')}`
-      );
-    }
-
-    // For non-CBC assessments, maxMarks is required
-    if (type !== 'COMPETENCY_BASED' && !maxMarks) {
-      return ResponseUtil.validationError(res, 'maxMarks is required for non-CBC assessments');
-    }
-
-    const assessmentDef = await assessmentService.createAssessmentDefinition({
-      name,
-      type,
-      maxMarks,
-      termId,
-      classSubjectId,
-      strandId,
-    });
-
-    logger.info('Assessment definition created', {
-      assessmentDefId: assessmentDef.id,
-      createdBy: req.user?.userId,
-    });
-
-    return ResponseUtil.created(res, 'Assessment definition created successfully', assessmentDef);
-  } catch (err: any) {
-    logger.error('Error creating assessment definition', { error: err.message });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get assessment definition by ID
- */
-export const getAssessmentDefinitionById = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { id } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const assessmentDef = await assessmentService.getAssessmentDefinitionById(id);
-
-    if (!assessmentDef) {
-      return ResponseUtil.notFound(res, 'Assessment definition');
-    }
-
-    return ResponseUtil.success(res, 'Assessment definition fetched successfully', assessmentDef);
-  } catch (err: any) {
-    logger.error('Error fetching assessment definition', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get all assessment definitions for a class subject
- */
-export const getClassSubjectAssessmentDefinitions = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { classSubjectId } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const assessments = await assessmentService.getClassSubjectAssessmentDefinitions(classSubjectId);
-
-    return ResponseUtil.success(
-      res,
-      'Assessment definitions fetched successfully',
-      assessments,
-      assessments.length
-    );
-  } catch (err: any) {
-    logger.error('Error fetching class subject assessments', { 
-      error: err.message, 
-      classSubjectId: req.params.classSubjectId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-/// TODO: Add Update Assessment Def & Delete to the Service file
-/**
- * Update assessment definition
- */
-/*
-export const updateAssessmentDefinition = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { name, type, maxMarks, strandId } = req.body;
-
-    const existing = await assessmentService.getAssessmentDefinitionById(id);
-    if (!existing) {
-      return ResponseUtil.notFound(res, 'Assessment definition');
-    }
-
-    const updated = await assessmentService.updateAssessmentDefinition(id, {
-      name,
-      type,
-      maxMarks,
-      strandId,
-    });
-
-    logger.info('Assessment definition updated', { assessmentDefId: id, updatedBy: req.user?.userId });
-
-    return ResponseUtil.success(res, 'Assessment definition updated successfully', updated);
-  } catch (err: any) {
-    logger.error('Error updating assessment definition', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-}; 
-*/
-/**
- * Delete assessment definition
- */
-/*
-export const deleteAssessmentDefinition = async (req: Request, res: Response) => {
-  try {
-    const { id } = req.params;
-
-    const existing = await assessmentService.getAssessmentDefinitionById(id);
-    const existingResult = await assessmentService.getAssessmentDefinitionResults(id);
-    if (!existing) {
-      return ResponseUtil.notFound(res, 'Assessment definition');
-    }
-
-    // Check if there are any results
-    if (existingResult && existingResult.length > 0) {
-      return ResponseUtil.validationError(
-        res,
-        'Cannot delete assessment definition with existing results. Please delete results first.'
-      );
-    }
-
-    await assessmentService.deleteAssessmentDefinition(id);
-
-    logger.info('Assessment definition deleted', { assessmentDefId: id, deletedBy: req.user?.id });
-
-    return ResponseUtil.success(res, 'Assessment definition deleted successfully');
-  } catch (err: any) {
-    logger.error('Error deleting assessment definition', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-}; */
-
-// ========== ASSESSMENT RESULT CONTROLLERS ==========
-
-/**
- * Create a single assessment result
- */
-export const createAssessmentResult = async (req: RequestWithUser, res: Response) => {
-  try {
-    const assessmentService = AssessmentService.withRequest(req);
-    const { studentId, assessmentDefId, numericValue, grade, competencyLevel, comment } = req.body;
-    const assessedById = req.user?.userId;
-
-    // Validate required fields
-    if (!studentId || !assessmentDefId || !assessedById) {
-      return ResponseUtil.validationError(
-        res,
-        'studentId, assessmentDefId, and assessedById are required'
-      );
-    }
-
-    // Validate that at least one scoring method is provided
-    if (!numericValue && !grade && !competencyLevel) {
-      return ResponseUtil.validationError(
-        res,
-        'At least one of numericValue, grade, or competencyLevel must be provided'
-      );
-    }
-
-    // Validate competency level if provided
-    if (competencyLevel && !Object.values(CompetencyLevel).includes(competencyLevel)) {
-      return ResponseUtil.validationError(
-        res,
-        `Invalid competency level. Must be one of: ${Object.values(CompetencyLevel).join(', ')}`
-      );
-    }
-
-    const result = await assessmentService.createAssessmentResult({
-      studentId,
-      assessmentDefId,
-      numericValue,
-      grade,
-      competencyLevel,
-      comment,
-      assessedById,
-    });
-
-    logger.info('Assessment result created', {
-      resultId: result.id,
-      studentId,
-      assessedById,
-    });
-
-    return ResponseUtil.created(res, 'Assessment result created successfully', result);
-  } catch (err: any) {
-    logger.error('Error creating assessment result', { error: err.message });
-    
-    // Handle unique constraint violation (student already has result for this assessment)
-    if (err.code === 'P2002') {
-      return ResponseUtil.conflict(res, 'Student already has a result for this assessment');
-    }
-    
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Create bulk assessment results
- */
-export const createBulkAssessmentResults = async (req: RequestWithUser, res: Response) => {
-  try {
-    const assessmentService = AssessmentService.withRequest(req);
-    const { results } = req.body;
-    const assessedById = req.user?.userId;
-
-    if (!results || !Array.isArray(results) || results.length === 0) {
-      return ResponseUtil.validationError(res, 'results array is required and must not be empty');
-    }
-
-    if (!assessedById) {
-      return ResponseUtil.unauthorized(res, 'User not authenticated');
-    }
-
-    // Add assessedById to all results
-    const resultsWithAssessor = results.map(result => ({
-      ...result,
-      assessedById,
-    }));
-
-    // Validate all results have required fields
-    const invalidResults = resultsWithAssessor.filter(
-      r => !r.studentId || !r.assessmentDefId || (!r.numericValue && !r.grade && !r.competencyLevel)
-    );
-
-    if (invalidResults.length > 0) {
-      return ResponseUtil.validationError(
-        res,
-        `${invalidResults.length} results are missing required fields`
-      );
-    }
-
-    const created = await assessmentService.createBulkAssessmentResults(resultsWithAssessor);
-
-    logger.info('Bulk assessment results created', {
-      count: created.count,
-      assessedById,
-    });
-
-    return ResponseUtil.created(
-      res,
-      `${created.count} assessment results created successfully`,
-      { count: created.count }
-    );
-  } catch (err: any) {
-    logger.error('Error creating bulk assessment results', { error: err.message });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get assessment result by ID
- */
-export const getAssessmentResultById = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { id } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const result = await assessmentService.getAssessmentResultById(id);
-
-    if (!result) {
-      return ResponseUtil.notFound(res, 'Assessment result');
-    }
-
-    return ResponseUtil.success(res, 'Assessment result fetched successfully', result);
-  } catch (err: any) {
-    logger.error('Error fetching assessment result', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Update assessment result
- */
-export const updateAssessmentResult = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { id } = req.params;
-    const { numericValue, grade, competencyLevel, comment } = req.body;
-    const assessmentService = AssessmentService.withRequest(req);
-
-    const updated = await assessmentService.updateAssessmentResult(id, {
-      numericValue,
-      grade,
-      competencyLevel,
-      comment,
-    });
-
-    logger.info('Assessment result updated', { resultId: id, updatedBy: req.user?.userId });
-
-    return ResponseUtil.success(res, 'Assessment result updated successfully', updated);
-  } catch (err: any) {
-    logger.error('Error updating assessment result', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Delete assessment result
- */
-export const deleteAssessmentResult = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { id } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    await assessmentService.deleteAssessmentResult(id);
-
-    logger.info('Assessment result deleted', { resultId: id, deletedBy: req.user?.userId });
-
-    return ResponseUtil.success(res, 'Assessment result deleted successfully');
-  } catch (err: any) {
-    logger.error('Error deleting assessment result', { 
-      error: err.message, 
-      id: req.params.id 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get student assessment results with filters
- */
-export const getStudentAssessmentResults = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { studentId } = req.params;
-    const { termId, classSubjectId, assessmentType, page, limit } = req.query;
-    const assessmentService = AssessmentService.withRequest(req);
-    const results = await assessmentService.getStudentAssessmentResults(studentId, {
-      termId: termId as string,
-      classSubjectId: classSubjectId as string,
-      assessmentType: assessmentType as AssessmentType,
-      page: page ? parseInt(page as string) : undefined,
-      limit: limit ? parseInt(limit as string) : undefined,
-    });
-
-    return ResponseUtil.paginated(
-      res,
-      'Student assessment results fetched successfully',
-      results.results,
-      results.pagination
-    );
-  } catch (err: any) {
-    logger.error('Error fetching student assessment results', { 
-      error: err.message, 
-      studentId: req.params.studentId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get all results for an assessment definition
- */
-export const getAssessmentDefinitionResults = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { assessmentDefId } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const results = await assessmentService.getAssessmentDefinitionResults(assessmentDefId);
-
-    return ResponseUtil.success(
-      res,
-      'Assessment results fetched successfully',
-      results,
-      results.length
-    );
-  } catch (err: any) {
-    logger.error('Error fetching assessment definition results', { 
-      error: err.message, 
-      assessmentDefId: req.params.assessmentDefId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-// ========== STATISTICS & REPORTS ==========
-
-/**
- * Calculate student term average
- */
-export const calculateStudentTermAverage = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { studentId, termId } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const average = await assessmentService.calculateStudentTermAverage(studentId, termId);
-
-    return ResponseUtil.success(res, 'Student term average calculated successfully', average);
-  } catch (err: any) {
-    logger.error('Error calculating student term average', { 
-      error: err.message, 
-      studentId: req.params.studentId,
-      termId: req.params.termId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get class subject statistics
- */
-export const getClassSubjectStatistics = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { classSubjectId } = req.params;
-    const { termId } = req.query;
-    const assessmentService = AssessmentService.withRequest(req);
-
-    const statistics = await assessmentService.getClassSubjectStatistics(
-      classSubjectId,
-      termId as string
-    );
-
-    return ResponseUtil.success(
-      res,
-      'Class subject statistics fetched successfully',
-      statistics
-    );
-  } catch (err: any) {
-    logger.error('Error fetching class subject statistics', { 
-      error: err.message, 
-      classSubjectId: req.params.classSubjectId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Generate student term report
- */
-export const generateStudentTermReport = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { studentId, termId } = req.params;
-    const assessmentService = AssessmentService.withRequest(req);
-    const report = await assessmentService.generateStudentTermReport(studentId, termId);
-
-    logger.info('Student term report generated', {
-      studentId,
-      termId,
-      generatedBy: req.user?.userId,
-    });
-
-    return ResponseUtil.success(res, 'Student term report generated successfully', report);
-  } catch (err: any) {
-    logger.error('Error generating student term report', { 
-      error: err.message, 
-      studentId: req.params.studentId,
-      termId: req.params.termId 
-    });
-    
-    if (err.message === 'Student not found') {
-      return ResponseUtil.notFound(res, 'Student');
-    }
-    
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Get assessment analytics for a class
- */
-export const getClassAssessmentAnalytics = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { classId } = req.params;
-    const { termId, academicYearId } = req.query;
-
-    // This would be a more complex analytics method
-    // For now, return a basic structure
-    const analytics = {
-      classId,
-      termId,
-      academicYearId,
-      message: 'Analytics endpoint - to be implemented with specific requirements',
-    };
-
-    return ResponseUtil.success(res, 'Class assessment analytics fetched successfully', analytics);
-  } catch (err: any) {
-    logger.error('Error fetching class assessment analytics', { 
-      error: err.message, 
-      classId: req.params.classId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
-
-/**
- * Export assessment results (CSV/Excel)
- */
-export const exportAssessmentResults = async (req: RequestWithUser, res: Response) => {
-  try {
-    const { assessmentDefId } = req.params;
-    const { format = 'csv' } = req.query;
-    const assessmentService = AssessmentService.withRequest(req);
-    const results = await assessmentService.getAssessmentDefinitionResults(assessmentDefId);
-
-    if (results.length === 0) {
-      return ResponseUtil.notFound(res, 'Assessment results');
-    }
-
-    // Format the data for export
-    const exportData = results.map(result => ({
-      'Student Name': `${result.student.firstName} ${result.student.lastName}`,
-      'Admission No': result.student.admissionNo,
-      'Numeric Value': result.numericValue ?? '',
-      'Grade': result.grade ?? '',
-      'Competency Level': result.competencyLevel ?? '',
-      'Comment': result.comment ?? '',
-      'Date': result.createdAt.toISOString(),
-    }));
-
-    logger.info('Assessment results exported', {
-      assessmentDefId,
-      format,
-      count: results.length,
-      exportedBy: req.user?.userId,
-    });
-
-    return ResponseUtil.success(
-      res,
-      'Assessment results prepared for export',
-      {
-        format,
-        count: exportData.length,
-        data: exportData,
+      res.status(201).json({
+        message: 'Assessment created successfully',
+        data: assessment,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'CREATE_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to create assessment',
+        });
       }
-    );
-  } catch (err: any) {
-    logger.error('Error exporting assessment results', { 
-      error: err.message, 
-      assessmentDefId: req.params.assessmentDefId 
-    });
-    return ResponseUtil.serverError(res, err.message);
-  }
-};
+    }
+  };
+
+  /**
+   * Bulk create assessments
+   * POST /api/assessments/bulk
+   */
+  bulkCreateAssessments = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { assessments } = bulkCreateAssessmentsSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+
+      const result = await this.assessmentService.bulkCreateAssessments(
+        assessments,
+        schoolId
+      );
+
+      res.status(201).json({
+        message: `Successfully created ${result.created} assessments`,
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'BULK_CREATE_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to create assessments',
+        });
+      }
+    }
+  };
+
+  /**
+   * Get all assessments with filtering
+   * GET /api/assessments
+   */
+  getAssessments = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const query = getAssessmentsQuerySchema.parse(req.query);
+      const schoolId = req.user!.schoolId!;
+
+      const result = await this.assessmentService.getAssessments(schoolId, query);
+
+      res.json({
+        data: result.assessments,
+        pagination: {
+          page: result.page,
+          limit: query.limit || 20,
+          total: result.total,
+          pages: result.pages,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: error.errors,
+        });
+      } else {
+        res.status(500).json({
+          error: 'FETCH_FAILED',
+          message: 'Failed to fetch assessments',
+        });
+      }
+    }
+  };
+
+  /**
+   * Get single assessment by ID
+   * GET /api/assessments/:id
+   */
+  getAssessmentById = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      const assessment = await this.assessmentService.getAssessmentById(id, schoolId);
+
+      if (!assessment) {
+        res.status(404).json({
+          error: 'NOT_FOUND',
+          message: 'Assessment not found',
+        });
+        return;
+      }
+
+      res.json({
+        data: assessment,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'FETCH_FAILED',
+        message: 'Failed to fetch assessment',
+      });
+    }
+  };
+
+  /**
+   * Update assessment definition
+   * PUT /api/assessments/:id
+   */
+  updateAssessment = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const data = updateAssessmentDefinitionSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+
+      const assessment = await this.assessmentService.updateAssessment(
+        id,
+        data,
+        schoolId
+      );
+
+      res.json({
+        message: 'Assessment updated successfully',
+        data: assessment,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'UPDATE_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to update assessment',
+        });
+      }
+    }
+  };
+
+  /**
+   * Delete assessment definition
+   * DELETE /api/assessments/:id
+   */
+  deleteAssessment = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      await this.assessmentService.deleteAssessment(id, schoolId);
+
+      res.json({
+        message: 'Assessment deleted successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'DELETE_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to delete assessment',
+      });
+    }
+  };
+
+  /**
+   * Get assessments for a specific class
+   * GET /api/assessments/class/:classId/term/:termId
+   */
+  getClassAssessments = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { classId, termId } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      const assessments = await this.assessmentService.getClassAssessments(
+        classId,
+        termId,
+        schoolId
+      );
+
+      res.json({
+        data: assessments,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'FETCH_FAILED',
+        message: 'Failed to fetch class assessments',
+      });
+    }
+  };
+
+  /**
+   * Get assessments for a specific subject
+   * GET /api/assessments/class-subject/:classSubjectId
+   */
+  getSubjectAssessments = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { classSubjectId } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      const assessments = await this.assessmentService.getSubjectAssessments(
+        classSubjectId,
+        schoolId
+      );
+
+      res.json({
+        data: assessments,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'FETCH_FAILED',
+        message: 'Failed to fetch subject assessments',
+      });
+    }
+  };
+
+  /**
+   * Get assessment statistics
+   * GET /api/assessments/stats
+   */
+  getAssessmentStats = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { academicYearId } = req.query;
+      const schoolId = req.user!.schoolId!;
+
+      const stats = await this.assessmentService.getAssessmentStats(
+        schoolId,
+        academicYearId as string | undefined
+      );
+
+      res.json({
+        data: stats,
+      });
+    } catch (error) {
+      res.status(500).json({
+        error: 'FETCH_FAILED',
+        message: 'Failed to fetch assessment statistics',
+      });
+    }
+  };
+
+  /**
+   * Create or update single grade entry
+   * POST /api/assessments/results
+   */
+  createResult = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = createAssessmentResultSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+      const assessedById = req.user!.userId;
+
+      const result = await this.gradeEntryService.createOrUpdateResult(
+        data,
+        assessedById,
+        schoolId
+      );
+
+      res.status(201).json({
+        message: 'Grade recorded successfully',
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'CREATE_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to record grade',
+        });
+      }
+    }
+  };
+
+  /**
+   * Bulk grade entry
+   * POST /api/assessments/results/bulk
+   */
+  bulkGradeEntry = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const data = gradeEntrySchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+      const assessedById = req.user!.userId;
+
+      const result = await this.gradeEntryService.bulkGradeEntry(
+        data,
+        assessedById,
+        schoolId
+      );
+
+      res.status(201).json({
+        message: `Successfully recorded ${result.successful} grades`,
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'BULK_ENTRY_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to record grades',
+        });
+      }
+    }
+  };
+
+  /**
+   * CSV bulk upload
+   * POST /api/assessments/results/upload/:assessmentId
+   */
+  csvBulkUpload = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { assessmentId } = req.params;
+      const csvData = req.body.data; // Array of CSV rows
+      const schoolId = req.user!.schoolId!;
+      const assessedById = req.user!.userId;
+
+      // Validate CSV data
+      const validatedData = z.array(csvGradeEntryRowSchema).parse(csvData);
+
+      const result = await this.gradeEntryService.csvBulkUpload(
+        validatedData,
+        assessmentId,
+        assessedById,
+        schoolId
+      );
+
+      res.status(201).json({
+        message: `Successfully uploaded ${result.successful} grades`,
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid CSV data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'UPLOAD_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to upload grades',
+        });
+      }
+    }
+  };
+
+  /**
+   * Get assessment results
+   * GET /api/assessments/results
+   */
+  getResults = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const query = getResultsQuerySchema.parse(req.query);
+      const schoolId = req.user!.schoolId!;
+
+      const result = await this.gradeEntryService.getResults(schoolId, query);
+
+      res.json({
+        data: result.results,
+        pagination: {
+          page: result.page,
+          limit: query.limit || 50,
+          total: result.total,
+          pages: result.pages,
+        },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid query parameters',
+          details: error.errors,
+        });
+      } else {
+        res.status(500).json({
+          error: 'FETCH_FAILED',
+          message: 'Failed to fetch results',
+        });
+      }
+    }
+  };
+
+  /**
+   * Update assessment result
+   * PUT /api/assessments/results/:id
+   */
+  updateResult = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const data = updateAssessmentResultSchema.parse(req.body);
+      const schoolId = req.user!.schoolId!;
+
+      const result = await this.gradeEntryService.updateResult(id, data, schoolId);
+
+      res.json({
+        message: 'Grade updated successfully',
+        data: result,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Invalid input data',
+          details: error.errors,
+        });
+      } else {
+        res.status(400).json({
+          error: 'UPDATE_FAILED',
+          message: error instanceof Error ? error.message : 'Failed to update grade',
+        });
+      }
+    }
+  };
+
+  /**
+   * Delete assessment result
+   * DELETE /api/assessments/results/:id
+   */
+  deleteResult = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      await this.gradeEntryService.deleteResult(id, schoolId);
+
+      res.json({
+        message: 'Grade deleted successfully',
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'DELETE_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to delete grade',
+      });
+    }
+  };
+
+  /**
+   * Generate student report card
+   * GET /api/reports/student/:studentId/term/:termId
+   */
+  generateStudentReport = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { studentId, termId } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      const report = await this.reportService.generateStudentReportCard(
+        studentId,
+        termId,
+        schoolId
+      );
+
+      res.json({
+        data: report,
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'REPORT_GENERATION_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to generate report',
+      });
+    }
+  };
+
+  /**
+   * Generate class performance report
+   * GET /api/reports/class/:classId/term/:termId
+   */
+  generateClassReport = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { classId, termId } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      const report = await this.reportService.generateClassPerformanceReport(
+        classId,
+        termId,
+        schoolId
+      );
+
+      res.json({
+        data: report,
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'REPORT_GENERATION_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to generate report',
+      });
+    }
+  };
+}

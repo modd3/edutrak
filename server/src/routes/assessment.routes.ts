@@ -1,54 +1,162 @@
+// src/routes/assessment.routes.ts
+
 import { Router } from 'express';
-import * as assessmentController from '../controllers/assessment.controller';
-import { authenticate, authorize } from '../middleware/auth.middleware';
-import { enforceSchoolContext } from '../middleware/school-context';
+import { AssessmentController } from '../controllers/assessment.controller';
+import { authenticate, authorize } from '@/middleware/auth.middleware';
+import { enforceSchoolContext } from '@/middleware/school-context';
 
 const router = Router();
+const controller = new AssessmentController();
 
-// Apply authentication and school context middleware to all assessment routes
 router.use(authenticate);
 router.use(enforceSchoolContext);
 
-// --- Assessment Definition Routes ---
+/**
+ * Assessment Definition Routes
+ */
+
+// Create new assessment
 router.post(
-    '/definitions', 
-    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
-    assessmentController.createAssessmentDefinition
+  '/',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.createAssessment
 );
+
+// Bulk create assessments
+router.post(
+  '/bulk',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.bulkCreateAssessments
+);
+
+// Get all assessments with filtering
 router.get(
-    '/definitions/class-subject/:classSubjectId',
-    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
-    assessmentController.getClassSubjectAssessmentDefinitions
+  '/',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.getAssessments
 );
-router.get('/definitions/:id', assessmentController.getAssessmentDefinitionById);
-// router.put('/definitions/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), assessmentController.updateAssessmentDefinition);
-// router.delete('/definitions/:id', authorize('ADMIN', 'SUPER_ADMIN'), assessmentController.deleteAssessmentDefinition);
 
+// Get assessment statistics
+router.get(
+  '/stats',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.getAssessmentStats
+);
 
-// --- Assessment Result Routes ---
+// Get assessments for a specific class
+router.get(
+  '/class/:classId/term/:termId',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.getClassAssessments
+);
+
+// Get assessments for a specific subject
+router.get(
+  '/class-subject/:classSubjectId',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.getSubjectAssessments
+);
+
+// Get single assessment by ID
+router.get(
+  '/:id',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.getAssessmentById
+);
+
+// Update assessment
+router.put(
+  '/:id',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.updateAssessment
+);
+
+// Delete assessment
+router.delete(
+  '/:id',
+  authenticate,
+  authorize('ADMIN'),
+  controller.deleteAssessment
+);
+
+/**
+ * Grade Entry Routes
+ */
+
+// Create or update single result
 router.post(
-    '/results', 
-    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
-    assessmentController.createAssessmentResult
+  '/results',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.createResult
 );
+
+// Bulk grade entry
 router.post(
-    '/results/bulk', 
-    authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), 
-    assessmentController.createBulkAssessmentResults
+  '/results/bulk',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.bulkGradeEntry
 );
-router.get('/results/:id', assessmentController.getAssessmentResultById);
-router.put('/results/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), assessmentController.updateAssessmentResult);
-router.delete('/results/:id', authorize('ADMIN', 'SUPER_ADMIN'), assessmentController.deleteAssessmentResult);
-router.get('/definitions/:assessmentDefId/results', assessmentController.getAssessmentDefinitionResults);
 
-// --- Student-Specific Assessment Routes ---
-router.get('/students/:studentId/results', assessmentController.getStudentAssessmentResults);
-router.get('/students/:studentId/reports/term/:termId', assessmentController.generateStudentTermReport);
-router.get('/students/:studentId/average/term/:termId', assessmentController.calculateStudentTermAverage);
+// CSV bulk upload
+router.post(
+  '/results/upload/:assessmentId',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.csvBulkUpload
+);
 
-// --- Statistics & Analytics ---
-router.get('/statistics/class-subject/:classSubjectId', assessmentController.getClassSubjectStatistics);
-router.get('/analytics/class/:classId', assessmentController.getClassAssessmentAnalytics);
-router.get('/export/definition/:assessmentDefId', assessmentController.exportAssessmentResults);
+// Get results with filtering
+router.get(
+  '/results',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.getResults
+);
+
+// Update result
+router.put(
+  '/results/:id',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.updateResult
+);
+
+// Delete result
+router.delete(
+  '/results/:id',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.deleteResult
+);
+
+/**
+ * Report Generation Routes
+ */
+
+// Generate student report card
+router.get(
+  '/reports/student/:studentId/term/:termId',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.generateStudentReport
+);
+
+// Generate class performance report
+router.get(
+  '/reports/class/:classId/term/:termId',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.generateClassReport
+);
 
 export default router;
