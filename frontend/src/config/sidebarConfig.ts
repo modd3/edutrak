@@ -1,99 +1,99 @@
 import {
-    LayoutDashboard,
-    Users,
-    GraduationCap,
-    BookOpen,
-    Calendar,
-    ClipboardCheck,
-    BarChart3,
-    Settings,
-    School,
-    UserCog,
-    FileText,
-    Bell,
-    Home,
-    Trophy,
-    type LucideIcon,
-    Lock,
-    CalendarFoldIcon,
-    BookMarked,
-    UserCheck,
-    TestTubes,
-  } from 'lucide-react';
-  import { UserRole } from '../store/auth-store';
-  
-  export interface NavItem {
-    title: string;
-    href: string;
-    icon: LucideIcon;
-    roles: UserRole[];
-    badge?: string;
-    children?: NavItem[];
-  }
-  
-  export const sidebarConfig: NavItem[] = [
-    {
-      title: 'Dashboard',
-      href: '/dashboard',
-      icon: LayoutDashboard,
-      roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
-    },
-    {
-        title: 'Schools',
+  LayoutDashboard,
+  Users,
+  GraduationCap,
+  BookOpen,
+  Calendar,
+  ClipboardCheck,
+  BarChart3,
+  Settings,
+  School,
+  UserCog,
+  FileText,
+  Bell,
+  Home,
+  Trophy,
+  type LucideIcon,
+  Lock,
+  CalendarFoldIcon,
+  BookMarked,
+  UserCheck,
+  TestTubes,
+} from 'lucide-react';
+import { UserRole } from '../store/auth-store';
+
+export interface NavItem {
+  title: string;
+  href: string;
+  icon: LucideIcon;
+  roles: UserRole[];
+  badge?: string;
+  children?: NavItem[];
+}
+
+export const sidebarConfig: NavItem[] = [
+  {
+    title: 'Dashboard',
+    href: '/dashboard',
+    icon: LayoutDashboard,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT'],
+  },
+  {
+    title: 'Schools',
+    href: '/schools',
+    icon: School,
+    roles: ['SUPER_ADMIN'],
+    children: [
+      {
+        title: 'All Schools',
         href: '/schools',
         icon: School,
         roles: ['SUPER_ADMIN'],
-        children: [
-          {
-            title: 'All Schools',
-            href: '/schools',
-            icon: School,
-            roles: ['SUPER_ADMIN'],
-          },
-          {
-            title: 'Enrollments',
-            href: '/students/enrollments',
-            icon: BookOpen,
-            roles: ['SUPER_ADMIN'],
-          },
-          {
-            title: 'Promotions',
-            href: '/students/promotions',
-            icon: Trophy,
-            roles: ['SUPER_ADMIN'],
-          },
-        ]
       },
       {
-        title: 'Students',
+        title: 'Enrollments',
+        href: '/students/enrollments',
+        icon: BookOpen,
+        roles: ['SUPER_ADMIN'],
+      },
+      {
+        title: 'Promotions',
+        href: '/students/promotions',
+        icon: Trophy,
+        roles: ['SUPER_ADMIN'],
+      },
+    ]
+  },
+  {
+    title: 'Students',
+    href: '/students',
+    icon: GraduationCap,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+    children: [
+      {
+        title: 'All Students',
         href: '/students',
-        icon: GraduationCap,
+        icon: Users,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
-        children: [
-          {
-            title: 'All Students',
-            href: '/students',
-            icon: Users,
-            roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
-          },
-          {
-            title: 'Enrollments',
-            href: '/students/enrollments',
-            icon: BookOpen,
-            roles: ['SUPER_ADMIN', 'ADMIN'],
-          },
-          {
-            title: 'Promotions',
-            href: '/students/promotions',
-            icon: Trophy,
-            roles: ['SUPER_ADMIN', 'ADMIN'],
-          },
-        ],
       },
       {
-        title: 'Teachers',
-        href: '/teachers',
-        icon: UserCog,
+        title: 'Enrollments',
+        href: '/students/enrollments',
+        icon: BookOpen,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Promotions',
+        href: '/students/promotions',
+        icon: Trophy,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+    ],
+  },
+  {
+    title: 'Teachers',
+    href: '/teachers',
+    icon: UserCog,
     roles: ['SUPER_ADMIN', 'ADMIN'],
     children: [
       {
@@ -155,14 +155,14 @@ import {
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
       {
-        title: 'Assessment Definitions',
-        href: '/assessments/definitions',
-        icon: TestTubes,
+        title: 'Assessment Reports',
+        href: '/reports',
+        icon: BarChart3,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
       {
         title: 'Grade Entry',
-        href: '/assessments/grade-entry',
+        href: '//assessments/:assessmentId/grades',
         icon: ClipboardCheck,
         roles: ['TEACHER'],
       },

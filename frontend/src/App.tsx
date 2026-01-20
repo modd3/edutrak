@@ -17,6 +17,9 @@ import UsersList from './pages/users/UsersList';
 import { AcademicYearsPage } from './pages/academic/AcademicYearsPage';
 import TeachersList from './pages/teachers/TeachersList';
 import { SubjectsList } from './pages/subjects/SubjectsList';
+import { AssessmentsPage } from './pages/assessments/AssessmentsPage';
+import { GradeEntryPage } from './pages/assessments/GradeEntryPage';
+import { ReportsPage } from './pages/assessments/ReportsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -41,7 +44,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-    const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated } = useAuthStore();
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -111,13 +114,13 @@ function App() {
             }
           />
 
-      
+
           <Route
             path="/students"
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-        <StudentsList/> 
+                  <StudentsList />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -130,7 +133,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardLayout>
-                  <TeachersList/>
+                  <TeachersList />
                 </DashboardLayout>
               </ProtectedRoute>
             }
@@ -169,7 +172,7 @@ function App() {
             }
           />
 
-<Route
+          <Route
             path="/academic-year"
             element={
               <ProtectedRoute>
@@ -181,28 +184,50 @@ function App() {
           />
 
           <Route
-          path="/assessments"
-          element={
-            <ProtectedRoute>
-              <DashboardLayout>
-                <div>Assessments Page</div>
-              </DashboardLayout>
-            </ProtectedRoute>
-          }
-        />
+            path="/assessments"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < AssessmentsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Default redirect */}
-        <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route
+            path="/assessments/:assessmentId/grades"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < GradeEntryPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-        {/* 404 */}
-        <Route path="*" element={<div>404 - Page Not Found</div>} />
-      </Routes>
+          <Route
+            path="/reports"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < ReportsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
 
-      {/* Toast notifications */}
-      <Toaster position="top-right" richColors />
-    </BrowserRouter>
-  </QueryClientProvider>
-);
+          {/* Default redirect */}
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+
+          {/* 404 */}
+          <Route path="*" element={<div>404 - Page Not Found</div>} />
+        </Routes>
+
+        {/* Toast notifications */}
+        <Toaster position="top-right" richColors />
+      </BrowserRouter>
+    </QueryClientProvider>
+  );
 }
 
 export default App;

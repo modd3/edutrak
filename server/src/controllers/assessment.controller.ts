@@ -54,7 +54,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -88,7 +88,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -124,7 +124,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid query parameters',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(500).json({
@@ -190,7 +190,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -324,7 +324,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -360,7 +360,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -401,7 +401,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid CSV data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({
@@ -437,7 +437,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid query parameters',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(500).json({
@@ -469,7 +469,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid input data',
-          details: error.errors,
+          details: error,
         });
       } else {
         res.status(400).json({

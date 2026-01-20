@@ -2,8 +2,8 @@
 
 import { Router } from 'express';
 import { AssessmentController } from '../controllers/assessment.controller';
-import { authenticate, authorize } from '@/middleware/auth.middleware';
-import { enforceSchoolContext } from '@/middleware/school-context';
+import { authenticate, authorize } from '../middleware/auth.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
 
 const router = Router();
 const controller = new AssessmentController();
