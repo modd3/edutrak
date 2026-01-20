@@ -280,7 +280,10 @@ export default function UsersList() {
             <Upload className="mr-2 h-4 w-4" />
             Bulk Upload
           </Button>
-          <Button onClick={() => setShowCreateModal(true)}>
+          <Button
+           onClick={() => {
+            setSelectedUser(null);
+            setShowCreateModal(true)}}>
             <PlusCircle className="mr-2 h-4 w-4" />
             Add User
           </Button>
@@ -333,13 +336,19 @@ export default function UsersList() {
       )}
 
       {/* Create User Modal */}
-      <UserFormModal open={showCreateModal} onOpenChange={setShowCreateModal} mode="create" />
+      <UserFormModal
+        open={showCreateModal && !selectedUser}
+        onOpenChange={setShowCreateModal}
+        mode="create"
+      />
 
       {/* Edit User Modal */}
       {selectedUser && (
         <UserFormModal
-          open={showCreateModal}
-          onOpenChange={setShowCreateModal}
+          open={showCreateModal && !!selectedUser}
+          onOpenChange={(open) => {setShowCreateModal(open);
+             if (!open) setSelectedUser(null);
+            }}
           mode="edit"
           user={selectedUser}
         />
