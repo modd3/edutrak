@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload } from 'lucide-react';
+import { ArrowLeft, Upload, Users } from 'lucide-react';
 import { useAssessment } from '@/hooks/use-assessments';
+import { useClassSubjectStudents } from '@/hooks/use-student-subjects';
 import { GradeEntryTable } from '@/components/grades/GradeEntryTable';
 import { CSVUpload } from '@/components/grades/CSVUpload';
 import { Button } from '@/components/ui/button';
@@ -16,13 +17,24 @@ import {
 } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export function GradeEntryPage() {
   const { assessmentId } = useParams<{ assessmentId: string }>();
   const navigate = useNavigate();
   const [showCSVUpload, setShowCSVUpload] = useState(false);
 
-  const { data, isLoading } = useAssessment(assessmentId);
+  // Fetch assessment details
+  const { data: assessmentData, isLoading: assessmentLoading } = useAssessment(assessmentId);
+  const assessment = assessmentData?.data;
+
+  // Fetch students who have selected this subject
+  const { data: studentsData, isLoading: studentsLoading } = useClassSubjectStudents(
+    assessment?.classSubjectId
+  );
+  const students = studentsData?.data || [];
+
+  const isLoading = assessmentLoading || studentsLoading;
 
   if (isLoading) {
     return (
@@ -33,7 +45,7 @@ export function GradeEntryPage() {
     );
   }
 
-  if (!data?.data) {
+  if (!assessment) {
     return (
       <Card>
         <CardContent className="py-12 text-center">
@@ -46,24 +58,7 @@ export function GradeEntryPage() {
     );
   }
 
-  const assessment = data.data;
-
-  // TODO: Fetch students from the class
-  const students = [
-    {
-      id: '1',
-      admissionNo: 'STU-2024-00001',
-      firstName: 'John',
-      lastName: 'Doe',
-    },
-    {
-      id: '2',
-      admissionNo: 'STU-2024-00002',
-      firstName: 'Jane',
-      lastName: 'Smith',
-    },
-    // ... more students
-  ];
+  const isCoreSubject = assessment.classSubject?.subjectCategory === 'CORE';
 
   return (
     <div className="space-y-6">
@@ -83,6 +78,7 @@ export function GradeEntryPage() {
             <p className="text-gray-500 mt-1">
               {assessment.classSubject?.subject?.name} -{' '}
               {assessment.classSubject?.class?.name}
+              {assessment.classSubject?.stream && ` (${assessment.classSubject.stream.name})`}
             </p>
           </div>
         </div>
@@ -98,11 +94,20 @@ export function GradeEntryPage() {
           <CardTitle className="text-base">Assessment Details</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <div>
               <p className="text-sm text-gray-500">Type</p>
               <Badge className="mt-1">
                 {assessment.type.replace('_', ' ')}
+              </Badge>
+            </div>
+            <div>
+              <p className="text-sm text-gray-500">Subject Category</p>
+              <Badge 
+                variant={isCoreSubject ? "default" : "secondary"}
+                className="mt-1"
+              >
+                {assessment.classSubject?.subjectCategory}
               </Badge>
             </div>
             <div>
@@ -125,12 +130,42 @@ export function GradeEntryPage() {
         </CardContent>
       </Card>
 
+      {/* Student Count Alert */}
+      {students.length === 0 ? (
+        <Alert>
+          <Users className="h-4 w-4" />
+          <AlertDescription>
+            {isCoreSubject 
+              ? "No students enrolled in this class yet."
+              : "No students have selected this subject. Students need to select elective subjects during enrollment."
+            }
+          </AlertDescription>
+        </Alert>
+      ) : (
+        <Alert>
+          <Users className="h-4 w-4" />
+          <AlertDescription>
+            {isCoreSubject
+              ? `${students.length} students enrolled (Core subject - all students)`
+              : `${students.length} students have selected this subject`
+            }
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Grade Entry Table */}
-      <GradeEntryTable
-        assessmentId={assessmentId!}
-        students={students}
-        maxMarks={assessment.maxMarks || 100}
-      />
+      {students.length > 0 && (
+        <GradeEntryTable
+          assessmentId={assessmentId!}
+          students={students.map((s: any) => ({
+            id: s.student.id,
+            admissionNo: s.student.admissionNo,
+            firstName: s.student.firstName,
+            lastName: s.student.lastName,
+          }))}
+          maxMarks={assessment.maxMarks || 100}
+        />
+      )}
 
       {/* CSV Upload Modal */}
       <CSVUpload

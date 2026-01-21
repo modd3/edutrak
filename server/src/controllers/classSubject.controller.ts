@@ -2,13 +2,14 @@
 import { Request, Response } from 'express';
 import { ClassSubjectService } from '../services/class-subject.service';
 import { ResponseUtil} from '../utils/response'; // Assuming you have these helpers
+import { RequestWithUser } from '@/middleware/school-context';
 
 const service = new ClassSubjectService();
 
 export class ClassSubjectController {
   
   // POST /api/class-subjects
-  async assignSubject(req: Request, res: Response) {
+  async assignSubject(req: RequestWithUser, res: Response) {
     try {
       const { 
         classId, 
@@ -42,7 +43,7 @@ export class ClassSubjectController {
   }
 
   // PATCH /api/class-subjects/:id/teacher
-  async assignTeacher(req: Request, res: Response) {
+  async assignTeacher(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
       const { teacherId } = req.body;
@@ -58,7 +59,7 @@ export class ClassSubjectController {
   }
 
   // GET /api/classes/:classId/subjects
-  async getByClass(req: Request, res: Response) {
+  async getByClass(req: RequestWithUser, res: Response) {
     try {
       const { classId } = req.params;
       const { academicYearId, termId } = req.query;
@@ -78,4 +79,167 @@ export class ClassSubjectController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
+  
+
+/**
+ * Get students who have selected a specific class subject
+ * Used for grade entry - only shows students who are taking this subject
+ */
+async getClassSubjectStudents  (req: RequestWithUser, res: Response) {
+  try {
+    const { classSubjectId } = req.params;
+    const schoolId = req.user!.schoolId!;
+
+    // Get the class subject details
+    const classSubject = await ClassSubjectService.getClassSubjectById(
+      classSubjectId,
+      schoolId
+    );
+
+    if (!classSubject) {
+      res.status(404).json({
+        error: 'NOT_FOUND',
+        message: 'Class subject not found',
+      });
+      return;
+    }
+
+    // Get all students enrolled in this class
+    const enrollments = await ClassSubjectService.getStudentEnrollmentsForClassSubject(
+      classSubject.classId,
+      classSubject.streamId,
+      schoolId,
+      classSubject.subjectCategory !== 'CORE' ? classSubject.subjectId : undefined
+    );
+
+    // If it's a CORE subject, get all students
+    // If it's ELECTIVE/OPTIONAL, only get students who selected it
+    let filteredEnrollments = enrollments;
+
+    if (classSubject.subjectCategory !== 'CORE') {
+      filteredEnrollments = enrollments.filter((enrollment) =>
+        enrollment.selectedSubjects.includes(classSubject.subjectId)
+      );
+    }
+
+    res.json({
+      data: filteredEnrollments,
+      meta: {
+        classSubject: {
+          id: classSubject.id,
+          subjectName: classSubject.subject.name,
+          subjectCategory: classSubject.subjectCategory,
+          className: classSubject.class.name,
+        },
+        totalStudents: filteredEnrollments.length,
+        isCoreSubject: classSubject.subjectCategory === 'CORE',
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching class subject students:', error);
+    res.status(500).json({
+      error: 'FETCH_FAILED',
+      message: 'Failed to fetch students',
+    });
+  }
+};
+
+/**
+ * Get class subjects taught by a specific teacher
+ */
+async getTeacherClassSubjects  (req: RequestWithUser, res: Response) {
+  try {
+    const { teacherId } = req.params;
+    const { termId } = req.query;
+    const schoolId = req.user!.schoolId!;
+
+    const classSubjects = await ClassSubjectService.getClassSubjectsByTeacher(
+      teacherId,
+      schoolId,
+      termId as string
+    );
+
+    res.json({
+      data: classSubjects,
+      total: classSubjects.length,
+    });
+  } catch (error) {
+    console.error('Error fetching teacher class subjects:', error);
+    res.status(500).json({
+      error: 'FETCH_FAILED',
+      message: 'Failed to fetch class subjects',
+    });
+  }
+};
+
+/**
+ * Auto-assign core subjects to all students in a class
+ */
+async assignCoreSubjects (req: RequestWithUser, res: Response)  {
+  try {
+    const { classId } = req.params;
+    const schoolId = req.user!.schoolId!;
+
+    // Get all CORE subjects for this class
+    const coreSubjects = await ClassSubjectService.getCoreSubjectsForClass(
+      classId,
+      schoolId
+    );
+
+    const coreSubjectIds = coreSubjects.map((cs) => cs.subjectId);
+
+    if (coreSubjectIds.length === 0) {
+      res.status(400).json({
+        error: 'NO_CORE_SUBJECTS',
+        message: 'No core subjects found for this class',
+      });
+      return;
+    }
+
+    // Get all students enrolled in this class
+    const enrollments = await ClassSubjectService.getActiveStudentEnrollments(
+      classId,
+      schoolId
+    );
+
+    if (enrollments.length === 0) {
+      res.status(400).json({
+        error: 'NO_STUDENTS',
+        message: 'No active students found in this class',
+      });
+      return;
+    }
+
+    // Prepare updates for each enrollment
+    const updates = enrollments.map((enrollment) => {
+      const existingSubjects = enrollment.selectedSubjects || [];
+      const newSubjects = Array.from(
+        new Set([...existingSubjects, ...coreSubjectIds])
+      );
+
+      return {
+        enrollmentId: enrollment.id,
+        selectedSubjects: newSubjects,
+      };
+    });
+
+    // Update each enrollment to include core subjects
+    await ClassSubjectService.batchUpdateStudentSelectedSubjects(updates);
+
+    res.json({
+      message: `Core subjects assigned to ${enrollments.length} students`,
+      data: {
+        studentsUpdated: enrollments.length,
+        coreSubjectsCount: coreSubjectIds.length,
+        coreSubjectIds,
+      },
+    });
+  } catch (error) {
+    console.error('Error assigning core subjects:', error);
+    res.status(500).json({
+      error: 'ASSIGN_FAILED',
+      message: 'Failed to assign core subjects',
+    });
+  }
+};
 }

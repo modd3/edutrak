@@ -79,3 +79,19 @@ export function useAssignSubjectTeacher() {
     },
   });
 }
+
+/**
+ * Get class subjects taught by a specific teacher
+ */
+export function useTeacherClassSubjects(teacherId: string | undefined, termId?: string) {
+  return useQuery({
+    queryKey: ['class-subjects', 'teacher', teacherId, termId],
+    queryFn: async () => {
+      const response = await api.get(`/academic/class-subject/teacher/${teacherId}`, {
+        params: termId ? { termId } : {}
+      });
+      return response.data;
+    },
+    enabled: !!teacherId,
+  });
+}

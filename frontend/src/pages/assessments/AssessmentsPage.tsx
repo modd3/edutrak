@@ -36,14 +36,11 @@ export function AssessmentsPage() {
   const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
   const activeYear = activeYearData;
 
-  console.log("active Year: ", activeYear);
-
+  
   // Fetch classes for the active academic year
   const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
   const classes = classesData?.data.data || [];
-  console.log("ClassesData: ", classesData)
-  console.log('Classes:', classes);
-
+ 
   // Fetch class subjects based on selected class and term
   const { data: classSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = useClassSubjects(
     selectedClass,
@@ -51,9 +48,7 @@ export function AssessmentsPage() {
     selectedTerm
   );
   const classSubjects = classSubjectsData?.data.data || [];
-  console.log('ClassSubjectsData: ', classSubjectsData)
-  console.log('Class Subjects:', classSubjects);
-  // Fetch assessment statistics
+   // Fetch assessment statistics
   const { data: stats, isLoading: isLoadingStats, error: statsError } = useAssessmentStats(activeYear?.id);
 
   // Get terms from active academic year
@@ -109,42 +104,15 @@ export function AssessmentsPage() {
 
   useEffect(() => {
     if (selectedClass && selectedTerm) {
-      console.log('Class Subjects Data:', {
-        classId: selectedClass,
-        termId: selectedTerm,
-        isLoading: isLoadingSubjects,
-        error: subjectsError,
-        count: classSubjects.length,
-        subjects: classSubjects.map((cs: { id: any; subject: { id: any; name: any; code: any; }; teacher: { user: { firstName: any; lastName: any; }; }; }) => ({
-          id: cs.id,
-          subjectId: cs.subject?.id,
-          subjectName: cs.subject?.name,
-          subjectCode: cs.subject?.code,
-          teacher: cs.teacher ?
-            `${cs.teacher.user?.firstName} ${cs.teacher.user?.lastName}` : 'Not assigned'
-        }))
-      });
-
       // Auto-select the first subject if available
       if (!selectedClassSubject && classSubjects.length > 0) {
-        console.log('Auto-selecting first subject:', classSubjects[0].subject?.name);
         setSelectedClassSubject(classSubjects[0].id);
       }
     }
   }, [selectedClass, selectedTerm, classSubjects, isLoadingSubjects, subjectsError, selectedClassSubject]);
 
-  useEffect(() => {
-    if (stats) {
-      console.log('Assessment Statistics:', {
-        isLoading: isLoadingStats,
-        error: statsError,
-        data: stats.data
-      });
-    }
-  }, [stats, isLoadingStats, statsError]);
 
   const handleGradeEntry = (assessmentId: string) => {
-    console.log('Grade entry clicked for assessment:', assessmentId);
     navigate(`/assessments/${assessmentId}/grades`);
   };
 

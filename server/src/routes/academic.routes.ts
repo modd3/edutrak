@@ -65,4 +65,33 @@ router.get(
   controller.getByClass
 );
 
+/**
+ * Get students who have selected a specific class subject
+ * Used for grade entry - only shows students who are taking this subject
+ */
+router.get(
+  '/class-subject/:classSubjectId/students',
+  authorize('ADMIN', 'TEACHER'),
+  controller.getClassSubjectStudents
+);
+
+/**
+ * Get class subjects taught by a specific teacher
+ */
+router.get(
+  '/class-subject/teacher/:teacherId',
+  authorize('ADMIN', 'TEACHER'),
+  controller.getTeacherClassSubjects
+);
+
+/**
+ * Auto-assign core subjects to all students in a class
+ */
+router.post(
+  '/class-subject/:classId/assign-core-subjects',
+  authorize('ADMIN'),
+  controller.assignCoreSubjects
+);
+
+
 export default router;

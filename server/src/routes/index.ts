@@ -9,6 +9,7 @@ import subjectRoutes from './subject.routes';
 import assessmentRoutes from './assessment.routes';
 import authRoutes from './auth.routes'
 import sequenceRoutes from './sequence.routes';
+import studentClassRoutes from './studentClass.routes';
 
 const router = Router();
 
@@ -17,6 +18,7 @@ router.use('/auth', authRoutes);
 router.use('/sequences', sequenceRoutes);
 router.use('/schools', schoolRoutes);
 router.use('/students', studentRoutes);
+router.use('/student-class', studentClassRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/guardians', guardianRoutes);
 router.use('/academic', academicRoutes);

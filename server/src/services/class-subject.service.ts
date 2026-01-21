@@ -137,4 +137,163 @@ export class ClassSubjectService {
       }
     });
   }
+
+
+   /* Get class subject details by ID
+   */
+  static async getClassSubjectById(classSubjectId: string, schoolId: string) {
+    return await prisma.classSubject.findFirst({
+      where: {
+        id: classSubjectId,
+        schoolId,
+      },
+      include: {
+        subject: true,
+        class: true,
+      },
+    });
+  }
+
+  /**
+   * Get student enrollments for a class subject
+   */
+  static async getStudentEnrollmentsForClassSubject(
+    classId: string,
+    streamId: string | null,
+    schoolId: string,
+    subjectId?: string
+  ) {
+    const whereClause: any = {
+      classId,
+      streamId: streamId || undefined,
+      status: 'ACTIVE',
+      schoolId,
+    };
+
+    // Add subject filter if provided (for elective/optional subjects)
+    if (subjectId) {
+      whereClause.selectedSubjects = { has: subjectId };
+    }
+
+    return await prisma.studentClass.findMany({
+      where: whereClause,
+      include: {
+        student: {
+          select: {
+            id: true,
+            admissionNo: true,
+            firstName: true,
+            middleName: true,
+            lastName: true,
+            gender: true,
+          },
+        },
+      },
+      orderBy: {
+        student: {
+          admissionNo: 'asc',
+        },
+      },
+    });
+  }
+
+  /**
+   * Get class subjects taught by a teacher
+   */
+  static async getClassSubjectsByTeacher(
+    teacherId: string,
+    schoolId: string,
+    termId?: string
+  ) {
+    const whereClause: any = {
+      teacherId,
+      schoolId,
+    };
+
+    if (termId) {
+      whereClause.termId = termId;
+    }
+
+    return await prisma.classSubject.findMany({
+      where: whereClause,
+      include: {
+        subject: true,
+        class: true,
+        stream: true,
+        term: true,
+        _count: {
+          select: {
+            assessments: true,
+          },
+        },
+      },
+      orderBy: [
+        { class: { name: 'asc' } },
+        { subject: { name: 'asc' } },
+      ],
+    });
+  }
+
+  /**
+   * Get core subjects for a class
+   */
+  static async getCoreSubjectsForClass(classId: string, schoolId: string) {
+    return await prisma.classSubject.findMany({
+      where: {
+        classId,
+        schoolId,
+        subjectCategory: 'CORE',
+      },
+      select: {
+        subjectId: true,
+      },
+    });
+  }
+
+  /**
+   * Get active student enrollments for a class
+   */
+  static async getActiveStudentEnrollments(classId: string, schoolId: string) {
+    return await prisma.studentClass.findMany({
+      where: {
+        classId,
+        status: 'ACTIVE',
+        schoolId,
+      },
+    });
+  }
+
+  /**
+   * Update student's selected subjects
+   */
+  static async updateStudentSelectedSubjects(
+    enrollmentId: string,
+    selectedSubjects: string[]
+  ) {
+    return await prisma.studentClass.update({
+      where: { id: enrollmentId },
+      data: {
+        selectedSubjects,
+      },
+    });
+  }
+
+  /**
+   * Batch update student selected subjects
+   */
+  static async batchUpdateStudentSelectedSubjects(
+    updates: Array<{ enrollmentId: string; selectedSubjects: string[] }>
+  ) {
+    return await prisma.$transaction(
+      updates.map(update =>
+        prisma.studentClass.update({
+          where: { id: update.enrollmentId },
+          data: {
+            selectedSubjects: update.selectedSubjects,
+          },
+        })
+      )
+    );
+  }
 }
+
