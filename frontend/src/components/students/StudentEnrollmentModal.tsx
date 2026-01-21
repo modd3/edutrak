@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Student } from '@/types';
 import { useActiveAcademicYear } from '@/hooks/use-academic';
 import { useClasses } from '@/hooks/use-classes';
-import { useClassStreams } from '@/hooks/use-classes';
+import { useClassStreams } from '@/hooks/use-academic';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUpdateEnrollment } from '@/hooks/use-students';
@@ -70,13 +70,15 @@ export function StudentEnrollmentModal({
   const watchedClassId = form.watch('classId');
 
   // Fetch streams when class is selected
-  const { data: streamsData, isLoading: isLoadingStreams } = useClassStreams(watchedClassId);
-  console.log("StreamsData: ", streamsData);
-  console.log("StreamsData hook: ", useClassStreams(watchedClassId));
-
+  const { data: streamsResponse, isLoading: isLoadingStreams, error: streamsError } = useClassStreams(watchedClassId);
+  
+  // Extract streams data properly from React Query response
+  const streamsData = streamsResponse?.data?.data || streamsResponse?.data || streamsResponse;
+  const streams = Array.isArray(streamsData) ? streamsData : [];
+  
+  // Extract classes data properly
   const classes = Array.isArray(classesData) ? classesData : classesData?.data?.data || [];
-  const streams = Array.isArray(streamsData) ? streamsData : streamsData?.data || [];
-
+  
   // Enroll mutation (create)
   const { mutate: createEnrollment, isPending: isCreating } = useMutation({
     mutationFn: async (data: EnrollmentFormData) => {
@@ -98,28 +100,6 @@ export function StudentEnrollmentModal({
     onError: (error: any) => {
       console.error('Enrollment error:', error);
       toast.error(error.response?.data?.message || 'Failed to enroll student');
-    },
-  });
-
-  // Update enrollment mutation (edit)
-  const updateEnrollmentMutation = useMutation({
-    mutationFn: async ({ enrollmentId, data }: { enrollmentId: string; data: Partial<EnrollmentFormData> }) => {
-      const response = await api.put(`/students/enrollments/${enrollmentId}`, {
-        classId: data.classId,
-        streamId: data.streamId === 'none' ? undefined : data.streamId,
-        // Note: academicYearId and studentId typically cannot be changed
-      });
-      return response.data?.data || response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Enrollment updated successfully');
-      onOpenChange(false);
-      form.reset();
-    },
-    onError: (error: any) => {
-      console.error('Update enrollment error:', error);
-      toast.error(error.response?.data?.message || 'Failed to update enrollment');
     },
   });
 
@@ -339,6 +319,11 @@ export function StudentEnrollmentModal({
                   </Select>
                 )}
               />
+              {streamsError && (
+                <p className="text-sm text-destructive">
+                  Failed to load streams: {streamsError.message}
+                </p>
+              )}
               <p className="text-xs text-muted-foreground">
                 Select a stream if the class is divided into streams
               </p>

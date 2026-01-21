@@ -273,6 +273,19 @@ export class UserCreationService extends BaseService {
     user: any,
     profileData: TeacherProfileData
   ) {
+
+    // 1. Handle Employee Number (Auto-generate if missing)
+  let employeeNumber = profileData.employeeNumber;
+
+  if (!employeeNumber && user.schoolId) {
+    employeeNumber = await sequenceGenerator.generateNext(
+      SequenceType.EMPLOYEE_NUMBER, // Use the TEACHER/EMPLOYEE sequence
+      user.schoolId
+    );
+    logger.info('Auto-generated employee number', { employeeNumber, schoolId: user.schoolId });
+  }
+
+
     // Validate TSC number uniqueness
     const existing = await tx.teacher.findUnique({
       where: { tscNumber: profileData.tscNumber },
@@ -287,7 +300,7 @@ export class UserCreationService extends BaseService {
         id: uuidv4(),
         userId: user.id,
         tscNumber: profileData.tscNumber,
-        employeeNumber: profileData.employeeNumber,
+        employeeNumber: employeeNumber!,
         employmentType: profileData.employmentType,
         qualification: profileData.qualification,
         specialization: profileData.specialization,
