@@ -40,7 +40,7 @@ export function AssessmentsPage() {
 
   // Fetch classes for the active academic year
   const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
-  const classes = classesData?.data || [];
+  const classes = classesData?.data.data || [];
   console.log("ClassesData: ", classesData)
   console.log('Classes:', classes);
 
@@ -50,7 +50,7 @@ export function AssessmentsPage() {
     activeYear?.id || '',
     selectedTerm
   );
-  const classSubjects = classSubjectsData?.data || [];
+  const classSubjects = classSubjectsData?.data.data || [];
   console.log('ClassSubjectsData: ', classSubjectsData)
   console.log('Class Subjects:', classSubjects);
   // Fetch assessment statistics
