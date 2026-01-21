@@ -35,6 +35,7 @@ model School {
   students              Student[]
   studentClasses        StudentClass[]
   subjectOfferings      SubjectOffering[]
+  studentClassSubjects StudentClassSubject[]
   terms                 Term[]
   users                 User[]
 
@@ -91,8 +92,9 @@ model Student {
   school            School?            @relation(fields: [schoolId], references: [id])
   user              User?              @relation(fields: [userId], references: [id])
   enrollments       StudentClass[]
+  subjectEnrollments    StudentClassSubject[]
   guardians         StudentGuardian[]
-
+  
   @@index([schoolId])
   @@index([schoolId, admissionNo])
   @@index([schoolId, gender])
@@ -294,6 +296,7 @@ model ClassSubject {
   teacherProfile  Teacher?                @relation("TeacherClassSubjects", fields: [teacherId], references: [id])
   term            Term                   @relation("TermClassSubjects", fields: [termId], references: [id])
   strands         ClassSubjectStrand[]
+  studentEnrollments StudentClassSubject[]
 
   @@unique([classId, streamId, subjectId, termId, academicYearId])
   @@index([teacherId])
@@ -310,7 +313,7 @@ model StudentClass {
   academicYearId   String
   schoolId         String?
   status           EnrollmentStatus @default(ACTIVE)
-  selectedSubjects String[]
+  subjectEnrollments StudentClassSubject[]
   promotedToId     String?
   promotionDate    DateTime?
   transferredFrom  String?
@@ -330,6 +333,32 @@ model StudentClass {
   @@index([schoolId, academicYearId])
   @@index([schoolId, classId])
 }
+
+model StudentClassSubject {
+  id             String       @id @default(uuid())
+  studentId      String
+  classSubjectId String
+  enrollmentId   String       // Link to StudentClass for context
+  schoolId       String?
+  enrolledAt     DateTime     @default(now())
+  status         EnrollmentStatus @default(ACTIVE)
+  droppedAt      DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  
+  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classSubject   ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  enrollment     StudentClass @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  school         School?      @relation(fields: [schoolId], references: [id])
+
+  @@unique([studentId, classSubjectId, enrollmentId])
+  @@index([studentId])
+  @@index([classSubjectId])
+  @@index([enrollmentId])
+  @@index([schoolId])
+  @@index([status])
+}
+
 
 model Strand {
   id                    String                 @id @default(uuid())
@@ -506,6 +535,13 @@ enum EnrollmentStatus {
   GRADUATED
   DROPPED_OUT
   SUSPENDED
+}
+
+enum SubjectEnrollmentStatus {
+  ACTIVE
+  DROPPED
+  COMPLETED
+  FAILED
 }
 
 enum AssessmentType {

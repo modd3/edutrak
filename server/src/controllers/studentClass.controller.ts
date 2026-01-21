@@ -64,13 +64,10 @@ export const assignStudentToClass = async (req: Request, res: Response) => {
   }
 };
 
-/**
- * Get all students in a class for a given year
- */
 export const getStudentsInClass = async (req: Request, res: Response) => {
   try {
     const { classId, academicYearId } = req.params;
-    const { status = 'ACTIVE' } = req.query;
+    const { status = 'ACTIVE',  } = req.query;
 
     // Validate parameters
     if (!classId || !academicYearId) {
@@ -99,6 +96,29 @@ export const getStudentsInClass = async (req: Request, res: Response) => {
         },
         stream: true,
         class: true,
+        classSubjects: {
+          include: {
+            subject: {
+              select: {
+                id: true,
+                name: true,
+                code: true,
+                category: true,
+              },
+            },
+            teacher: {
+              select: {
+                id: true,
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                  },
+                },
+              },
+            },
+          },
+        },
       },
       orderBy: {
         student: {
