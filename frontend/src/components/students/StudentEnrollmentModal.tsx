@@ -14,6 +14,7 @@ import { useClassStreams } from '@/hooks/use-academic';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useUpdateEnrollment } from '@/hooks/use-students';
+import { ElectiveSubjectSelectionDialog } from '@/components/subjects/ElectiveSubjectSelectionDialog';
 import api from '@/api';
 import { toast } from 'sonner';
 import { UserPlus, Info, Pencil } from 'lucide-react';
@@ -25,6 +26,7 @@ const enrollmentSchema = z.object({
   classId: z.string().min(1, 'Class is required'),
   streamId: z.string().optional(),
   academicYearId: z.string().min(1, 'Academic year is required'),
+  // Note: selectedSubjects removed - handled via StudentClassSubjectService
 });
 
 type EnrollmentFormData = z.infer<typeof enrollmentSchema>;
@@ -46,6 +48,10 @@ export function StudentEnrollmentModal({
 }: StudentEnrollmentModalProps) {
   const { schoolId } = useSchoolContext();
   const queryClient = useQueryClient();
+  
+  // State for subject selection dialog
+  const [showSubjectSelection, setShowSubjectSelection] = useState(false);
+  const [newEnrollmentData, setNewEnrollmentData] = useState<any>(null);
   
   const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
   const activeAcademicYear = activeYearData?.data || activeYearData;
@@ -91,11 +97,12 @@ export function StudentEnrollmentModal({
       });
       return response.data?.data || response.data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Store enrollment data and show subject selection dialog
+      setNewEnrollmentData(data);
+      setShowSubjectSelection(true);
+      toast.success('Student enrolled in class. Now select elective subjects.');
       queryClient.invalidateQueries({ queryKey: ['students'] });
-      toast.success('Student enrolled successfully');
-      onOpenChange(false);
-      form.reset();
     },
     onError: (error: any) => {
       console.error('Enrollment error:', error);
@@ -359,6 +366,24 @@ export function StudentEnrollmentModal({
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Subject Selection Dialog - shown after enrollment success */}
+      {newEnrollmentData && (
+        <ElectiveSubjectSelectionDialog
+          open={showSubjectSelection}
+          onOpenChange={setShowSubjectSelection}
+          classId={newEnrollmentData.classId}
+          studentId={newEnrollmentData.studentId}
+          enrollmentId={newEnrollmentData.id}
+          schoolId={schoolId}
+          onSuccess={() => {
+            // Close enrollment modal after subject selection is complete
+            setNewEnrollmentData(null);
+            onOpenChange(false);
+            form.reset();
+          }}
+        />
+      )}
     </Dialog>
   );
 }

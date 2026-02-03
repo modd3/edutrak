@@ -1,9 +1,10 @@
 // src/components/grades/GradeEntryTable.tsx
 
 import { useState, useEffect } from 'react';
-import { Save, Upload, Download } from 'lucide-react';
+import { Save, Upload, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { useAssessmentResults } from '@/hooks/use-grades';
 import { useBulkGradeEntry } from '@/hooks/use-grades';
+import { useStudentsEnrolledInSubject } from '@/hooks/use-student-subject-enrollment';
 import {
   Card,
   CardContent,
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 interface Student {
   id: string;
@@ -33,7 +35,7 @@ interface Student {
 
 interface GradeEntryTableProps {
   assessmentId: string;
-  students: Student[];
+  classSubjectId: string;  // ✅ Changed: now takes classSubjectId instead of students array
   maxMarks?: number;
   onClose?: () => void;
 }
@@ -46,14 +48,18 @@ interface GradeEntry {
 
 export function GradeEntryTable({
   assessmentId,
-  students,
+  classSubjectId,
   maxMarks = 100,
   onClose,
 }: GradeEntryTableProps) {
   const [grades, setGrades] = useState<Record<string, GradeEntry>>({});
   const [hasChanges, setHasChanges] = useState(false);
 
-  const { data: existingResults, isLoading } = useAssessmentResults(assessmentId);
+  // ✅ NEW: Fetch students enrolled in this specific subject
+  const { data: subjectRosterData, isLoading: isLoadingRoster, error: rosterError } = useStudentsEnrolledInSubject(classSubjectId);
+  const students = subjectRosterData?.data || subjectRosterData || [];
+
+  const { data: existingResults, isLoading: isLoadingResults } = useAssessmentResults(assessmentId);
   const bulkEntryMutation = useBulkGradeEntry();
 
   // Initialize grades from existing results
@@ -182,13 +188,13 @@ export function GradeEntryTable({
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={downloadTemplate}>
+            <Button variant="outline" size="sm" onClick={downloadTemplate} disabled={isLoadingRoster || students.length === 0}>
               <Download className="mr-2 h-4 w-4" />
               Template
             </Button>
             <Button
               onClick={handleSave}
-              disabled={!hasChanges || bulkEntryMutation.isPending}
+              disabled={!hasChanges || bulkEntryMutation.isPending || isLoadingRoster}
             >
               <Save className="mr-2 h-4 w-4" />
               {bulkEntryMutation.isPending ? 'Saving...' : 'Save Grades'}
@@ -197,21 +203,51 @@ export function GradeEntryTable({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="border rounded-lg overflow-hidden">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[100px]">Adm No</TableHead>
-                <TableHead>Student Name</TableHead>
-                <TableHead className="w-[120px]">Marks</TableHead>
-                <TableHead className="w-[80px]">Grade</TableHead>
-                <TableHead>Comment</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {students.map((student) => {
-                const grade = grades[student.id];
-                const marks = grade?.marks ? parseFloat(grade.marks) : null;
+        {/* Error state */}
+        {rosterError && (
+          <Alert variant="destructive" className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Failed to load student roster: {rosterError.message || 'Unknown error'}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Loading state */}
+        {isLoadingRoster && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-blue-600 mr-2" />
+            <span>Loading enrolled students...</span>
+          </div>
+        )}
+
+        {/* Empty state */}
+        {!isLoadingRoster && students.length === 0 && (
+          <Alert>
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No students are enrolled in this subject yet.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Grade entry table */}
+        {!isLoadingRoster && students.length > 0 && (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[100px]">Adm No</TableHead>
+                  <TableHead>Student Name</TableHead>
+                  <TableHead className="w-[120px]">Marks</TableHead>
+                  <TableHead className="w-[80px]">Grade</TableHead>
+                  <TableHead>Comment</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {students.map((student) => {
+                  const grade = grades[student.id];
+                  const marks = grade?.marks ? parseFloat(grade.marks) : null;
 
                 return (
                   <TableRow key={student.id}>
@@ -260,9 +296,10 @@ export function GradeEntryTable({
               })}
             </TableBody>
           </Table>
-        </div>
+          </div>
+        )}
 
-        {hasChanges && (
+        {hasChanges && !isLoadingRoster && students.length > 0 && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-sm text-yellow-800">
               You have unsaved changes. Click "Save Grades" to save your entries.
