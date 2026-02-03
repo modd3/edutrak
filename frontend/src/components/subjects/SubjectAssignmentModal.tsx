@@ -27,9 +27,9 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useSubjects, useAssignSubject } from '@/hooks/use-class-subjects';
+import { useSubjects, useAssignSubject, useClassSubjects } from '@/hooks/use-class-subjects';
 import { useTeachers } from '@/hooks/use-teachers';
-import { Loader2, Info, CheckCircle } from 'lucide-react';
+import { Loader2, Info, CheckCircle, AlertCircle } from 'lucide-react';
 import { Term, Stream } from '@/types';
 import { toast } from 'sonner';
 
@@ -61,6 +61,9 @@ export function SubjectAssignmentModal({
   const { data: subjectsData, isLoading: loadingSubjects } = useSubjects();
   const { data: teachersData, isLoading: loadingTeachers } = useTeachers();
   const { mutate: assignSubject, isPending } = useAssignSubject();
+  
+  // Track selected term ID for the hook
+  const [selectedTermIdForHook, setSelectedTermIdForHook] = useState<string>('');
 
   // Find active term based on current date
   const activeTerm = useMemo(() => {
@@ -84,25 +87,93 @@ export function SubjectAssignmentModal({
     },
   });
 
+  // Get selected term and stream from form
+  const selectedTermId = form.watch('termId');
+  const selectedStreamId = form.watch('streamId');
+  const selectedSubjectId = form.watch('subjectId');
+
+  // Get already assigned subjects for this class, academic year, and selected term
+  const { data: assignedSubjectsData, isLoading: loadingAssignedSubjects } = useClassSubjects(
+    classId,
+    academicYearId,
+    selectedTermIdForHook || selectedTermId // Use the tracked term ID or the current form value
+  );
+
   const subjects = subjectsData?.data?.data || [];
   const teachers = teachersData?.data || [];
-
+  const assignedSubjects = assignedSubjectsData?.data.data || [];
   
-  // Watch subjectId to auto-set category
-  const selectedSubjectId = form.watch('subjectId');
-  const selectedTermId = form.watch('termId');
+  // Update the term ID for the hook when form value changes
+  useEffect(() => {
+    if (selectedTermId) {
+      setSelectedTermIdForHook(selectedTermId);
+    }
+  }, [selectedTermId]);
 
+  // Get already assigned subject IDs for the selected term and stream
+  const assignedSubjectIds = useMemo(() => {
+    if (!assignedSubjects || assignedSubjects.length === 0) return new Set<string>();
+    
+    return new Set(
+      assignedSubjects
+        .filter(subject => {
+          // Filter by selected term (already filtered by hook)
+          // Filter by stream
+          if (selectedStreamId === 'all') {
+            // For "entire class", check if subject is assigned to entire class (streamId = null)
+            return subject.streamId === null;
+          } else {
+            // For specific stream, check if subject is assigned to this stream
+            return subject.streamId === selectedStreamId;
+          }
+        })
+        .map(subject => subject.subjectId)
+    );
+  }, [assignedSubjects, selectedStreamId]);
+
+  // Filter available subjects to exclude already assigned ones
+  const availableSubjects = useMemo(() => {
+    if (!subjects || subjects.length === 0) return [];
+    
+    return subjects.filter(subject => !assignedSubjectIds.has(subject.id));
+  }, [subjects, assignedSubjectIds]);
+
+  // Check if selected subject is already assigned
+  const isSubjectAlreadyAssigned = useMemo(() => {
+    if (!selectedSubjectId) return false;
+    return assignedSubjectIds.has(selectedSubjectId);
+  }, [selectedSubjectId, assignedSubjectIds]);
 
   // Set initial term to active term or first term
   useEffect(() => {
     if (open && terms.length > 0) {
       const initialTermId = activeTerm?.id || terms[0].id;
       form.setValue('termId', initialTermId);
-      
+      setSelectedTermIdForHook(initialTermId);
     }
   }, [open, terms, activeTerm, form]);
 
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (open) {
+      const initialTermId = activeTerm?.id || (terms.length > 0 ? terms[0].id : '');
+      form.reset({
+        subjectId: '',
+        subjectCategory: 'CORE',
+        termId: initialTermId,
+        streamId: 'all',
+        teacherId: 'none',
+      });
+      setSelectedTermIdForHook(initialTermId);
+    }
+  }, [open, activeTerm, terms, form]);
+
   const onSubmit = (values: z.infer<typeof formSchema>) => {
+    // Double-check client-side validation
+    if (isSubjectAlreadyAssigned) {
+      toast.error('This subject is already assigned to the selected class/stream for this term.');
+      return;
+    }
            
     assignSubject({
       classId,
@@ -114,14 +185,16 @@ export function SubjectAssignmentModal({
       subjectCategory: values.subjectCategory,
     }, {
       onSuccess: () => {
-       // toast.success(`Subject assignment successful!`);
+        toast.success('Subject assigned successfully!');
+        const initialTermId = activeTerm?.id || (terms.length > 0 ? terms[0].id : '');
         form.reset({
           subjectId: '',
           subjectCategory: 'CORE',
-          termId: activeTerm?.id || (terms.length > 0 ? terms[0].id : ''),
+          termId: initialTermId,
           streamId: 'all',
           teacherId: 'none',
         });
+        setSelectedTermIdForHook(initialTermId);
         onOpenChange(false);
       },
       onError: (error) => {
@@ -134,6 +207,8 @@ export function SubjectAssignmentModal({
     const termNumber = term.termNumber || term.name?.split('_')[1] || 'N/A';
     return `Term ${termNumber}`;
   };
+
+  const isLoading = loadingSubjects || loadingAssignedSubjects || loadingTeachers;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -162,7 +237,17 @@ export function SubjectAssignmentModal({
                         </Badge>
                       )}
                     </FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Update the term ID for the hook
+                        setSelectedTermIdForHook(value);
+                        // Clear subject selection when term changes
+                        form.setValue('subjectId', '');
+                      }} 
+                      value={field.value}
+                      disabled={isLoading}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select term" />
@@ -203,7 +288,15 @@ export function SubjectAssignmentModal({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Assign To</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Clear subject selection when stream changes
+                        form.setValue('subjectId', '');
+                      }} 
+                      defaultValue={field.value}
+                      disabled={isLoading}
+                    >
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select target" />
@@ -230,27 +323,67 @@ export function SubjectAssignmentModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Subject</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={isLoading || availableSubjects.length === 0}
+                  >
                     <FormControl>
-                      <SelectTrigger disabled={loadingSubjects}>
-                        <SelectValue placeholder="Select a subject" />
+                      <SelectTrigger>
+                        <SelectValue 
+                          placeholder={
+                            isLoading 
+                              ? "Loading subjects..." 
+                              : availableSubjects.length === 0
+                                ? "No subjects available"
+                                : "Select a subject"
+                          } 
+                        />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      {subjects.map((subject: any) => (
-                        <SelectItem key={subject.id} value={subject.id}>
-                          {subject.name} ({subject.code})
-                        </SelectItem>
-                      ))}
+                      {availableSubjects.length === 0 ? (
+                        <div className="p-4 text-center text-sm text-muted-foreground">
+                          <AlertCircle className="h-4 w-4 mx-auto mb-2" />
+                          <p>All subjects have already been assigned for this term and stream.</p>
+                          <p className="text-xs mt-1">Try selecting a different term or stream.</p>
+                        </div>
+                      ) : (
+                        availableSubjects.map((subject: any) => (
+                          <SelectItem key={subject.id} value={subject.id}>
+                            <div className="flex items-center justify-between">
+                              <span>{subject.name} ({subject.code})</span>
+                              <Badge variant="outline" className="ml-2 text-xs">
+                                {subject.category || 'No Category'}
+                              </Badge>
+                            </div>
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
-                  {/* Visual indicator of the auto-selected category */}
-                  {selectedSubjectId && (
-                    <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground bg-muted p-2 rounded">
-                      <Info className="h-3 w-3" />
-                      <span>Category: <strong>{form.getValues('subjectCategory')}</strong> (Inherited from Subject)</span>
+                  
+                  {/* Show assigned subjects info */}
+                  {assignedSubjectIds.size > 0 && (
+                    <div className="flex items-start gap-2 mt-1 text-xs text-muted-foreground bg-muted p-2 rounded">
+                      <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <span>
+                          <strong>{assignedSubjectIds.size}</strong> subject{assignedSubjectIds.size !== 1 ? 's' : ''} already assigned.
+                          {availableSubjects.length > 0 && ` ${availableSubjects.length} available.`}
+                        </span>
+                      </div>
                     </div>
                   )}
+                  
+                  {/* Warning if subject is already assigned */}
+                  {isSubjectAlreadyAssigned && (
+                    <div className="flex items-center gap-2 mt-1 text-xs text-destructive bg-destructive/10 p-2 rounded">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>This subject is already assigned to the selected class/stream for this term.</span>
+                    </div>
+                  )}
+                  
                   <FormMessage />
                 </FormItem>
               )}
@@ -262,9 +395,13 @@ export function SubjectAssignmentModal({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Subject Teacher (Optional)</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
+                  <Select 
+                    onValueChange={field.onChange} 
+                    value={field.value}
+                    disabled={isLoading}
+                  >
                     <FormControl>
-                      <SelectTrigger disabled={loadingTeachers}>
+                      <SelectTrigger>
                         <SelectValue placeholder="Select a teacher" />
                       </SelectTrigger>
                     </FormControl>
@@ -283,13 +420,13 @@ export function SubjectAssignmentModal({
             />
 
             <DialogFooter className="pt-4">
-              <Button type="button" variant="outline" onClick={() => {
-                console.log('Subject assignment cancelled');
-                onOpenChange(false);
-              }}>
+              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button 
+                type="submit" 
+                disabled={isPending || isLoading || isSubjectAlreadyAssigned || !selectedSubjectId}
+              >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Assign Subject
               </Button>

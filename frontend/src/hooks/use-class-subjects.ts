@@ -60,6 +60,7 @@ export function useAssignSubject() {
     },
     onError: (error: any) => {
       toast.error(error.response?.data?.message || 'Failed to assign subject');
+      console.log('Error assigning subject:', error);
     },
   });
 }

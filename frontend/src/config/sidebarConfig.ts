@@ -128,6 +128,19 @@ export const sidebarConfig: NavItem[] = [
         icon: BookMarked,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
+
+      {
+        title: 'Subjects Selection',
+        href: '/students/subjects',
+        icon: BookMarked,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
+        title: 'Student Subjects Select',
+        href: '/students/student-subjects',
+        icon: BookMarked,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
       {
         title: 'Class Subjects',
         href: '/classes/subjects',

@@ -27,18 +27,29 @@ export class ClassSubjectService {
   }): Promise<ClassSubject> {
     
     // Validate subject offering exists for this school
-    const offering = await this.prisma.subjectOffering.findFirst({
+   let offering = await this.prisma.subjectOffering.findFirst({
       where: {
         schoolId: data.schoolId,
         subjectId: data.subjectId,
-        isActive: true,
       },
     });
 
+    // If not offered, auto-create the offering instead of throwing an error
     if (!offering) {
-      throw new Error('Subject is not offered at this school or is inactive');
+      offering = await this.prisma.subjectOffering.create({
+        data: {
+          schoolId: data.schoolId,
+          subjectId: data.subjectId,
+          isActive: true,
+        },
+      });
+    } else if (!offering.isActive) {
+      // If it exists but was disabled, re-enable it
+      await this.prisma.subjectOffering.update({
+        where: { id: offering.id },
+        data: { isActive: true },
+      });
     }
-
     // Validate class exists and belongs to school
     const classRecord = await this.prisma.class.findFirst({
       where: {
@@ -52,15 +63,13 @@ export class ClassSubjectService {
     }
 
     // Check for existing assignment to prevent duplicates
-    const existing = await this.prisma.classSubject.findUnique({
+    const existing = await this.prisma.classSubject.findFirst({
       where: {
-        classId_streamId_subjectId_termId_academicYearId: {
-          classId: data.classId,
-          subjectId: data.subjectId,
-          termId: data.termId,
-          academicYearId: data.academicYearId,
-          streamId: data.streamId || "", // Handle unique constraint quirk if streamId is usually null
-        } as any
+        classId: data.classId,
+        subjectId: data.subjectId,
+        termId: data.termId,
+        academicYearId: data.academicYearId,
+        streamId: data.streamId || null,
       }
     });
 
@@ -375,4 +384,3 @@ export class ClassSubjectService {
     return [];
   }
 }
-

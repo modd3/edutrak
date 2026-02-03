@@ -20,6 +20,8 @@ import { SubjectsList } from './pages/subjects/SubjectsList';
 import { AssessmentsPage } from './pages/assessments/AssessmentsPage';
 import { GradeEntryPage } from './pages/assessments/GradeEntryPage';
 import { ReportsPage } from './pages/assessments/ReportsPage';
+import { StudentSubjectManagementPage } from './pages/subjects/StudentSubjectManagementPage';
+import { StudentSubjectEnrollmentPage } from './pages/students/SubjectEnrollment';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -167,6 +169,28 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   < SubjectsList />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+<Route
+            path="/students/subjects"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  < StudentSubjectManagementPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/students/:studentId/subjects"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <StudentSubjectEnrollmentPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

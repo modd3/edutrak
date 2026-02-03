@@ -84,3 +84,40 @@ export function useDeleteEnrollment() {
     },
   });
 }
+
+
+/**
+ * Get students enrolled in a class for a specific academic year and term
+ */
+export function useClassStudents(classId: string, academicYearId: string, termId?: string) {
+  return useQuery({
+    queryKey: ['class-students', classId, academicYearId, termId],
+    queryFn: async () => {
+      const response = await api.get<PaginatedResponse<StudentClass>>(`/classes/${classId}/enrollments`, {
+        params: {
+          academicYearId,
+          ...(termId && { termId }),
+          include: 'student,subjectEnrollments.classSubject.subject'
+        }
+      });
+      return response.data;
+    },
+    enabled: !!classId && !!academicYearId,
+  });
+}
+
+/**
+ * Get students by stream
+ */
+export function useStreamStudents(streamId: string, academicYearId: string) {
+  return useQuery({
+    queryKey: ['stream-students', streamId, academicYearId],
+    queryFn: async () => {
+      const response = await api.get<PaginatedResponse<StudentClass>>(`/streams/${streamId}/students`, {
+        params: { academicYearId }
+      });
+      return response.data;
+    },
+    enabled: !!streamId && !!academicYearId,
+  });
+}
