@@ -135,6 +135,7 @@ export const studentClassSubjectApi = {
    */
   getStudentsEnrolledInSubject: async (
     classSubjectId: string,
+    schoolId: string,
     params?: {
       status?: EnrollmentStatus;
       page?: number;
@@ -143,7 +144,7 @@ export const studentClassSubjectApi = {
   ): Promise<StudentSubjectRoster> => {
     const response = await api.get(
       '/academic/student-class-subject/subject-roster',
-      { params: { classSubjectId, ...params } }
+      { params: { classSubjectId, schoolId, ...params } }
     );
     return response.data.data;
   },

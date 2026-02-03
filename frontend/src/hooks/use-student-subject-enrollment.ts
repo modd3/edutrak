@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentClassSubjectApi } from '@/api/student-class-subject-api';
+import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
 import { EnrollmentStatus } from '@/types';
 
@@ -120,14 +121,17 @@ export function useStudentsEnrolledInSubject(
     status?: EnrollmentStatus;
   }
 ) {
+  const { user } = useAuthStore();
+
   return useQuery({
-    queryKey: ['subject-roster', classSubjectId, params],
+    queryKey: ['subject-roster', classSubjectId, user?.schoolId, params],
     queryFn: () =>
       studentClassSubjectApi.getStudentsEnrolledInSubject(
         classSubjectId!,
+        user?.schoolId!,
         params
       ),
-    enabled: !!classSubjectId,
+    enabled: !!classSubjectId && !!user?.schoolId,
   });
 }
 

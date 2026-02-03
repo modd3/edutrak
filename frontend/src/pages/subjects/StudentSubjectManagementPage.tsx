@@ -47,7 +47,6 @@ export function StudentSubjectManagementPage() {
     academicYearId: activeYear?.id,
     schoolId: schoolId
   });
-  console.log('classesData', classesData);
   const classes = classesData?.data?.data || [];
 
   // Get terms

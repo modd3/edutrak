@@ -93,9 +93,8 @@ export function useClassStudents(classId: string, academicYearId: string, termId
   return useQuery({
     queryKey: ['class-students', classId, academicYearId, termId],
     queryFn: async () => {
-      const response = await api.get<PaginatedResponse<StudentClass>>(`/classes/${classId}/enrollments`, {
+      const response = await api.get<PaginatedResponse<StudentClass>>(`/student-classes/class/${classId}/year/${academicYearId}`, {
         params: {
-          academicYearId,
           ...(termId && { termId }),
           include: 'student,subjectEnrollments.classSubject.subject'
         }

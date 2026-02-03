@@ -64,7 +64,7 @@ export function AdminSubjectAssignmentDialog({
   const { mutate: bulkEnroll } = useBulkEnrollStudentsInSubject();
 
   const classSubjects = classSubjectsData?.data?.data || [];
-  const students = studentsData?.data?.data || [];
+  const students = studentsData?.data || [];
 
   // Filter subjects by category
   const electiveSubjects = classSubjects.filter(

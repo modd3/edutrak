@@ -18,7 +18,7 @@ router.use('/auth', authRoutes);
 router.use('/sequences', sequenceRoutes);
 router.use('/schools', schoolRoutes);
 router.use('/students', studentRoutes);
-router.use('/student-class', studentClassRoutes);
+router.use('/student-classes', studentClassRoutes);
 router.use('/teachers', teacherRoutes);
 router.use('/guardians', guardianRoutes);
 router.use('/academic', academicRoutes);

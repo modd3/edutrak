@@ -9,64 +9,70 @@ const studentController = new StudentController();
 router.use(authenticate);
 router.use(enforceSchoolContext);
 
-// Student management (Admin only)
-router.get(
-    '/',
-    authorize('SUPER_ADMIN', 'ADMIN', 'TEACHER'),
-    studentController.getStudents.bind(studentController)
-  );
-  
-  // Get student by ID
-  router.get(
-    '/:id',
-    authorize('SUPER_ADMIN', 'ADMIN', 'TEACHER'),
-    studentController.getStudentById.bind(studentController)
-  );
-  
+// Specific routes FIRST (before :id parameter routes)
 router.post('/enroll', 
   authorize('ADMIN', 'SUPER_ADMIN'), 
   studentController.enrollStudent.bind(studentController)
 );
+
+router.post('/promote', 
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  studentController.promoteStudent.bind(studentController)
+);
+
+router.post('/transfer', 
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  studentController.transferStudent.bind(studentController)
+);
+
+router.get('/class/:classId', studentController.getStudentsByClass);
+router.get('/admission/:admissionNo', studentController.getStudentByAdmissionNo);
+router.get('/stats/overview',
+  authorize('SUPER_ADMIN', 'ADMIN'),
+  studentController.getStudentStatistics.bind(studentController)
+);
+
+// Generic list route
+router.get(
+  '/',
+  authorize('SUPER_ADMIN', 'ADMIN', 'TEACHER'),
+  studentController.getStudents.bind(studentController)
+);
+
+// ID-based routes LAST
+router.get(
+  '/:id',
+  authorize('SUPER_ADMIN', 'ADMIN', 'TEACHER'),
+  studentController.getStudentById.bind(studentController)
+);
+
+router.get(
+  '/:studentId/performance',
+  studentController.getStudentPerformance
+);
+
 router.put(
   '/enrollment/:enrollmentId',
   authorize('ADMIN', 'SUPER_ADMIN'),
   studentController.updateEnrollment.bind(studentController)
 );
-router.post('/promote', 
-  authorize('ADMIN', 'SUPER_ADMIN'), 
-  studentController.promoteStudent.bind(studentController)
-);
-router.post('/transfer', 
-  authorize('ADMIN', 'SUPER_ADMIN'), 
-  studentController.transferStudent.bind(studentController)
-);
-// Student access
-router.get('/class/:classId', studentController.getStudentsByClass);
-router.get('/admission/:admissionNo', studentController.getStudentByAdmissionNo);
-router.get('/:studentId/performance', studentController.getStudentPerformance);
 
-// Student updates (Admin only)
 router.patch(
-    '/:id/profile',
-    authorize('SUPER_ADMIN', 'ADMIN'),
-    studentController.updateStudent.bind(studentController)
-  );
+  '/:id/profile',
+  authorize('SUPER_ADMIN', 'ADMIN'),
+  studentController.updateStudent.bind(studentController)
+);
+
 router.patch(
-    '/enrollment/:enrollmentId/status',
-    authorize('ADMIN', 'SUPER_ADMIN'),
-    studentController.updateEnrollmentStatus.bind(studentController)
-  );
-  router.delete(
-    '/:id',
-    authorize('SUPER_ADMIN', 'ADMIN'),
-    studentController.deleteStudent.bind(studentController)
-  );
-  
-  // Get statistics
-  router.get(
-    '/stats/overview',
-    authorize('SUPER_ADMIN', 'ADMIN'),
-    studentController.getStudentStatistics.bind(studentController)
-  );
+  '/enrollment/:enrollmentId/status',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  studentController.updateEnrollmentStatus.bind(studentController)
+);
+
+router.delete(
+  '/:id',
+  authorize('SUPER_ADMIN', 'ADMIN'),
+  studentController.deleteStudent.bind(studentController)
+);
 
 export default router;

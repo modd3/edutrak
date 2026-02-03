@@ -136,12 +136,6 @@ export const sidebarConfig: NavItem[] = [
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
       {
-        title: 'Student Subjects Select',
-        href: '/students/:studentId/subjects',
-        icon: BookMarked,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
-      },
-      {
         title: 'Class Subjects',
         href: '/classes/subjects',
         icon: BookOpen,
@@ -175,7 +169,7 @@ export const sidebarConfig: NavItem[] = [
       },
       {
         title: 'Grade Entry',
-        href: '//assessments/:assessmentId/grades',
+        href: '/assessments/:assessmentId/grades',
         icon: ClipboardCheck,
         roles: ['TEACHER'],
       },

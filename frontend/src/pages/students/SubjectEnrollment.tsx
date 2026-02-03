@@ -26,7 +26,7 @@ export function StudentSubjectEnrollmentPage() {
 
   // Get student details
   const { data: studentData, isLoading: isLoadingStudent } = useStudent(studentId as string);
-  const student = studentData?.data;
+  const student = studentData;
 
   // Get student's subject enrollments
   const { data: enrollmentsData, isLoading: isLoadingEnrollments } = useAllStudentSubjectEnrollments(studentId);
