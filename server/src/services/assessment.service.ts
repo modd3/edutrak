@@ -379,6 +379,168 @@ export class AssessmentService {
   }
 
   /**
+   * Get assessments for a specific strand within a class subject
+   */
+  async getStrandAssessments(
+    classSubjectId: string,
+    strandId: string,
+    schoolId: string
+  ): Promise<AssessmentDefinition[]> {
+    // Validate strand is assigned to class subject
+    const assignment = await this.prisma.classSubjectStrand.findFirst({
+      where: {
+        classSubjectId,
+        strandId,
+      },
+    });
+
+    if (!assignment) {
+      throw new Error('Strand is not assigned to this class subject');
+    }
+
+    return this.prisma.assessmentDefinition.findMany({
+      where: {
+        schoolId,
+        classSubjectId,
+        strandId,
+      },
+      include: {
+        term: true,
+        strand: true,
+        classSubject: {
+          include: {
+            subject: true,
+          },
+        },
+        _count: {
+          select: { results: true },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  /**
+   * Get all strands with assessments for a class subject
+   */
+  async getStrandAssessmentSummary(classSubjectId: string, schoolId: string) {
+    // Validate class subject
+    const classSubject = await this.prisma.classSubject.findFirst({
+      where: {
+        id: classSubjectId,
+        schoolId,
+      },
+    });
+
+    if (!classSubject) {
+      throw new Error('Class subject not found');
+    }
+
+    // Get all strands assigned to this class subject
+    const strands = await this.prisma.classSubjectStrand.findMany({
+      where: { classSubjectId },
+      include: {
+        strand: true,
+      },
+    });
+
+    // Get assessment counts for each strand
+    const summary = await Promise.all(
+      strands.map(async (assignment) => {
+        const assessments = await this.prisma.assessmentDefinition.findMany({
+          where: {
+            classSubjectId,
+            strandId: assignment.strandId,
+            schoolId,
+          },
+          include: {
+            _count: {
+              select: { results: true },
+            },
+          },
+        });
+
+        return {
+          strand: assignment.strand,
+          assessmentCount: assessments.length,
+          assessments,
+          totalResults: assessments.reduce((sum, a) => sum + a._count.results, 0),
+        };
+      })
+    );
+
+    return summary;
+  }
+
+  /**
+   * Get assessment results by strand for reporting
+   */
+  async getStrandResultsSummary(
+    classSubjectId: string,
+    strandId: string,
+    schoolId: string
+  ) {
+    // Validate strand is assigned and get strand details
+    const assignment = await this.prisma.classSubjectStrand.findFirst({
+      where: {
+        classSubjectId,
+        strandId,
+      },
+      include: {
+        strand: true,
+      },
+    });
+
+    if (!assignment) {
+      throw new Error('Strand is not assigned to this class subject');
+    }
+
+    // Get assessments for this strand
+    const assessments = await this.prisma.assessmentDefinition.findMany({
+      where: {
+        classSubjectId,
+        strandId,
+        schoolId,
+      },
+      select: { id: true, name: true },
+    });
+
+    // Get results grouped by assessment
+    const results = await Promise.all(
+      assessments.map(async (assessment) => {
+        const resultData = await this.prisma.assessmentResult.findMany({
+          where: {
+            assessmentDefId: assessment.id,
+            schoolId,
+          },
+          include: {
+            student: {
+              select: {
+                id: true,
+                admissionNo: true,
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        });
+
+        return {
+          assessment,
+          resultCount: resultData.length,
+          results: resultData,
+        };
+      })
+    );
+
+    return {
+      strand: assignment.strand,
+      classSubjectId,
+      assessments: results,
+    };
+  }
+
+  /**
    * Check if assessment exists
    */
   async assessmentExists(id: string, schoolId: string): Promise<boolean> {
@@ -386,6 +548,83 @@ export class AssessmentService {
       where: { id, schoolId },
     });
     return count > 0;
+  }
+
+  /**
+   * Get all students eligible for an assessment (enrolled in the subject)
+   * Uses StudentClassSubject relationship
+   */
+  async getStudentsForAssessment(
+    assessmentDefId: string,
+    schoolId: string,
+    page: number = 1,
+    limit: number = 20
+  ) {
+    const skip = (page - 1) * limit;
+
+    // Get the assessment and its class subject
+    const assessment = await this.prisma.assessmentDefinition.findFirst({
+      where: {
+        id: assessmentDefId,
+        schoolId,
+      },
+      include: {
+        classSubject: {
+          include: {
+            subject: true,
+          },
+        },
+      },
+    });
+
+    if (!assessment) {
+      throw new Error('Assessment not found');
+    }
+
+    // Get all students enrolled in this class subject
+    const [students, total] = await Promise.all([
+      this.prisma.studentClassSubject.findMany({
+        where: {
+          classSubjectId: assessment.classSubjectId,
+          schoolId,
+          status: 'ACTIVE',
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              admissionNo: true,
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              gender: true,
+            },
+          },
+        },
+        skip,
+        take: limit,
+        orderBy: {
+          student: {
+            admissionNo: 'asc',
+          },
+        },
+      }),
+      this.prisma.studentClassSubject.count({
+        where: {
+          classSubjectId: assessment.classSubjectId,
+          schoolId,
+          status: 'ACTIVE',
+        },
+      }),
+    ]);
+
+    return {
+      students: students.map((s) => s.student),
+      total,
+      page,
+      limit,
+      pages: Math.ceil(total / limit),
+    };
   }
 
   /**

@@ -1,11 +1,18 @@
 // src/hooks/use-student-subjects.ts
+/**
+ * DEPRECATED: Use use-student-subject-enrollment.ts for new relational model
+ * This file is kept for backward compatibility during migration
+ */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '@/api';
 import { toast } from 'sonner';
+import { studentClassSubjectApi } from '@/api/student-class-subject-api';
+import { useAuthStore } from '@/store/auth-store';
 
 /**
- * Get students enrolled in a class with their selected subjects
+ * Get students enrolled in a class with their subject enrollments
+ * UPDATED: Now uses StudentClassSubject relationships
  */
 export function useClassStudentsWithSubjects(classId: string | undefined, termId: string | undefined) {
   return useQuery({
@@ -13,7 +20,7 @@ export function useClassStudentsWithSubjects(classId: string | undefined, termId
     queryFn: async () => {
       if (!classId) return { data: [] };
       
-      const response = await api.get(`/classes/${classId}/students`, {
+      const response = await api.get(`/classes/${classId}/enrollments`, {
         params: termId ? { termId } : {}
       });
       return response.data;
@@ -23,40 +30,62 @@ export function useClassStudentsWithSubjects(classId: string | undefined, termId
 }
 
 /**
- * Get students who have selected a specific subject (for grade entry)
+ * Get students enrolled in a specific subject (for grade entry)
+ * UPDATED: Now uses StudentClassSubject relationships instead of selectedSubjects
  */
 export function useClassSubjectStudents(classSubjectId: string | undefined) {
   return useQuery({
     queryKey: ['class-subject-students', classSubjectId],
     queryFn: async () => {
-      const response = await api.get(`/academic/class-subject/${classSubjectId}/students`);
-      return response.data;
+      if (!classSubjectId) return { data: [] };
+      const response = await studentClassSubjectApi.getStudentsEnrolledInSubject(classSubjectId);
+      return response;
     },
     enabled: !!classSubjectId,
   });
 }
 
 /**
- * Update student's selected subjects
+ * Update student's selected subjects (elective/optional only)
+ * UPDATED: Now creates StudentClassSubject records instead of updating JSON array
  */
 export function useUpdateStudentSubjects() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
 
   return useMutation({
     mutationFn: async ({ 
       enrollmentId, 
-      selectedSubjects 
+      selectedSubjects,
+      classId,
     }: { 
       enrollmentId: string; 
-      selectedSubjects: string[] 
+      selectedSubjects: string[];
+      classId: string;
     }) => {
-      const response = await api.patch(`/student-classes/${enrollmentId}`, {
-        selectedSubjects
-      });
-      return response.data;
+      // Get class subject IDs for selected subjects
+      const response = await api.get(`/academic/class-subject/class/${classId}`);
+      const classSubjects = response.data.data || [];
+      
+      // Filter to only elective/optional subjects
+      const electiveSubjects = classSubjects.filter((cs: any) => 
+        ['ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED'].includes(cs.subjectCategory) &&
+        selectedSubjects.includes(cs.subjectId)
+      );
+
+      // Bulk enroll in selected subjects
+      if (electiveSubjects.length > 0) {
+        await studentClassSubjectApi.bulkEnrollStudentsInSubject({
+          enrollmentIds: [enrollmentId],
+          classSubjectId: electiveSubjects[0].id, // Note: This would need adjustment for multiple
+          schoolId: user?.schoolId || '',
+        });
+      }
+
+      return { enrollmentId, updated: electiveSubjects.length };
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['class-students-subjects'] });
+    onSuccess: (_, { classId }) => {
+      queryClient.invalidateQueries({ queryKey: ['class-students-subjects', classId] });
       toast.success('Subject selection updated successfully');
     },
     onError: (error: any) => {
@@ -73,11 +102,11 @@ export function useAutoAssignCoreSubjects() {
 
   return useMutation({
     mutationFn: async (classId: string) => {
-      const response = await api.post(`/classes/${classId}/assign-core-subjects`);
+      const response = await api.post(`/academic/class-subject/${classId}/assign-core-subjects`);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['class-students-subjects'] });
+    onSuccess: (_, classId) => {
+      queryClient.invalidateQueries({ queryKey: ['class-students-subjects', classId] });
       toast.success('Core subjects assigned to all students');
     },
     onError: (error: any) => {

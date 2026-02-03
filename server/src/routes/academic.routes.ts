@@ -4,8 +4,12 @@ import AcademicController from '../controllers/academic.controller';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { ClassSubjectController } from '../controllers/classSubject.controller';
+import { StudentClassSubjectController } from '../controllers/student-class-subject.controller';
+import { ClassSubjectStrandController } from '../controllers/class-subject-strand.controller';
 
 const controller = new ClassSubjectController();
+const studentClassSubjectController = new StudentClassSubjectController();
+const strandController = new ClassSubjectStrandController();
 const router = express.Router();
 
 // Apply authentication and school context to all routes
@@ -91,6 +95,110 @@ router.post(
   '/class-subject/:classId/assign-core-subjects',
   authorize('ADMIN'),
   controller.assignCoreSubjects
+);
+
+/**
+ * Student Class Subject Routes (new relational model)
+ * Manage student enrollments in specific subjects
+ */
+router.post(
+  '/student-class-subject/enroll',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  studentClassSubjectController.enrollStudentInSubject
+);
+
+router.post(
+  '/student-class-subject/bulk-enroll',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  studentClassSubjectController.bulkEnrollStudentsInSubject
+);
+
+router.post(
+  '/student-class-subject/drop',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  studentClassSubjectController.dropStudentFromSubject
+);
+
+router.get(
+  '/student-class-subject/enrollment/:enrollmentId',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER', 'STUDENT'),
+  studentClassSubjectController.getStudentSubjectEnrollments
+);
+
+router.get(
+  '/student-class-subject/students/:studentId',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER', 'STUDENT'),
+  studentClassSubjectController.getAllStudentSubjectEnrollments
+);
+
+router.get(
+  '/student-class-subject/subject-roster',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  studentClassSubjectController.getStudentsEnrolledInSubject
+);
+
+router.get(
+  '/student-class-subject/count',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  studentClassSubjectController.getSubjectEnrollmentCount
+);
+
+router.patch(
+  '/student-class-subject/status',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  studentClassSubjectController.updateSubjectEnrollmentStatus
+);
+
+router.patch(
+  '/student-class-subject/bulk-status',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  studentClassSubjectController.bulkUpdateSubjectStatus
+);
+
+/**
+ * Class Subject Strand Routes
+ * Manage strand assignments to class subjects for strand-based assessments
+ */
+router.post(
+  '/class-subject-strand/assign',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  strandController.assignStrandToClassSubject
+);
+
+router.post(
+  '/class-subject-strand/bulk-assign',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  strandController.bulkAssignStrands
+);
+
+router.get(
+  '/class-subject-strand/class-subject',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  strandController.getStrandsForClassSubject
+);
+
+router.get(
+  '/class-subject-strand/strand/:strandId',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  strandController.getClassSubjectsForStrand
+);
+
+router.get(
+  '/class-subject-strand/count',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'),
+  strandController.getStrandCount
+);
+
+router.delete(
+  '/class-subject-strand/remove',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  strandController.removeStrandFromClassSubject
+);
+
+router.get(
+  '/class-subject-strand/validate',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  strandController.validateStrandAssignments
 );
 
 

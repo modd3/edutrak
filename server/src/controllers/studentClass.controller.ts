@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { RequestWithUser } from '../middleware/school-context';
 import prisma from '../database/client';
 import { ResponseUtil, ErrorMessages } from '../utils/response';
 import logger from '../utils/logger';
@@ -6,9 +7,10 @@ import logger from '../utils/logger';
 /**
  * Assign a student to a class for an academic year
  */
-export const assignStudentToClass = async (req: Request, res: Response) => {
+export const assignStudentToClass = async (req: RequestWithUser, res: Response) => {
   try {
     const { studentId, classId, academicYearId, streamId, selectedSubjects } = req.body;
+    const schoolId = req.schoolId!;
 
     // Validate required fields
     if (!studentId || !classId || !academicYearId) {
@@ -35,7 +37,7 @@ export const assignStudentToClass = async (req: Request, res: Response) => {
         classId,
         academicYearId,
         streamId,
-        selectedSubjects: selectedSubjects || [],
+        schoolId,
         status: 'ACTIVE',
       },
       include: {
@@ -96,29 +98,7 @@ export const getStudentsInClass = async (req: Request, res: Response) => {
         },
         stream: true,
         class: true,
-        classSubjects: {
-          include: {
-            subject: {
-              select: {
-                id: true,
-                name: true,
-                code: true,
-                category: true,
-              },
-            },
-            teacher: {
-              select: {
-                id: true,
-                user: {
-                  select: {
-                    firstName: true,
-                    lastName: true,
-                  },
-                },
-              },
-            },
-          },
-        },
+        academicYear: true,
       },
       orderBy: {
         student: {
@@ -242,9 +222,10 @@ export const updateStudentClassAssignment = async (req: Request, res: Response) 
 /**
  * Promote a student to another class for the next year
  */
-export const promoteStudent = async (req: Request, res: Response) => {
+export const promoteStudent = async (req: RequestWithUser, res: Response) => {
   try {
     const { studentId, currentClassId, toClassId, nextAcademicYearId, promotionDate } = req.body;
+    const schoolId = req.schoolId!;
 
     // Validate required fields
     if (!studentId || !currentClassId || !toClassId || !nextAcademicYearId) {
@@ -298,9 +279,8 @@ export const promoteStudent = async (req: Request, res: Response) => {
           studentId,
           classId: toClassId,
           academicYearId: nextAcademicYearId,
+          schoolId,
           status: 'ACTIVE',
-          // Optionally carry over stream assignment or selected subjects
-          selectedSubjects: currentEnrollment.selectedSubjects,
         },
         include: {
           student: true,

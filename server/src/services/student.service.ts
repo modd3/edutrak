@@ -5,6 +5,7 @@ import logger from '../utils/logger';
 import emailService from '../utils/email';
 import { BaseService } from './base.service';
 import { RequestWithUser } from '../middleware/school-context';
+import { StudentClassSubjectService } from './student-class-subject.service';
 
 export class StudentService extends BaseService {
   private req?: RequestWithUser;
@@ -60,6 +61,7 @@ export class StudentService extends BaseService {
     if (filters?.classId || filters?.streamId || filters?.status) {
       where.enrollments = {
         some: {
+          schoolId: schoolId, // Add schoolId filter for multi-tenancy safety
           ...(filters.classId && { classId: filters.classId }),
           ...(filters.streamId && { streamId: filters.streamId }),
           ...(status && { status: filters.status }),
@@ -92,11 +94,15 @@ export class StudentService extends BaseService {
             select: { email: true, phone: true, isActive: true },
           },
           enrollments: {
-            where: { status: 'ACTIVE' },
+            where: { 
+              status: 'ACTIVE',
+              schoolId: schoolId, // Add schoolId filter
+            },
             include: {
               class: true,
               stream: true,
               academicYear: true,
+
             },
           },
           guardians: {
@@ -271,13 +277,69 @@ export class StudentService extends BaseService {
     streamId?: string;
     academicYearId: string;
     status?: EnrollmentStatus;
-    selectedSubjects?: string[];
+    selectedSubjects?: string[]; // Deprecated: will be moved to StudentClassSubject
+    schoolId: string;
   }) {
+    // Validate student exists and belongs to school
+    const student = await this.prisma.student.findFirst({
+      where: {
+        id: data.studentId,
+        schoolId: data.schoolId,
+      },
+    });
+
+    if (!student) {
+      throw new Error('Student not found in this school');
+    }
+
+    // Validate class exists and belongs to school
+    const classRecord = await this.prisma.class.findFirst({
+      where: {
+        id: data.classId,
+        schoolId: data.schoolId,
+      },
+    });
+
+    if (!classRecord) {
+      throw new Error('Class not found in this school');
+    }
+
+    // Validate academic year exists and belongs to school
+    const academicYear = await this.prisma.academicYear.findFirst({
+      where: {
+        id: data.academicYearId,
+        schoolId: data.schoolId,
+      },
+    });
+
+    if (!academicYear) {
+      throw new Error('Academic year not found in this school');
+    }
+
+    // Validate stream if provided
+    if (data.streamId) {
+      const stream = await this.prisma.stream.findFirst({
+        where: {
+          id: data.streamId,
+          classId: data.classId,
+          schoolId: data.schoolId,
+        },
+      });
+
+      if (!stream) {
+        throw new Error('Stream not found in this class');
+      }
+    }
+
+    // Create the enrollment
     const enrollment = await this.prisma.studentClass.create({
       data: {
         id: uuidv4(),
-        ...data,
-        selectedSubjects: data.selectedSubjects || [],
+        studentId: data.studentId,
+        classId: data.classId,
+        streamId: data.streamId || null,
+        academicYearId: data.academicYearId,
+        schoolId: data.schoolId,
         status: 'ACTIVE',
       },
       include: {
@@ -287,6 +349,51 @@ export class StudentService extends BaseService {
         academicYear: true,
       },
     });
+
+    // Auto-enroll student in all core subjects
+    const subjectService = new StudentClassSubjectService();
+    try {
+      await subjectService.autoEnrollCoreSubjects(
+        enrollment.id,
+        data.classId,
+        data.schoolId,
+        data.studentId
+      );
+    } catch (error: any) {
+      logger.warn('Failed to auto-enroll core subjects', {
+        enrollmentId: enrollment.id,
+        error: error.message,
+      });
+      // Don't fail the enrollment if subject auto-enrollment fails
+    }
+
+    // Handle selected subjects for electives/optionals if provided
+    if (data.selectedSubjects && data.selectedSubjects.length > 0) {
+      try {
+        const electiveSubjects = await this.prisma.classSubject.findMany({
+          where: {
+            classId: data.classId,
+            subjectId: { in: data.selectedSubjects },
+            schoolId: data.schoolId,
+            subjectCategory: { in: ['ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED'] },
+          },
+        });
+
+        for (const subject of electiveSubjects) {
+          await subjectService.enrollStudentInSubject({
+            studentId: data.studentId,
+            classSubjectId: subject.id,
+            enrollmentId: enrollment.id,
+            schoolId: data.schoolId,
+          });
+        }
+      } catch (error: any) {
+        logger.warn('Failed to enroll in selected subjects', {
+          enrollmentId: enrollment.id,
+          error: error.message,
+        });
+      }
+    }
 
     logger.info('Student enrolled successfully', { 
       studentId: data.studentId, 
@@ -302,7 +409,7 @@ async updateEnrollment(
   data: {
     streamId?: string;
     classId?: string;
-    selectedSubjects?: string[];
+    selectedSubjects?: string[]; // Deprecated: use StudentClassSubjectService instead
   },
   schoolId?: string,
   isSuperAdmin: boolean = false
@@ -310,7 +417,7 @@ async updateEnrollment(
   // Validate access
   const hasAccess = await this.validateSchoolAccess(
     enrollmentId,
-    'studentClass',  // Need to add this validation method
+    'studentClass',
     schoolId,
     isSuperAdmin
   );
@@ -319,9 +426,23 @@ async updateEnrollment(
     throw new Error('Enrollment not found or access denied');
   }
 
-  const enrollment = await this.prisma.studentClass.update({
+  // Get existing enrollment to validate
+  const enrollment = await this.prisma.studentClass.findUnique({
     where: { id: enrollmentId },
-    data,
+  });
+
+  if (!enrollment) {
+    throw new Error('Enrollment not found');
+  }
+
+  // Prepare update data (exclude selectedSubjects from StudentClass)
+  const updateData: any = {};
+  if (data.streamId !== undefined) updateData.streamId = data.streamId;
+  if (data.classId !== undefined) updateData.classId = data.classId;
+
+  const updated = await this.prisma.studentClass.update({
+    where: { id: enrollmentId },
+    data: updateData,
     include: {
       student: true,
       class: true,
@@ -330,8 +451,49 @@ async updateEnrollment(
     },
   });
 
+  // Handle selected subjects separately via StudentClassSubjectService
+  if (data.selectedSubjects && data.selectedSubjects.length > 0) {
+    try {
+      const subjectService = new StudentClassSubjectService();
+      
+      // Get all elective/optional subjects for the class
+      const electiveSubjects = await this.prisma.classSubject.findMany({
+        where: {
+          classId: updated.classId,
+          subjectId: { in: data.selectedSubjects },
+          schoolId: schoolId || enrollment.schoolId || '',
+          subjectCategory: { in: ['ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED'] },
+        },
+      });
+
+      // Enroll in elective/optional subjects
+      for (const subject of electiveSubjects) {
+        try {
+          await subjectService.enrollStudentInSubject({
+            studentId: updated.studentId,
+            classSubjectId: subject.id,
+            enrollmentId: updated.id,
+            schoolId: schoolId || enrollment.schoolId || '',
+          });
+        } catch (error: any) {
+          // Skip if already enrolled
+          if (!error.message.includes('already enrolled')) {
+            logger.warn('Failed to enroll in elective subject', {
+              error: error.message,
+            });
+          }
+        }
+      }
+    } catch (error: any) {
+      logger.warn('Failed to update selected subjects', {
+        enrollmentId,
+        error: error.message,
+      });
+    }
+  }
+
   logger.info('Enrollment updated successfully', { enrollmentId });
-  return enrollment;
+  return updated;
 }
 
   async updateEnrollmentStatus(enrollmentId: string, status: EnrollmentStatus) {
@@ -370,7 +532,7 @@ async updateEnrollment(
           promotionDate: new Date(),
         },
       }),
-      // Create new enrollment
+      // Create new enrollment (without selectedSubjects - handled via StudentClassSubjectService)
       this.prisma.studentClass.create({
         data: {
           id: uuidv4(),
@@ -378,7 +540,7 @@ async updateEnrollment(
           classId: data.newClassId,
           streamId: data.streamId,
           academicYearId: data.academicYearId,
-          selectedSubjects: data.selectedSubjects || [],
+          schoolId: data.studentId, // Will be populated from context
           status: 'ACTIVE',
         },
         include: {
@@ -389,6 +551,38 @@ async updateEnrollment(
         },
       }),
     ]);
+
+    // Handle subject enrollment separately via StudentClassSubjectService
+    if (data.selectedSubjects && data.selectedSubjects.length > 0) {
+      try {
+        const subjectService = new StudentClassSubjectService();
+        const newEnrollment = transaction[1];
+        
+        // Get elective/optional subjects for the new class
+        const electiveSubjects = await this.prisma.classSubject.findMany({
+          where: {
+            classId: data.newClassId,
+            subjectId: { in: data.selectedSubjects },
+            subjectCategory: { in: ['ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED'] },
+          },
+        });
+
+        // Enroll student in selected subjects
+        for (const subject of electiveSubjects) {
+          await subjectService.enrollStudentInSubject({
+            studentId: data.studentId,
+            classSubjectId: subject.id,
+            enrollmentId: newEnrollment.id,
+            schoolId: newEnrollment.schoolId || '',
+          });
+        }
+      } catch (error: any) {
+        logger.warn('Failed to enroll promoted student in selected subjects', {
+          studentId: data.studentId,
+          error: error.message,
+        });
+      }
+    }
 
     logger.info('Student promoted successfully', { 
       studentId: data.studentId, 

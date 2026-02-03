@@ -1,7 +1,7 @@
 // src/controllers/class-subject.controller.ts
 import { Request, Response } from 'express';
 import { ClassSubjectService } from '../services/class-subject.service';
-import { ResponseUtil} from '../utils/response'; // Assuming you have these helpers
+import { ResponseUtil} from '../utils/response'; 
 import { RequestWithUser } from '@/middleware/school-context';
 
 const service = new ClassSubjectService();
@@ -21,7 +21,7 @@ export class ClassSubjectController {
         subjectCategory 
       } = req.body;
 
-      const schoolId = req.user?.schoolId; // Assumes auth middleware attaches user
+      const schoolId = req.user?.schoolId;
 
       if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
 
@@ -112,15 +112,9 @@ async getClassSubjectStudents  (req: RequestWithUser, res: Response) {
       classSubject.subjectCategory !== 'CORE' ? classSubject.subjectId : undefined
     );
 
-    // If it's a CORE subject, get all students
-    // If it's ELECTIVE/OPTIONAL, only get students who selected it
-    let filteredEnrollments = enrollments;
-
-    if (classSubject.subjectCategory !== 'CORE') {
-      filteredEnrollments = enrollments.filter((enrollment) =>
-        enrollment.selectedSubjects.includes(classSubject.subjectId)
-      );
-    }
+    // For all subjects, the enrollments returned are already filtered
+    // by StudentClassSubject relationship (handled in service)
+    const filteredEnrollments = enrollments;
 
     res.json({
       data: filteredEnrollments,
@@ -210,30 +204,18 @@ async assignCoreSubjects (req: RequestWithUser, res: Response)  {
       return;
     }
 
-    // Prepare updates for each enrollment
-    const updates = enrollments.map((enrollment) => {
-      const existingSubjects = enrollment.selectedSubjects || [];
-      const newSubjects = Array.from(
-        new Set([...existingSubjects, ...coreSubjectIds])
-      );
-
-      return {
-        enrollmentId: enrollment.id,
-        selectedSubjects: newSubjects,
-      };
-    });
-
-    // Update each enrollment to include core subjects
-    await ClassSubjectService.batchUpdateStudentSelectedSubjects(updates);
-
+    // Note: Core subject auto-enrollment is now handled in StudentService.enrollStudent()
+    // via StudentClassSubjectService.autoEnrollCoreSubjects()
+    // This endpoint is deprecated and can be removed in favor of auto-enrollment on class enrollment
     res.json({
-      message: `Core subjects assigned to ${enrollments.length} students`,
+      message: 'Core subject auto-enrollment is handled during student class enrollment',
       data: {
-        studentsUpdated: enrollments.length,
+        studentsWithAutoEnrollment: enrollments.length,
         coreSubjectsCount: coreSubjectIds.length,
         coreSubjectIds,
       },
     });
+    return;
   } catch (error) {
     console.error('Error assigning core subjects:', error);
     res.status(500).json({

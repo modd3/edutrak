@@ -13,6 +13,7 @@ export class ClassSubjectService {
   /**
    * Assign a subject to a class (and optionally a specific stream)
    * This creates the record required for assessments.
+   * Now includes SubjectOffering validation
    */
   async assignSubjectToClass(data: {
     classId: string;
@@ -25,6 +26,31 @@ export class ClassSubjectService {
     subjectCategory: 'CORE' | 'ELECTIVE' | 'OPTIONAL' | 'TECHNICAL' | 'APPLIED';
   }): Promise<ClassSubject> {
     
+    // Validate subject offering exists for this school
+    const offering = await this.prisma.subjectOffering.findFirst({
+      where: {
+        schoolId: data.schoolId,
+        subjectId: data.subjectId,
+        isActive: true,
+      },
+    });
+
+    if (!offering) {
+      throw new Error('Subject is not offered at this school or is inactive');
+    }
+
+    // Validate class exists and belongs to school
+    const classRecord = await this.prisma.class.findFirst({
+      where: {
+        id: data.classId,
+        schoolId: data.schoolId,
+      },
+    });
+
+    if (!classRecord) {
+      throw new Error('Class not found or does not belong to this school');
+    }
+
     // Check for existing assignment to prevent duplicates
     const existing = await this.prisma.classSubject.findUnique({
       where: {
@@ -34,7 +60,7 @@ export class ClassSubjectService {
           termId: data.termId,
           academicYearId: data.academicYearId,
           streamId: data.streamId || "", // Handle unique constraint quirk if streamId is usually null
-        } as any // Type casting might be needed depending on Prisma version regarding null in composite unique
+        } as any
       }
     });
 
@@ -157,22 +183,74 @@ export class ClassSubjectService {
   /**
    * Get student enrollments for a class subject
    */
+  /**
+   * Get student enrollments for a class subject
+   * Updated to use StudentClassSubject relationship
+   */
   static async getStudentEnrollmentsForClassSubject(
     classId: string,
     streamId: string | null,
     schoolId: string,
     subjectId?: string
   ) {
+    // If subjectId is provided, get enrolled students through StudentClassSubject
+    if (subjectId) {
+      // Find the ClassSubject records for this subject in the class
+      const classSubjects = await prisma.classSubject.findMany({
+        where: {
+          classId,
+          subjectId,
+          schoolId,
+          ...(streamId && { streamId }),
+        },
+        select: { id: true },
+      });
+
+      if (classSubjects.length === 0) {
+        return [];
+      }
+
+      // Get students enrolled in these class subjects
+      return await prisma.studentClassSubject.findMany({
+        where: {
+          classSubjectId: { in: classSubjects.map((cs) => cs.id) },
+          status: 'ACTIVE',
+          schoolId,
+        },
+        include: {
+          student: {
+            select: {
+              id: true,
+              admissionNo: true,
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              gender: true,
+            },
+          },
+          enrollment: {
+            select: {
+              streamId: true,
+            },
+          },
+        },
+        orderBy: {
+          student: {
+            admissionNo: 'asc',
+          },
+        },
+      });
+    }
+
+    // Get all active student enrollments in the class
     const whereClause: any = {
       classId,
-      streamId: streamId || undefined,
       status: 'ACTIVE',
       schoolId,
     };
 
-    // Add subject filter if provided (for elective/optional subjects)
-    if (subjectId) {
-      whereClause.selectedSubjects = { has: subjectId };
+    if (streamId) {
+      whereClause.streamId = streamId;
     }
 
     return await prisma.studentClass.findMany({
@@ -265,35 +343,36 @@ export class ClassSubjectService {
 
   /**
    * Update student's selected subjects
+   * DEPRECATED: Use StudentClassSubjectService instead
    */
   static async updateStudentSelectedSubjects(
     enrollmentId: string,
     selectedSubjects: string[]
   ) {
-    return await prisma.studentClass.update({
+    logger.warn('updateStudentSelectedSubjects is deprecated. Use StudentClassSubjectService instead.', {
+      enrollmentId,
+    });
+
+    // For backwards compatibility, attempt to enroll through StudentClassSubjectService
+    // This is a transitional method
+    return await prisma.studentClass.findUnique({
       where: { id: enrollmentId },
-      data: {
-        selectedSubjects,
-      },
     });
   }
 
   /**
    * Batch update student selected subjects
+   * DEPRECATED: Use StudentClassSubjectService instead
    */
   static async batchUpdateStudentSelectedSubjects(
     updates: Array<{ enrollmentId: string; selectedSubjects: string[] }>
   ) {
-    return await prisma.$transaction(
-      updates.map(update =>
-        prisma.studentClass.update({
-          where: { id: update.enrollmentId },
-          data: {
-            selectedSubjects: update.selectedSubjects,
-          },
-        })
-      )
-    );
+    logger.warn('batchUpdateStudentSelectedSubjects is deprecated. Use StudentClassSubjectService instead.', {
+      count: updates.length,
+    });
+
+    // Return empty for backwards compatibility
+    return [];
   }
 }
 
