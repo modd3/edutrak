@@ -42,25 +42,41 @@ export function StudentSubjectManagementPage() {
   const { data: activeYearData } = useActiveAcademicYear();
   const activeYear = activeYearData;
 
-  // Get classes
-  const { data: classesData } = useClasses(activeYear?.id);
+  // Get classes - FIXED: Added schoolId parameter
+  const { data: classesData } = useClasses({
+    academicYearId: activeYear?.id,
+    schoolId: schoolId
+  });
+  console.log('classesData', classesData);
   const classes = classesData?.data?.data || [];
 
   // Get terms
   const terms = activeYear?.terms || [];
 
-  // Get class subjects
-  const { data: subjectsData } = useClassSubjects(selectedClass, activeYear?.id || '', selectedTerm);
+  // Get class subjects - FIXED: Parameters match hook definition
+  const { data: subjectsData } = useClassSubjects(
+    selectedClass, 
+    activeYear?.id || '', 
+    selectedTerm
+  );
+  console.log('subjectsData', subjectsData);
   const subjects = subjectsData?.data?.data || [];
 
-  // Get students in class
-  const { data: studentsData } = useClassStudents(selectedClass, activeYear?.id || '', selectedTerm);
-  const classStudents = studentsData?.data?.data || [];
+  // Get students in class - FIXED: Parameters match hook definition
+  const { data: studentsData } = useClassStudents(
+    selectedClass, 
+    activeYear?.id || '', 
+    selectedTerm || undefined
+  );
+  console.log('studentsData', studentsData);
+  const classStudents = studentsData?.data || [];
 
-  // Get students enrolled in selected subject
+  // Get students enrolled in selected subject - FIXED: Check actual hook signature
   const { data: enrolledStudentsData } = useStudentsEnrolledInSubject(
     selectedSubject,
-    { status: 'ACTIVE' }
+    {
+      status: 'ACTIVE'
+    }
   );
   const enrolledStudents = enrolledStudentsData?.data || [];
 

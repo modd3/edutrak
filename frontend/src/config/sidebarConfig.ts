@@ -137,7 +137,7 @@ export const sidebarConfig: NavItem[] = [
       },
       {
         title: 'Student Subjects Select',
-        href: '/students/student-subjects',
+        href: '/students/:studentId/subjects',
         icon: BookMarked,
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
