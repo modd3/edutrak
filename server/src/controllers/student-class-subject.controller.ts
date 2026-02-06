@@ -234,4 +234,37 @@ export class StudentClassSubjectController {
       return ResponseUtil.error(res, error.message, 400);
     }
   }
+
+  /**
+   * Get available elective/optional subjects for a student
+   */
+  async getAvailableSubjectsForStudent(req: RequestWithUser, res: Response) {
+    try {
+      const { enrollmentId, classId } = req.query;
+
+      if (!enrollmentId || typeof enrollmentId !== 'string') {
+        return ResponseUtil.validationError(res, 'Enrollment ID is required');
+      }
+      if (!classId || typeof classId !== 'string') {
+        return ResponseUtil.validationError(res, 'Class ID is required');
+      }
+
+      const availableSubjects = await service.getAvailableSubjectsForStudent(
+        enrollmentId,
+        classId,
+        req.schoolId!
+      );
+
+      return ResponseUtil.success(
+        res,
+        'Available subjects retrieved successfully',
+        {
+          data: availableSubjects,
+          total: availableSubjects.length,
+        }
+      );
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
 }

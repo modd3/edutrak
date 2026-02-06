@@ -164,6 +164,21 @@ export const studentClassSubjectApi = {
   },
 
   /**
+   * Get available elective/optional subjects for a student in a specific class
+   */
+  getAvailableSubjectsForStudent: async (
+    enrollmentId: string,
+    classId: string,
+    schoolId: string
+  ): Promise<{ data: any[]; total: number }> => {
+    const response = await api.get(
+      '/academic/student-class-subject/available-subjects',
+      { params: { enrollmentId, classId, schoolId } }
+    );
+    return response.data.data;
+  },
+
+  /**
    * Update subject enrollment status
    */
   updateSubjectEnrollmentStatus: async (data: {

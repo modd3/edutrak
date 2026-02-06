@@ -6,6 +6,7 @@ import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
@@ -14,15 +15,57 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useStudent } from '@/hooks/use-students';
-import { useAllStudentSubjectEnrollments } from '@/hooks/use-student-subject-enrollment';
+import {
+  useAllStudentSubjectEnrollments,
+  useDropStudentFromSubject,
+} from '@/hooks/use-student-subject-enrollment';
 import { ElectiveSubjectSelectionDialog } from '@/components/subjects/ElectiveSubjectSelectionDialog';
 import { useSchoolContext } from '@/hooks/use-school-context';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export function StudentSubjectEnrollmentPage() {
   const { studentId } = useParams<{ studentId: string }>();
   const navigate = useNavigate();
   const { schoolId } = useSchoolContext();
   const [showElectiveDialog, setShowElectiveDialog] = useState(false);
+  const [showDropConfirm, setShowDropConfirm] = useState(false);
+  const [subjectToDrop, setSubjectToDrop] = useState<any>(null);
+
+  const { mutate: dropSubject, isPending: isDropping } =
+    useDropStudentFromSubject();
+
+  const handleDropSubject = (enrollment: any) => {
+    setSubjectToDrop(enrollment);
+    setShowDropConfirm(true);
+  };
+
+  const confirmDrop = () => {
+    if (subjectToDrop) {
+      dropSubject(
+        {
+          enrollmentId: subjectToDrop.enrollmentId,
+          classSubjectId: subjectToDrop.classSubjectId,
+          schoolId: schoolId!,
+        },
+        {
+          onSuccess: () => {
+            setShowDropConfirm(false);
+            setSubjectToDrop(null);
+          },
+        }
+      );
+    }
+  };
+
 
   // Get student details
   const { data: studentData, isLoading: isLoadingStudent } = useStudent(studentId as string);
@@ -219,6 +262,19 @@ export function StudentSubjectEnrollmentPage() {
                             </div>
                           </div>
                         </CardContent>
+                        {enrollment.classSubject?.subjectCategory !== 'CORE' && (
+                          <CardFooter>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full text-destructive border-destructive hover:bg-destructive/10 hover:text-destructive"
+                              onClick={() => handleDropSubject(enrollment)}
+                              disabled={isDropping}
+                            >
+                              Drop Subject
+                            </Button>
+                          </CardFooter>
+                        )}
                       </Card>
                     ))}
                   </div>
@@ -290,6 +346,33 @@ export function StudentSubjectEnrollmentPage() {
           }}
         />
       )}
+
+      {/* Confirmation Dialog for Dropping Subject */}
+      <AlertDialog open={showDropConfirm} onOpenChange={setShowDropConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will mark the subject{' '}
+              <span className="font-semibold">
+                {subjectToDrop?.classSubject?.subject?.name}
+              </span>{' '}
+              as DROPPED for {student.firstName}. You can re-enroll the student
+              later if needed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDropping}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDrop}
+              disabled={isDropping}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDropping ? 'Dropping...' : 'Confirm Drop'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

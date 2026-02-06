@@ -126,6 +126,12 @@ router.get(
 );
 
 router.get(
+  '/student-class-subject/available-subjects',
+  authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER', 'STUDENT'),
+  studentClassSubjectController.getAvailableSubjectsForStudent
+);
+
+router.get(
   '/student-class-subject/students/:studentId',
   authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER', 'STUDENT'),
   studentClassSubjectController.getAllStudentSubjectEnrollments

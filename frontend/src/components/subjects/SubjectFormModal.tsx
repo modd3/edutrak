@@ -129,14 +129,17 @@ export function SubjectFormModal({
     // Transform curriculum from array to enum values if needed
     const submitData = {
       ...data,
+      learningArea: (data.learningArea || undefined) as any,
+      subjectGroup: (data.subjectGroup || undefined) as any,
       // Ensure curriculum is properly formatted for backend
-      curriculum: data.curriculum,
+      curriculum: data.curriculum as any,
+      category: data.category as any,
     };
 
     console.log('Submitting subject:', submitData);
 
     if (mode === 'create') {
-      createSubject(submitData, {
+      createSubject(submitData as any, {
         onSuccess: () => {
           onOpenChange(false);
         },
@@ -242,7 +245,7 @@ export function SubjectFormModal({
                   <SelectValue placeholder="Select learning area" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">-- Learning Area --</SelectItem>
+                  <SelectItem value="learningArea">-- Learning Area --</SelectItem>
                   {LEARNING_AREAS.map((area) => (
                     <SelectItem key={area.value} value={area.value}>
                       {area.label}
@@ -265,7 +268,7 @@ export function SubjectFormModal({
                   <SelectValue placeholder="Select subject group" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="group">-- Select Group --</SelectItem>
+                  <SelectItem value="subjectGroup">-- Select Group --</SelectItem>
                   {SUBJECT_GROUPS.map((group) => (
                     <SelectItem key={group.value} value={group.value}>
                       {group.label}

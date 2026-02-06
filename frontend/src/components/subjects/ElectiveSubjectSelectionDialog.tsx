@@ -15,8 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { useClassSubjects } from '@/hooks/use-class-subjects';
-import { useEnrollStudentInSubject, useBulkEnrollStudentsInSubject } from '@/hooks/use-student-subject-enrollment';
+import { useAvailableSubjectsForStudent, useEnrollStudentInSubject, useBulkEnrollStudentsInSubject } from '@/hooks/use-student-subject-enrollment';
 
 interface Subject {
   id: string;
@@ -53,15 +52,11 @@ export function ElectiveSubjectSelectionDialog({
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Get all class subjects
-  const { data: classSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = useClassSubjects(classId);
+  // Get available elective subjects
+  const { data: availableSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = 
+    useAvailableSubjectsForStudent(enrollmentId, classId, schoolId);
   
-  // Filter for elective/optional subjects
-  const electiveSubjects = (classSubjectsData || []).filter(
-    (cs: ClassSubject) => 
-      cs.subjectCategory && 
-      ['ELECTIVE', 'OPTIONAL', 'TECHNICAL', 'APPLIED'].includes(cs.subjectCategory)
-  );
+  const electiveSubjects = availableSubjectsData?.data || [];
 
   // Hooks for enrollment
   const { mutate: enrollSingleSubject } = useEnrollStudentInSubject();

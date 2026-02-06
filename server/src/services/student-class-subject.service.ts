@@ -499,4 +499,61 @@ export class StudentClassSubjectService {
       pages: Math.ceil(total / limit),
     };
   }
+
+  /**
+   * Get available elective/optional subjects for a student in a specific class enrollment
+   */
+  async getAvailableSubjectsForStudent(
+    enrollmentId: string,
+    classId: string,
+    schoolId: string
+  ): Promise<any[]> {
+    // 1. Get all subjects the student is already enrolled in for this class enrollment
+    const enrolledSubjects = await this.prisma.studentClassSubject.findMany({
+      where: {
+        enrollmentId,
+        schoolId,
+        status: 'ACTIVE',
+      },
+      select: {
+        classSubjectId: true,
+      },
+    });
+    const enrolledSubjectIds = enrolledSubjects.map((s) => s.classSubjectId);
+
+    // 2. Get all non-core subjects offered for the class
+    const availableSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        classId,
+        schoolId,
+        subjectCategory: {
+          not: 'CORE',
+        },
+        // 3. Exclude subjects the student is already enrolled in
+        id: {
+          notIn: enrolledSubjectIds,
+        },
+      },
+      include: {
+        subject: true,
+        teacherProfile: {
+          include: {
+            user: {
+              select: {
+                firstName: true,
+                lastName: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        subject: {
+          name: 'asc',
+        },
+      },
+    });
+
+    return availableSubjects;
+  }
 }

@@ -10,6 +10,7 @@ RUN npm install
 COPY . .
 
 # Generate Prisma Client
+RUN npx prisma migrate dev
 RUN npx prisma generate
 
 EXPOSE 4000

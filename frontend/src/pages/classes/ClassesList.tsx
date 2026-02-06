@@ -177,7 +177,7 @@ export default function ClassesList() {
   accessorKey: 'classTeacher',
   header: 'Class Teacher',
   cell: ({ row }) => {
-    const teacher = row.original.classTeacher.user;
+    const teacher = row.original.classTeacher?.user;
     return (
       <span className="text-sm">
         {teacher  ? `${teacher.firstName} ${teacher.lastName}`

@@ -193,3 +193,23 @@ export function useBulkUpdateSubjectStatus() {
     },
   });
 }
+
+/**
+ * Get available subjects for a student to enroll in
+ */
+export function useAvailableSubjectsForStudent(
+  enrollmentId: string | undefined,
+  classId: string | undefined,
+  schoolId: string | undefined
+) {
+  return useQuery({
+    queryKey: ['available-subjects', enrollmentId, classId],
+    queryFn: () =>
+      studentClassSubjectApi.getAvailableSubjectsForStudent(
+        enrollmentId!,
+        classId!,
+        schoolId!
+      ),
+    enabled: !!enrollmentId && !!classId && !!schoolId,
+  });
+}

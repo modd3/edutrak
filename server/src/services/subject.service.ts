@@ -19,6 +19,9 @@ export class SubjectService {
     curriculum: Curriculum[];
     description?: string;
   }): Promise<Subject> {
+    if ((data as any).subjectGroup === '') {
+      (data as any).subjectGroup = undefined;
+    }
     const subject = await this.prisma.subject.create({
       data: {
         id: uuidv4(),
