@@ -17,8 +17,7 @@ export class ClassSubjectController {
         academicYearId, 
         termId, 
         streamId, 
-        teacherId, 
-        subjectCategory 
+        teacherId
       } = req.body;
 
       const schoolId = req.user?.schoolId;
@@ -32,8 +31,7 @@ export class ClassSubjectController {
         termId,
         streamId,
         teacherId,
-        schoolId,
-        subjectCategory
+        schoolId
       });
 
       return ResponseUtil.success(res, 'Subject assigned to class successfully', result);

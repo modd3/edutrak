@@ -353,10 +353,19 @@ export class TeacherService extends BaseService {
     teacherId: string;
     termId: string;
     academicYearId: string;
-    subjectCategory: SubjectCategory;
     streamId?: string;
     strandIds?: string[];
   }) {
+    // Fetch subject to get its category (source of truth)
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: data.subjectId },
+      select: { id: true, category: true },
+    });
+
+    if (!subject) {
+      throw new Error(`Subject ${data.subjectId} not found`);
+    }
+
     const assignment = await this.prisma.classSubject.create({
       data: {
         id: uuidv4(),
@@ -365,7 +374,7 @@ export class TeacherService extends BaseService {
         teacherId: data.teacherId,
         termId: data.termId,
         academicYearId: data.academicYearId,
-        subjectCategory: data.subjectCategory,
+        subjectCategory: subject.category,
         streamId: data.streamId,
         ...(data.strandIds && data.strandIds.length > 0 && {
           strands: {

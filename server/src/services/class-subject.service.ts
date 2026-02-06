@@ -14,6 +14,9 @@ export class ClassSubjectService {
    * Assign a subject to a class (and optionally a specific stream)
    * This creates the record required for assessments.
    * Now includes SubjectOffering validation
+   * 
+   * NOTE: subjectCategory is fetched from Subject model, not accepted as parameter
+   * to maintain referential integrity
    */
   async assignSubjectToClass(data: {
     classId: string;
@@ -23,7 +26,6 @@ export class ClassSubjectService {
     streamId?: string; // Optional: if null, applies to entire class
     teacherId?: string; // Optional: assign teacher immediately
     schoolId: string;
-    subjectCategory: 'CORE' | 'ELECTIVE' | 'OPTIONAL' | 'TECHNICAL' | 'APPLIED';
   }): Promise<ClassSubject> {
     
     // Validate subject offering exists for this school
@@ -77,6 +79,16 @@ export class ClassSubjectService {
       throw new Error('Subject is already assigned to this class/stream for this term.');
     }
 
+    // Fetch subject to get its category (source of truth)
+    const subject = await this.prisma.subject.findUnique({
+      where: { id: data.subjectId },
+      select: { id: true, category: true, name: true },
+    });
+
+    if (!subject) {
+      throw new Error(`Subject ${data.subjectId} not found`);
+    }
+
     const classSubject = await this.prisma.classSubject.create({
       data: {
         classId: data.classId,
@@ -86,7 +98,7 @@ export class ClassSubjectService {
         schoolId: data.schoolId,
         streamId: data.streamId || null,
         teacherId: data.teacherId || null,
-        subjectCategory: data.subjectCategory,
+        subjectCategory: subject.category,
       },
       include: {
         subject: true,
