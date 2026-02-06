@@ -1,5 +1,5 @@
 // src/services/student-class-subject.service.ts
-import { PrismaClient, StudentClassSubject, EnrollmentStatus } from '@prisma/client';
+import { PrismaClient, StudentClassSubject, SubjectEnrollmentStatus } from '@prisma/client';
 import prisma from '../database/client';
 import logger from '../utils/logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -104,6 +104,7 @@ export class StudentClassSubjectService {
 
   /**
    * Bulk enroll students in a subject
+   * Handles re-enrollment by updating dropped subjects back to ACTIVE
    */
   async bulkEnrollStudentsInSubject(data: {
     enrollmentIds: string[];
@@ -127,8 +128,21 @@ export class StudentClassSubjectService {
 
     const results = await this.prisma.$transaction(
       studentEnrollments.map((enrollment) =>
-        this.prisma.studentClassSubject.create({
-          data: {
+        // Use upsert to handle re-enrollment of dropped subjects
+        this.prisma.studentClassSubject.upsert({
+          where: {
+            studentId_classSubjectId_enrollmentId: {
+              studentId: enrollment.studentId,
+              classSubjectId: data.classSubjectId,
+              enrollmentId: enrollment.id,
+            },
+          },
+          update: {
+            status: 'ACTIVE',
+            droppedAt: null,
+            enrolledAt: new Date(),
+          },
+          create: {
             id: uuidv4(),
             studentId: enrollment.studentId,
             classSubjectId: data.classSubjectId,
@@ -186,7 +200,7 @@ export class StudentClassSubjectService {
     const updated = await this.prisma.studentClassSubject.update({
       where: { id: enrollment.id },
       data: {
-        status: 'DROPPED_OUT',
+        status: 'DROPPED',
         droppedAt: new Date(),
       },
       include: {
@@ -214,7 +228,7 @@ export class StudentClassSubjectService {
   async getStudentSubjectEnrollments(
     enrollmentId: string,
     schoolId: string,
-    status?: EnrollmentStatus
+    status?: SubjectEnrollmentStatus
   ): Promise<StudentClassSubject[]> {
     const whereClause: any = {
       enrollmentId,
@@ -294,7 +308,7 @@ export class StudentClassSubjectService {
   async getStudentsEnrolledInSubject(
     classSubjectId: string,
     schoolId: string,
-    status?: EnrollmentStatus
+    status?: SubjectEnrollmentStatus
   ): Promise<StudentClassSubject[]> {
     const whereClause: any = {
       classSubjectId,

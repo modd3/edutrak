@@ -341,7 +341,7 @@ model StudentClassSubject {
   enrollmentId   String       // Link to StudentClass for context
   schoolId       String?
   enrolledAt     DateTime     @default(now())
-  status         EnrollmentStatus @default(ACTIVE)
+  status         SubjectEnrollmentStatus @default(ACTIVE)
   droppedAt      DateTime?
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
