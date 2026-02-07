@@ -57,6 +57,7 @@ export function ElectiveSubjectSelectionDialog({
     useAvailableSubjectsForStudent(enrollmentId, classId, schoolId);
   
   const electiveSubjects = availableSubjectsData?.data || [];
+  console.log("Available subjects data: ", availableSubjectsData);
 
   // Hooks for enrollment
   const { mutate: enrollSingleSubject } = useEnrollStudentInSubject();

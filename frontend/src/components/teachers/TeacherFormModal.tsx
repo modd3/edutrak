@@ -195,7 +195,8 @@ export function TeacherFormModal({ open, onOpenChange, mode, teacher }: TeacherF
 
       if (mode === 'create') {
         await api.post('/teachers/with-user', requestBody);
-        toast.success('Teacher created successfully');
+        console.log("Teacher Form Modal Creare: ", requestBody);
+                toast.success('Teacher created successfully');
         onOpenChange(false);
         resetForm();
         // Optionally refresh the list
