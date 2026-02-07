@@ -59,7 +59,7 @@ export class GuardianService extends BaseService {
     
     const { email, password, firstName, lastName, middleName, phone, idNumber, relationship, occupation, employer, workPhone, schoolId } = data;
 
-    return await this.prisma.$transaction(async (tx) => {
+    const guardian = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           id: uuidv4(),
@@ -89,13 +89,6 @@ export class GuardianService extends BaseService {
         },
       });
 
-      // Send welcome email
-      try {
-        await emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`);
-      } catch (error) {
-        logger.warn('Failed to send welcome email to guardian', { email, error });
-      }
-
       logger.info('Guardian with user account created successfully', { 
         guardianId: guardian.id, 
         createdBy: createdBy.userId 
@@ -103,6 +96,16 @@ export class GuardianService extends BaseService {
 
       return guardian;
     });
+
+    // Send welcome email asynchronously (fire-and-forget) after transaction completes
+    setImmediate(() => {
+      emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`)
+        .catch(error => {
+          logger.warn('Failed to send welcome email to guardian', { email, error });
+        });
+    });
+
+    return guardian;
   }
 
   async getGuardians(filters?: {

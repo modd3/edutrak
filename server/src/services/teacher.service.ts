@@ -80,7 +80,7 @@ export class TeacherService extends BaseService {
       ...teacherData 
     } = data as any; // Cast to any to handle extra properties safely
 
-    return await this.prisma.$transaction(async (tx) => {
+    const teacher = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
           id: uuidv4(),
@@ -110,13 +110,6 @@ export class TeacherService extends BaseService {
         },
       });
 
-      // Send welcome email
-      try {
-        await emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`);
-      } catch (error) {
-        logger.warn('Failed to send welcome email to teacher', { email, error });
-      }
-
       logger.info('Teacher with user account created successfully', { 
         teacherId: teacher.id, 
         tscNumber: teacher.tscNumber,
@@ -125,6 +118,16 @@ export class TeacherService extends BaseService {
 
       return teacher;
     });
+
+    // Send welcome email asynchronously (fire-and-forget) after transaction completes
+    setImmediate(() => {
+      emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`)
+        .catch(error => {
+          logger.warn('Failed to send welcome email to teacher', { email, error });
+        });
+    });
+
+    return teacher;
   }
 
   async getTeachers(filters?: {
