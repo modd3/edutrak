@@ -1,7 +1,7 @@
 // src/validation/student-class-subject.validation.ts
 
 import { z } from 'zod';
-import { EnrollmentStatus } from '@prisma/client';
+import { SubjectEnrollmentStatus } from '@prisma/client';
 
 /**
  * Enroll Student in Subject Schema
@@ -38,7 +38,7 @@ export const updateSubjectEnrollmentStatusSchema = z.object({
   enrollmentId: z.string().uuid('Invalid enrollment ID'),
   classSubjectId: z.string().uuid('Invalid class subject ID'),
   schoolId: z.string().uuid('Invalid school ID'),
-  status: z.nativeEnum(EnrollmentStatus),
+  status: z.nativeEnum(SubjectEnrollmentStatus),
 });
 
 /**
@@ -49,7 +49,7 @@ export const getStudentSubjectEnrollmentsQuerySchema = z.object({
   classSubjectId: z.string().uuid('Invalid class subject ID').optional(),
   studentId: z.string().uuid('Invalid student ID').optional(),
   schoolId: z.string().uuid('Invalid school ID').optional(),
-  status: z.nativeEnum(EnrollmentStatus).optional(),
+  status: z.nativeEnum(SubjectEnrollmentStatus).optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
@@ -60,7 +60,7 @@ export const getStudentSubjectEnrollmentsQuerySchema = z.object({
 export const getStudentsEnrolledInSubjectQuerySchema = z.object({
   classSubjectId: z.string().uuid('Invalid class subject ID'),
   schoolId: z.string().uuid('Invalid school ID'),
-  status: z.nativeEnum(EnrollmentStatus).optional(),
+  status: z.nativeEnum(SubjectEnrollmentStatus).optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
@@ -73,7 +73,7 @@ export const bulkUpdateSubjectStatusSchema = z.object({
     z.object({
       enrollmentId: z.string().uuid('Invalid enrollment ID'),
       classSubjectId: z.string().uuid('Invalid class subject ID'),
-      status: z.nativeEnum(EnrollmentStatus),
+      status: z.nativeEnum(SubjectEnrollmentStatus),
     })
   ).min(1, 'At least one update is required'),
   schoolId: z.string().uuid('Invalid school ID'),

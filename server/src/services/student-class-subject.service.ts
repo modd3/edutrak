@@ -355,7 +355,7 @@ export class StudentClassSubjectService {
     enrollmentId: string,
     classSubjectId: string,
     schoolId: string,
-    status: EnrollmentStatus
+    status: SubjectEnrollmentStatus
   ): Promise<StudentClassSubject> {
     const enrollment = await this.prisma.studentClassSubject.findFirst({
       where: {
@@ -447,7 +447,7 @@ export class StudentClassSubjectService {
   async getSubjectEnrollmentCount(
     classSubjectId: string,
     schoolId: string,
-    status?: EnrollmentStatus
+    status?: SubjectEnrollmentStatus
   ): Promise<number> {
     return this.prisma.studentClassSubject.count({
       where: {
@@ -466,7 +466,7 @@ export class StudentClassSubjectService {
     schoolId: string,
     page: number = 1,
     limit: number = 20,
-    status?: EnrollmentStatus
+    status?: SubjectEnrollmentStatus
   ) {
     const skip = (page - 1) * limit;
 
