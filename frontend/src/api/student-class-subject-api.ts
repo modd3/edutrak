@@ -5,7 +5,7 @@
  */
 
 import api from '.';
-import { EnrollmentStatus } from '@/types';
+import { SubjectEnrollmentStatus } from '@/types';
 
 export interface StudentSubjectEnrollment {
   id: string;
@@ -13,7 +13,7 @@ export interface StudentSubjectEnrollment {
   classSubjectId: string;
   enrollmentId: string;
   schoolId: string;
-  status: EnrollmentStatus;
+  status: SubjectEnrollmentStatus;
   enrolledAt: string;
   droppedAt?: string;
 }
@@ -108,7 +108,7 @@ export const studentClassSubjectApi = {
   getStudentSubjectEnrollments: async (
     enrollmentId: string,
     params?: {
-      status?: EnrollmentStatus;
+      status?: SubjectEnrollmentStatus;
     }
   ): Promise<{ data: StudentSubjectEnrollmentWithDetails[]; total: number }> => {
     const response = await api.get(
@@ -137,7 +137,7 @@ export const studentClassSubjectApi = {
     classSubjectId: string,
     schoolId: string,
     params?: {
-      status?: EnrollmentStatus;
+      status?: SubjectEnrollmentStatus;
       page?: number;
       limit?: number;
     }
@@ -154,7 +154,7 @@ export const studentClassSubjectApi = {
    */
   getSubjectEnrollmentCount: async (
     classSubjectId: string,
-    status?: EnrollmentStatus
+    status?: SubjectEnrollmentStatus
   ): Promise<{ classSubjectId: string; count: number }> => {
     const response = await api.get(
       '/academic/student-class-subject/count',
@@ -185,7 +185,7 @@ export const studentClassSubjectApi = {
     enrollmentId: string;
     classSubjectId: string;
     schoolId: string;
-    status: EnrollmentStatus;
+    status: SubjectEnrollmentStatus;
   }): Promise<StudentSubjectEnrollment> => {
     const response = await api.patch(
       '/academic/student-class-subject/status',
@@ -201,7 +201,7 @@ export const studentClassSubjectApi = {
     updates: Array<{
       enrollmentId: string;
       classSubjectId: string;
-      status: EnrollmentStatus;
+      status: SubjectEnrollmentStatus;
     }>;
     schoolId: string;
   }): Promise<{ updated: number; results: StudentSubjectEnrollment[] }> => {

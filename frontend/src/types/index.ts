@@ -32,6 +32,13 @@ export enum EnrollmentStatus {
   DROPPED_OUT = 'DROPPED_OUT',
   SUSPENDED = 'SUSPENDED'
 };
+
+export enum SubjectEnrollmentStatus {
+  ACTIVE = 'ACTIVE',
+  DROPPED = 'DROPPED',
+  COMPLETED = 'COMPLETED',
+  FAILED = 'FAILED'
+}
 export enum AssessmentType  {
   CAT = 'CAT',
   MIDTERM = 'MIDTERM',

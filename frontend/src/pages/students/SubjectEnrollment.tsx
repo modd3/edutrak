@@ -18,6 +18,7 @@ import { useStudent } from '@/hooks/use-students';
 import {
   useAllStudentSubjectEnrollments,
   useDropStudentFromSubject,
+  useUpdateSubjectEnrollmentStatus,
 } from '@/hooks/use-student-subject-enrollment';
 import { ElectiveSubjectSelectionDialog } from '@/components/subjects/ElectiveSubjectSelectionDialog';
 import { useSchoolContext } from '@/hooks/use-school-context';
@@ -42,6 +43,16 @@ export function StudentSubjectEnrollmentPage() {
 
   const { mutate: dropSubject, isPending: isDropping } =
     useDropStudentFromSubject();
+
+  const { mutate: updateStatus, isPending: isUpdating } = useUpdateSubjectEnrollmentStatus();
+
+  const handleReEnroll = (enrollment: any) => {
+    updateStatus({
+      enrollmentId: enrollment.id,
+      status: 'ACTIVE',
+      schoolId: schoolId!,
+    });
+  };
 
   const handleDropSubject = (enrollment: any) => {
     setSubjectToDrop(enrollment);
@@ -75,6 +86,11 @@ export function StudentSubjectEnrollmentPage() {
   const { data: enrollmentsData, isLoading: isLoadingEnrollments } = useAllStudentSubjectEnrollments(studentId);
   const enrollments = enrollmentsData?.data || [];
 
+  // Find the student's active class enrollment (not subject enrollment)
+  const activeClassEnrollment = student?.enrollments?.find(
+    (e: any) => e.status === 'ACTIVE'
+  );
+
   // Group enrollments by status
   const activeEnrollments = enrollments.filter((e: any) => e.status === 'ACTIVE');
   const droppedEnrollments = enrollments.filter((e: any) => e.status === 'DROPPED');
@@ -82,7 +98,10 @@ export function StudentSubjectEnrollmentPage() {
   // Group by class
   const enrollmentsByClass: Record<string, any[]> = {};
   activeEnrollments.forEach((enrollment: any) => {
-    const className = enrollment.classSubject?.class?.name || 'Unknown Class';
+    const className = 
+      enrollment.classSubject?.class?.name || 
+      (enrollment.enrollmentId === activeClassEnrollment?.id ? activeClassEnrollment?.class?.name : null) ||
+      'Unknown Class';
     if (!enrollmentsByClass[className]) {
       enrollmentsByClass[className] = [];
     }
@@ -240,8 +259,10 @@ export function StudentSubjectEnrollmentPage() {
                             <div className="flex justify-between text-sm">
                               <span className="text-gray-500">Teacher:</span>
                               <span className="font-medium">
-                                {enrollment.classSubject?.teacherProfile?.user?.firstName}{' '}
-                                {enrollment.classSubject?.teacherProfile?.user?.lastName || 'Not assigned'}
+                                {(() => {
+                                  const user = enrollment.classSubject?.teacherProfile?.user || enrollment.classSubject?.teacher?.user;
+                                  return user ? `${user.firstName} ${user.lastName}` : 'Not assigned';
+                                })()}
                               </span>
                             </div>
                             <div className="flex justify-between text-sm">
@@ -322,6 +343,17 @@ export function StudentSubjectEnrollmentPage() {
                             : 'Unknown'}
                         </span>
                       </div>
+                      <div className="pt-2 mt-2 border-t">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => handleReEnroll(enrollment)}
+                          disabled={isUpdating}
+                        >
+                          Re-enroll Subject
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -332,13 +364,13 @@ export function StudentSubjectEnrollmentPage() {
       )}
 
       {/* Elective Selection Dialog */}
-      {student.currentEnrollmentId && (
+      {activeClassEnrollment && schoolId && (activeClassEnrollment.classId || activeClassEnrollment.class?.id) && (
         <ElectiveSubjectSelectionDialog
           open={showElectiveDialog}
           onOpenChange={setShowElectiveDialog}
-          classId={student.currentClassId || ''}
+          classId={activeClassEnrollment.classId || activeClassEnrollment.class?.id!}
           studentId={studentId!}
-          enrollmentId={student.currentEnrollmentId}
+          enrollmentId={activeClassEnrollment.id}
           schoolId={schoolId}
           onSuccess={() => {
             // Refresh enrollments data
