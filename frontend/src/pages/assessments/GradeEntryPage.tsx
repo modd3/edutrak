@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Upload, Users } from 'lucide-react';
 import { useAssessment } from '@/hooks/use-assessments';
-import { useClassSubjectStudents } from '@/hooks/use-student-subjects';
+import { useSubjectEnrollmentCount } from '@/hooks/use-student-subject-enrollment';
+import { SubjectEnrollmentStatus } from '@/types';
 import { GradeEntryTable } from '@/components/grades/GradeEntryTable';
 import { CSVUpload } from '@/components/grades/CSVUpload';
 import { Button } from '@/components/ui/button';
@@ -28,13 +29,14 @@ export function GradeEntryPage() {
   const { data: assessmentData, isLoading: assessmentLoading } = useAssessment(assessmentId);
   const assessment = assessmentData?.data;
 
-  // Fetch students who have selected this subject
-  const { data: studentsData, isLoading: studentsLoading } = useClassSubjectStudents(
-    assessment?.classSubjectId
+  // Fetch student count for this subject
+  const { data: countData, isLoading: countLoading } = useSubjectEnrollmentCount(
+    assessment?.classSubjectId,
+    SubjectEnrollmentStatus.ACTIVE
   );
-  const students = studentsData?.data || [];
+  const studentCount = countData?.count || 0;
 
-  const isLoading = assessmentLoading || studentsLoading;
+  const isLoading = assessmentLoading || countLoading;
 
   if (isLoading) {
     return (
@@ -123,7 +125,7 @@ export function GradeEntryPage() {
             <div>
               <p className="text-sm text-gray-500">Results Entered</p>
               <p className="font-semibold mt-1">
-                {assessment._count?.results || 0} / {students.length}
+                {assessment._count?.results || 0} / {studentCount}
               </p>
             </div>
           </div>
@@ -131,7 +133,7 @@ export function GradeEntryPage() {
       </Card>
 
       {/* Student Count Alert */}
-      {students.length === 0 ? (
+      {studentCount === 0 ? (
         <Alert>
           <Users className="h-4 w-4" />
           <AlertDescription>
@@ -146,23 +148,18 @@ export function GradeEntryPage() {
           <Users className="h-4 w-4" />
           <AlertDescription>
             {isCoreSubject
-              ? `${students.length} students enrolled (Core subject - all students)`
-              : `${students.length} students have selected this subject`
+              ? `${studentCount} students enrolled (Core subject - all students)`
+              : `${studentCount} students have selected this subject`
             }
           </AlertDescription>
         </Alert>
       )}
 
       {/* Grade Entry Table */}
-      {students.length > 0 && (
+      {studentCount > 0 && (
         <GradeEntryTable
           assessmentId={assessmentId!}
-          students={students.map((s: any) => ({
-            id: s.student.id,
-            admissionNo: s.student.admissionNo,
-            firstName: s.student.firstName,
-            lastName: s.student.lastName,
-          }))}
+          classSubjectId={assessment.classSubjectId}
           maxMarks={assessment.maxMarks || 100}
         />
       )}

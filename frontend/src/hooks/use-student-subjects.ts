@@ -30,22 +30,6 @@ export function useClassStudentsWithSubjects(classId: string | undefined, termId
 }
 
 /**
- * Get students enrolled in a specific subject (for grade entry)
- * UPDATED: Now uses StudentClassSubject relationships instead of selectedSubjects
- */
-export function useClassSubjectStudents(classSubjectId: string | undefined) {
-  return useQuery({
-    queryKey: ['class-subject-students', classSubjectId],
-    queryFn: async () => {
-      if (!classSubjectId) return { data: [] };
-      const response = await studentClassSubjectApi.getStudentsEnrolledInSubject(classSubjectId);
-      return response;
-    },
-    enabled: !!classSubjectId,
-  });
-}
-
-/**
  * Update student's selected subjects (elective/optional only)
  * UPDATED: Now creates StudentClassSubject records instead of updating JSON array
  */

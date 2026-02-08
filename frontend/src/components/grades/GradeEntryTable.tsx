@@ -5,6 +5,7 @@ import { Save, Upload, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { useAssessmentResults } from '@/hooks/use-grades';
 import { useBulkGradeEntry } from '@/hooks/use-grades';
 import { useStudentsEnrolledInSubject } from '@/hooks/use-student-subject-enrollment';
+import { SubjectEnrollmentStatus } from '@/types';
 import {
   Card,
   CardContent,
@@ -56,7 +57,7 @@ export function GradeEntryTable({
   const [hasChanges, setHasChanges] = useState(false);
 
   // ✅ NEW: Fetch students enrolled in this specific subject
-  const { data: subjectRosterData, isLoading: isLoadingRoster, error: rosterError } = useStudentsEnrolledInSubject(classSubjectId);
+  const { data: subjectRosterData, isLoading: isLoadingRoster, error: rosterError } = useStudentsEnrolledInSubject(classSubjectId, { status: SubjectEnrollmentStatus.ACTIVE });
   const students = subjectRosterData?.data?.map((item) => item.student) || [];
  
   const { data: existingResults, isLoading: isLoadingResults } = useAssessmentResults(assessmentId);

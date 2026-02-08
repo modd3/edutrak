@@ -63,6 +63,14 @@ router.get(
   controller.getSubjectAssessments
 );
 
+// Get results with filtering
+router.get(
+  '/results',
+  authenticate,
+  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
+  controller.getResults
+);
+
 // Get single assessment by ID
 router.get(
   '/:id',
@@ -113,14 +121,6 @@ router.post(
   authenticate,
   authorize('ADMIN', 'TEACHER'),
   controller.csvBulkUpload
-);
-
-// Get results with filtering
-router.get(
-  '/results',
-  authenticate,
-  authorize('ADMIN', 'TEACHER', 'STUDENT', 'PARENT'),
-  controller.getResults
 );
 
 // Update result
