@@ -111,8 +111,12 @@ export class StudentClassSubjectController {
    */
   async getStudentsEnrolledInSubject(req: RequestWithUser, res: Response) {
     try {
-      const query = getStudentsEnrolledInSubjectQuerySchema.parse(req.query);
-
+      const query = getStudentsEnrolledInSubjectQuerySchema.parse({
+        ...req.query,
+        schoolId: req.schoolId,
+      });
+console.log("Query: ", query);
+console.log("req: ", req);
       const result = await service.getSubjectStudentsWithPagination(
         query.classSubjectId,
         req.schoolId!,
@@ -120,9 +124,11 @@ export class StudentClassSubjectController {
         query.limit || 20,
         query.status
       );
-
+console.log("Results: ", result);
       return ResponseUtil.success(res, 'Students enrolled in subject retrieved', result);
     } catch (error: any) {
+      console.log("Req.query: ", req.query);
+      console.log("Error: ", error);
       return ResponseUtil.error(res, error.message, 400);
     }
   }

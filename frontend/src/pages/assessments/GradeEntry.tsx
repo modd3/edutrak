@@ -268,7 +268,7 @@ export default function GradeEntry() {
                   <SelectValue placeholder="Select class" />
                 </SelectTrigger>
                 <SelectContent>
-                  {classes.map((cls) => (
+                  {classes.map((cls: any) => (
                     <SelectItem key={cls.id} value={cls.id}>
                       {cls.name} ({cls.level})
                     </SelectItem>
@@ -289,7 +289,7 @@ export default function GradeEntry() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="">All streams</SelectItem>
-                  {streams.map((stream) => (
+                  {streams.map((stream: any) => (
                     <SelectItem key={stream.id} value={stream.id}>
                       {stream.name}
                     </SelectItem>
@@ -309,7 +309,7 @@ export default function GradeEntry() {
                   <SelectValue placeholder="Select assessment" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assessments.map((assessment) => (
+                  {assessments.map((assessment: any) => (
                     <SelectItem key={assessment.id} value={assessment.id}>
                       {assessment.name} ({assessment.type})
                     </SelectItem>
@@ -346,7 +346,6 @@ export default function GradeEntry() {
               columns={columns}
               data={gradeEntries}
               pageSize={50}
-              showPagination={gradeEntries.length > 50}
             />
           </CardContent>
         </Card>

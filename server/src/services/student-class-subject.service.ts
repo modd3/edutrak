@@ -504,6 +504,8 @@ export class StudentClassSubjectService {
       }),
       this.prisma.studentClassSubject.count({ where: whereClause }),
     ]);
+    console.log("SchoolId: ", schoolId);
+    console.log("StudentClassSubjectData: ", data);
 
     return {
       data,

@@ -57,8 +57,8 @@ export function GradeEntryTable({
 
   // ✅ NEW: Fetch students enrolled in this specific subject
   const { data: subjectRosterData, isLoading: isLoadingRoster, error: rosterError } = useStudentsEnrolledInSubject(classSubjectId);
-  const students = subjectRosterData?.data || subjectRosterData || [];
-
+  const students = subjectRosterData?.data?.map((item) => item.student) || [];
+ 
   const { data: existingResults, isLoading: isLoadingResults } = useAssessmentResults(assessmentId);
   const bulkEntryMutation = useBulkGradeEntry();
 
@@ -160,7 +160,7 @@ export function GradeEntryTable({
     return 'E';
   };
 
-  if (isLoading) {
+  if (isLoadingRoster || isLoadingResults) {
     return (
       <Card>
         <CardHeader>

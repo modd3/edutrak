@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { studentClassSubjectApi } from '@/api/student-class-subject-api';
 import { useAuthStore } from '@/store/auth-store';
 import { toast } from 'sonner';
-import { EnrollmentStatus } from '@/types';
+import { SubjectEnrollmentStatus } from '@/types';
 
 /**
  * Enroll a student in a subject
@@ -84,7 +84,7 @@ export function useDropStudentFromSubject() {
  */
 export function useStudentSubjectEnrollments(
   enrollmentId: string | undefined,
-  status?: EnrollmentStatus
+  status?: SubjectEnrollmentStatus
 ) {
   return useQuery({
     queryKey: ['student-subject-enrollments', enrollmentId, status],
@@ -118,7 +118,7 @@ export function useStudentsEnrolledInSubject(
   params?: {
     page?: number;
     limit?: number;
-    status?: EnrollmentStatus;
+    status?: SubjectEnrollmentStatus;
   }
 ) {
   const { user } = useAuthStore();
@@ -140,7 +140,7 @@ export function useStudentsEnrolledInSubject(
  */
 export function useSubjectEnrollmentCount(
   classSubjectId: string | undefined,
-  status?: EnrollmentStatus
+  status?: SubjectEnrollmentStatus
 ) {
   return useQuery({
     queryKey: ['subject-enrollment-count', classSubjectId, status],
