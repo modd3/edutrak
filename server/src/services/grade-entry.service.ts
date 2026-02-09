@@ -136,7 +136,7 @@ export class GradeEntryService {
     const results: AssessmentResult[] = [];
     const errors: Array<{ studentId: string; error: string }> = [];
 
-    // Verify assessment
+    // Verify assessment with full context
     const assessment = await this.prisma.assessmentDefinition.findFirst({
       where: {
         id: data.assessmentDefId,
@@ -155,10 +155,50 @@ export class GradeEntryService {
       throw new Error('Assessment not found');
     }
 
+    // Get students enrolled in this subject
+    const enrolledStudents = await this.prisma.studentClassSubject.findMany({
+      where: {
+        classSubjectId: assessment.classSubjectId,
+        status: 'ACTIVE',
+      },
+      select: { studentId: true },
+    });
+    const enrolledStudentIds = new Set(enrolledStudents.map((es) => es.studentId));
+
+    // Verify all students belong to the school
+    const studentIds = data.entries.map((entry) => entry.studentId);
+    const validStudents = await this.prisma.student.findMany({
+      where: {
+        id: { in: studentIds },
+        schoolId,
+      },
+      select: { id: true, admissionNo: true, firstName: true, lastName: true },
+    });
+    const validStudentMap = new Map(validStudents.map((s) => [s.id, s]));
+
     // Process each entry
     await this.prisma.$transaction(async (tx) => {
       for (const entry of data.entries) {
         try {
+          // Verify student exists in school
+          if (!validStudentMap.has(entry.studentId)) {
+            errors.push({
+              studentId: entry.studentId,
+              error: 'Student not found in school.',
+            });
+            continue;
+          }
+
+          // Verify student is enrolled in this subject
+          if (!enrolledStudentIds.has(entry.studentId)) {
+            const student = validStudentMap.get(entry.studentId);
+            errors.push({
+              studentId: entry.studentId,
+              error: `Student ${student?.admissionNo} (${student?.firstName} ${student?.lastName}) is not enrolled in this subject.`,
+            });
+            continue;
+          }
+
           // Validate marks
           if (assessment.maxMarks && entry.marks > assessment.maxMarks) {
             errors.push({

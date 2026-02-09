@@ -307,11 +307,24 @@ export class AssessmentController {
     try {
       const data = createAssessmentResultSchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
-      const assessedById = req.user!.userId;
+      const userId = req.user!.userId;
+
+      // Fetch teacher record to get teacher ID (required for foreign key)
+      const teacher = await prisma.teacher.findUnique({
+        where: { userId },
+      });
+
+      if (!teacher) {
+        res.status(403).json({
+          error: 'TEACHER_NOT_FOUND',
+          message: 'User is not a teacher. Only teachers can grade assessments.',
+        });
+        return;
+      }
 
       const result = await this.gradeEntryService.createOrUpdateResult(
         data,
-        assessedById,
+        teacher.id,
         schoolId
       );
 
@@ -343,11 +356,24 @@ export class AssessmentController {
     try {
       const data = gradeEntrySchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
-      const assessedById = req.user!.userId;
+      const userId = req.user!.userId;
+
+      // Fetch teacher record to get teacher ID (required for foreign key)
+      const teacher = await prisma.teacher.findUnique({
+        where: { userId },
+      });
+
+      if (!teacher) {
+        res.status(403).json({
+          error: 'TEACHER_NOT_FOUND',
+          message: 'User is not a teacher. Only teachers can grade assessments.',
+        });
+        return;
+      }
 
       const result = await this.gradeEntryService.bulkGradeEntry(
         data,
-        assessedById,
+        teacher.id,
         schoolId
       );
 
@@ -380,7 +406,20 @@ export class AssessmentController {
       const { assessmentId } = req.params;
       const csvData = req.body.data; // Array of CSV rows
       const schoolId = req.user!.schoolId!;
-      const assessedById = req.user!.userId;
+      const userId = req.user!.userId;
+
+      // Fetch teacher record to get teacher ID (required for foreign key)
+      const teacher = await prisma.teacher.findUnique({
+        where: { userId },
+      });
+
+      if (!teacher) {
+        res.status(403).json({
+          error: 'TEACHER_NOT_FOUND',
+          message: 'User is not a teacher. Only teachers can grade assessments.',
+        });
+        return;
+      }
 
       // Validate CSV data
       const validatedData = z.array(csvGradeEntryRowSchema).parse(csvData);
@@ -388,7 +427,7 @@ export class AssessmentController {
       const result = await this.gradeEntryService.csvBulkUpload(
         validatedData,
         assessmentId,
-        assessedById,
+        teacher.id,
         schoolId
       );
 

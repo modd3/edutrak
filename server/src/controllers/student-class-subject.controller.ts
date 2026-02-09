@@ -115,8 +115,7 @@ export class StudentClassSubjectController {
         ...req.query,
         schoolId: req.schoolId,
       });
-console.log("Query: ", query);
-console.log("req: ", req);
+
       const result = await service.getSubjectStudentsWithPagination(
         query.classSubjectId,
         req.schoolId!,
@@ -124,7 +123,7 @@ console.log("req: ", req);
         query.limit || 20,
         query.status
       );
-console.log("Results: ", result);
+
       return ResponseUtil.success(res, 'Students enrolled in subject retrieved', result);
     } catch (error: any) {
       console.log("Req.query: ", req.query);

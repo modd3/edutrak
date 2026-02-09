@@ -1,6 +1,6 @@
 // src/pages/assessments/ReportsPage.tsx
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { FileText, Users } from 'lucide-react';
 import { StudentReportCard } from '@/components/reports/StudentReportCard';
 import { ClassPerformanceReport } from '@/components/reports/ClassPerformanceReport';
@@ -19,12 +19,26 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
+import { useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
+import { useClassStudents } from '@/hooks/use-class-students';
 
 export function ReportsPage() {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedStudent, setSelectedStudent] = useState<string>('');
+
+  const { data: activeYear, isLoading: yearLoading } = useActiveAcademicYear();
+  const { data: classesData, isLoading: classesLoading } = useClasses(activeYear?.id);
+  const { data: studentsData, isLoading: studentsLoading } = useClassStudents(selectedClass, activeYear?.id);
+
+  const terms = activeYear?.terms || [];
+  const termsLoading = yearLoading;
+  const classes = classesData.data;
+
+  useEffect(() => {
+    // Reset student when class changes
+    setSelectedStudent('');
+  }, [selectedClass]);
 
   return (
     <div className="space-y-6">
@@ -64,13 +78,14 @@ export function ReportsPage() {
                   <label className="text-sm font-medium mb-2 block">Term</label>
                   <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select term" />
+                      <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* TODO: Load terms from API */}
-                      <SelectItem value="term1">Term 1 2024</SelectItem>
-                      <SelectItem value="term2">Term 2 2024</SelectItem>
-                      <SelectItem value="term3">Term 3 2024</SelectItem>
+                      {terms.map((term) => (
+                        <SelectItem key={term.id} value={term.id}>
+                          {term.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -79,13 +94,14 @@ export function ReportsPage() {
                   <label className="text-sm font-medium mb-2 block">Class</label>
                   <Select value={selectedClass} onValueChange={setSelectedClass}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
+                      <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* TODO: Load classes from API */}
-                      <SelectItem value="class1">Form 1A</SelectItem>
-                      <SelectItem value="class2">Form 1B</SelectItem>
-                      <SelectItem value="class3">Form 2A</SelectItem>
+                      {classes?.data?.map((classItem) => (
+                        <SelectItem key={classItem.id} value={classItem.id}>
+                          {classItem.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -97,19 +113,20 @@ export function ReportsPage() {
                   <Select
                     value={selectedStudent}
                     onValueChange={setSelectedStudent}
-                    disabled={!selectedClass}
+                    disabled={!selectedClass || studentsLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select student" />
+                      <SelectValue placeholder={studentsLoading ? 'Loading...' : 'Select student'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {/* TODO: Load students from API based on selected class */}
-                      <SelectItem value="student1">
-                        STU-001 - John Doe
-                      </SelectItem>
-                      <SelectItem value="student2">
-                        STU-002 - Jane Smith
-                      </SelectItem>
+                      {studentsData?.data?.map((item: any) => {
+                        const student = item.student || item;
+                        return (
+                          <SelectItem key={student.id} value={student.id}>
+                            {student.admissionNo} - {student.firstName} {student.lastName}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
@@ -152,12 +169,14 @@ export function ReportsPage() {
                   <label className="text-sm font-medium mb-2 block">Term</label>
                   <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select term" />
+                      <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="term1">Term 1 2024</SelectItem>
-                      <SelectItem value="term2">Term 2 2024</SelectItem>
-                      <SelectItem value="term3">Term 3 2024</SelectItem>
+                      {terms.map((term) => (
+                        <SelectItem key={term.id} value={term.id}>
+                          {term.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -166,12 +185,14 @@ export function ReportsPage() {
                   <label className="text-sm font-medium mb-2 block">Class</label>
                   <Select value={selectedClass} onValueChange={setSelectedClass}>
                     <SelectTrigger>
-                      <SelectValue placeholder="Select class" />
+                      <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="class1">Form 1A</SelectItem>
-                      <SelectItem value="class2">Form 1B</SelectItem>
-                      <SelectItem value="class3">Form 2A</SelectItem>
+                      {classes?.data?.map((classItem) => (
+                        <SelectItem key={classItem.id} value={classItem.id}>
+                          {classItem.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>
