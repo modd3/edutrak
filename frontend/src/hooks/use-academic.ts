@@ -193,6 +193,7 @@ export function useClasses(academicYearId?: string) {
       const response = await api.get('/academic/classes', { params });
       return response.data;
     },
+    enabled: !!academicYearId,
   });
 }
 

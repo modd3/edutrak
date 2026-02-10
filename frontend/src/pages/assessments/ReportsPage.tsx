@@ -32,8 +32,10 @@ export function ReportsPage() {
   const { data: studentsData, isLoading: studentsLoading } = useClassStudents(selectedClass, activeYear?.id);
 
   const terms = activeYear?.terms || [];
+ console.log(useActiveAcademicYear());
+ console.log(useClasses(activeYear?.id));
   const termsLoading = yearLoading;
-  const classes = classesData.data;
+  const classes = classesData?.data;
 
   useEffect(() => {
     // Reset student when class changes
