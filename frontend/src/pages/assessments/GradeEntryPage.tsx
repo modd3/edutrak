@@ -120,7 +120,7 @@ export function GradeEntryPage() {
             </div>
             <div>
               <p className="text-sm text-gray-500">Term</p>
-              <p className="font-semibold mt-1">{assessment.term?.name}</p>
+              <p className="font-semibold mt-1">{assessment.term?.name.replace('_', ' ')}</p>
             </div>
             <div>
               <p className="text-sm text-gray-500">Results Entered</p>
