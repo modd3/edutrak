@@ -50,6 +50,7 @@ export function GradeEntryPage() {
   if (!assessment) {
     return (
       <Card>
+        <CardDescription>Go back to the assessments page.</CardDescription>
         <CardContent className="py-12 text-center">
           <p className="text-gray-500">Assessment not found</p>
           <Button onClick={() => navigate('/assessments')} className="mt-4">

@@ -1,4 +1,14 @@
 node_modules
 dist
-.env
+coverage
 .git
+.env
+.env.*
+*.log
+npm-debug.log*
+README.md
+.vscode
+.idea
+__tests__
+*.test.ts
+jest.config.js
