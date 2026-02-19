@@ -191,7 +191,7 @@ export function useClasses(academicYearId?: string) {
     queryFn: async () => {
       const params = academicYearId ? { academicYearId } : {};
       const response = await api.get('/academic/classes', { params });
-      return response.data;
+      return response.data.data;
     },
     enabled: !!academicYearId,
   });

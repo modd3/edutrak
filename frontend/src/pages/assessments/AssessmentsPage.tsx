@@ -40,6 +40,7 @@ export function AssessmentsPage() {
   // Fetch classes for the active academic year
   const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
   const classes = classesData?.data.data || [];
+  console.log("Use Classes: ", useClasses(activeYear?.id))
  
   // Fetch class subjects based on selected class and term
   const { data: classSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = useClassSubjects(

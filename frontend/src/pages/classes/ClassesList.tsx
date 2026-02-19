@@ -71,16 +71,16 @@ export default function ClassesList() {
 
   // Get active academic year
   const { data: activeYearData } = useActiveAcademicYear();
-  const activeAcademicYearId = activeYearData?.data?.id;
+  const activeAcademicYearId = activeYearData?.id;
 
 
   // Fetch classes with filters
   const { data: classesData, isLoading, isError } = useClasses(activeAcademicYearId);
-
+  
   const { mutate: deleteClass, isPending: isDeleting } = useDeleteClass();
 
-  const classes = classesData?.data?.data || [];
-  
+  const classes = classesData?.data || [];
+    
   // Filter classes by search
   const filteredClasses = classes.filter((cls: Class) =>
     cls.name.toLowerCase().includes(search.toLowerCase()) ||

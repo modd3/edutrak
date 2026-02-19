@@ -21,6 +21,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { useClassStudents } from '@/hooks/use-class-students';
+import { Class, Term } from '@/types';
 
 export function ReportsPage() {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
@@ -83,7 +84,7 @@ export function ReportsPage() {
                       <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {terms.map((term) => (
+                      {terms.map((term: Term) => (
                         <SelectItem key={term.id} value={term.id}>
                           {term.name}
                         </SelectItem>
@@ -99,7 +100,7 @@ export function ReportsPage() {
                       <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {classes?.data?.map((classItem) => (
+                      {classes?.data?.map((classItem: Class) => (
                         <SelectItem key={classItem.id} value={classItem.id}>
                           {classItem.name}
                         </SelectItem>
@@ -174,9 +175,9 @@ export function ReportsPage() {
                       <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {terms.map((term) => (
+                      {terms.map((term: Term) => (
                         <SelectItem key={term.id} value={term.id}>
-                          {term.name}
+                          {term.name.replace('_', ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -190,7 +191,7 @@ export function ReportsPage() {
                       <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
                     </SelectTrigger>
                     <SelectContent>
-                      {classes?.data?.map((classItem) => (
+                      {classes?.data?.map((classItem: Class) => (
                         <SelectItem key={classItem.id} value={classItem.id}>
                           {classItem.name}
                         </SelectItem>
