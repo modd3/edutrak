@@ -192,7 +192,7 @@ export function ReportsPage() {
                   </Select>
                 </div>
 
-                {/* Class — NOTE: fixed from classes?.data?.map → classes?.map */}
+                {/* Class */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Class</label>
                   <Select value={selectedClass} onValueChange={setSelectedClass}>
