@@ -68,18 +68,8 @@ export function StreamFormModal({
 
   // Reset form when modal opens/closes or when stream data changes
   useEffect(() => {
-    if (open) {
-      console.log('StreamFormModal opened:', { mode, stream, classId });
-      
+    if (open) {      
       if (mode === 'edit' && stream) {
-        console.log('Setting form for edit mode:', {
-          name: stream.name,
-          capacity: stream.capacity,
-          classId: stream.classId,
-          streamTeacherId: stream.streamTeacherId,
-          hasStreamTeacher: !!stream.streamTeacherId,
-        });
-        
         // Use setTimeout to ensure form reset happens after render
         setTimeout(() => {
           form.reset({
@@ -90,7 +80,6 @@ export function StreamFormModal({
           });
         }, 0);
       } else if (mode === 'create') {
-        console.log('Setting form for create mode:', { classId });
         form.reset({
           name: '',
           capacity: undefined,
@@ -101,10 +90,7 @@ export function StreamFormModal({
     }
   }, [open, mode, stream, classId]);
 
-  const onSubmit = async (data: StreamFormData) => {
-    console.log('Form submitted:', data);
-    console.log('Original stream data:', stream);
-    
+  const onSubmit = async (data: StreamFormData) => {    
     const requestBody = {
       ...data,
       // Remove undefined values and handle "none" selection
@@ -112,8 +98,6 @@ export function StreamFormModal({
       // Ensure streamTeacherId is null if empty string or "none"
       streamTeacherId: data.streamTeacherId && data.streamTeacherId !== 'none' ? data.streamTeacherId : null,
     };
-
-    console.log('Request body:', requestBody);
 
     if (mode === 'create') {
       createStream(requestBody, {
@@ -147,7 +131,6 @@ export function StreamFormModal({
   // Get stream teacher display value
   const getStreamTeacherDisplay = () => {
     const teacherId = form.watch('streamTeacherId');
-    console.log("Teacher Id for strem: ", teacherId);
     if (!teacherId || teacherId === 'none') return '-- Select stream teacher --';
     
     const teacher = teachers.find((t: any) => t.id === teacherId);
@@ -250,21 +233,6 @@ export function StreamFormModal({
               Stream teacher manages only this specific stream section
             </p>
           </div>
-
-          {/* Debug section - only show in development */}
-          {process.env.NODE_ENV === 'development' && (
-            <div className="mt-4 p-2 border rounded bg-gray-50">
-              <p className="text-xs font-mono text-gray-600">
-                <strong>Debug:</strong> {debugInfo}
-              </p>
-              <p className="text-xs font-mono text-gray-600 mt-1">
-                <strong>Current stream teacher ID:</strong> {form.watch('streamTeacherId') || 'empty'}
-              </p>
-              <p className="text-xs font-mono text-gray-600">
-                <strong>Original stream teacher ID:</strong> {stream?.streamTeacherId || 'none'}
-              </p>
-            </div>
-          )}
 
           <DialogFooter>
             <Button 

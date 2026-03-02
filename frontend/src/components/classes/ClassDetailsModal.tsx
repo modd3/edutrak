@@ -116,10 +116,6 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
 
   const streams = streamsData?.data || [];
   const subjects = subjectsData?.data.data || [];
-  console.log("subjects: ", subjects);
-  console.log("subjectsData: ", subjectsData);
-
-   
 
   // Safe access to terms
   const terms = activeAcademicYear?.terms || [];
@@ -177,54 +173,8 @@ export function ClassDetailsModal({ open, onOpenChange, classData }: ClassDetail
     }
   };
 
-  // Log streams and subjects when assign subject button is clicked
+
   const handleAssignSubjectClick = () => {
-    console.log('=== Assign Subject Button Clicked ===');
-    console.log('Class Details:', {
-      id: classData.id,
-      name: classData.name,
-      level: classData.level,
-      curriculum: classData.curriculum,
-    });
-    
-    console.log('Available Streams:', streams.map(stream => ({
-      id: stream.id,
-      name: stream.name,
-      capacity: stream.capacity,
-      studentCount: stream._count?.students || 0,
-      teacher: stream.streamTeacher?.user 
-        ? `${stream.streamTeacher.user.firstName} ${stream.streamTeacher.user.lastName}`
-        : 'Not assigned'
-    })));
-    
-    console.log('Existing Subjects:', subjects.map(subject => ({
-      id: subject.id,
-      name: subject.subject?.name || subject.name,
-      code: subject.subject?.code,
-      category: subject.category,
-      teacher: subject.teacher?.user 
-        ? `${subject.teacher.user.firstName} ${subject.teacher.user.lastName}`
-        : 'Not assigned'
-    })));
-    
-    console.log('Academic Terms:', terms.map(term => ({
-      id: term.id,
-      name: term.name,
-      termNumber: term.termNumber,
-      startDate: term.startDate,
-      endDate: term.endDate,
-      displayName: getTermDisplayName(term)
-    })));
-    
-    console.log('Active Term:', activeTerm ? {
-      id: activeTerm.id,
-      name: activeTerm.name,
-      termNumber: activeTerm.termNumber,
-      startDate: activeTerm.startDate,
-      endDate: activeTerm.endDate,
-    } : 'No active term');
-    
-    console.log('=== End Log ===');
     setShowSubjectModal(true);
   };
 

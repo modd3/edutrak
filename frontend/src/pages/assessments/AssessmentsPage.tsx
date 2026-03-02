@@ -39,9 +39,8 @@ export function AssessmentsPage() {
   
   // Fetch classes for the active academic year
   const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
-  const classes = classesData?.data.data || [];
-  console.log("Use Classes: ", useClasses(activeYear?.id))
- 
+  const classes = classesData?.data || [];
+   
   // Fetch class subjects based on selected class and term
   const { data: classSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = useClassSubjects(
     selectedClass,
@@ -55,53 +54,14 @@ export function AssessmentsPage() {
   // Get terms from active academic year
   const terms = activeYear?.terms || [];
 
-  // Log data for debugging
-  useEffect(() => {
-    console.log('=== AssessmentsPage Data Log ===');
-    console.log('Active Academic Year:', {
-      isLoading: isLoadingYear,
-      error: yearError,
-      data: activeYear ? {
-        id: activeYear.id,
-        year: activeYear.year,
-        isActive: activeYear.isActive,
-        termsCount: activeYear.terms?.length || 0
-      } : 'No active year'
-    });
-  }, [activeYear, isLoadingYear, yearError]);
-
   useEffect(() => {
     if (terms.length > 0) {
-      console.log('Academic Terms:', terms.map((term: { id: any; name: any; termNumber: any; startDate: any; endDate: any; }) => ({
-        id: term.id,
-        name: term.name,
-        termNumber: term.termNumber,
-        startDate: term.startDate,
-        endDate: term.endDate
-      })));
-
       // Auto-select the first term if available
       if (!selectedTerm && terms[0]) {
-        console.log('Auto-selecting first term:', terms[0].name);
         setSelectedTerm(terms[0].id);
       }
     }
   }, [terms, selectedTerm]);
-
-  useEffect(() => {
-    console.log('Classes Data:', {
-      isLoading: isLoadingClasses,
-      error: classesError,
-      count: classes.length,
-      classes: classes.map((cls: { id: any; name: any; level: any; curriculum: any; _count: { students: any; }; }) => ({
-        id: cls.id,
-        name: cls.name,
-        level: cls.level,
-        curriculum: cls.curriculum,
-        studentCount: cls._count?.students || 0
-      }))
-    });
-  }, [classes, isLoadingClasses, classesError]);
 
   useEffect(() => {
     if (selectedClass && selectedTerm) {
@@ -123,12 +83,6 @@ export function AssessmentsPage() {
       return;
     }
 
-    console.log('Creating new assessment with:', {
-      classId: selectedClass,
-      termId: selectedTerm,
-      classSubjectId: selectedClassSubject || 'Not selected'
-    });
-
     navigate('/assessments/new', {
       state: {
         classId: selectedClass,
@@ -139,14 +93,12 @@ export function AssessmentsPage() {
   };
 
   const handleClassChange = (classId: string) => {
-    console.log('Class changed to:', classId);
     setSelectedClass(classId);
     // Reset subject selection when class changes
     setSelectedClassSubject('');
   };
 
   const handleTermChange = (termId: string) => {
-    console.log('Term changed to:', termId);
     setSelectedTerm(termId);
     // Reset subject selection when term changes
     setSelectedClassSubject('');

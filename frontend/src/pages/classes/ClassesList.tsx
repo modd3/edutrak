@@ -78,9 +78,8 @@ export default function ClassesList() {
   const { data: classesData, isLoading, isError } = useClasses(activeAcademicYearId);
   
   const { mutate: deleteClass, isPending: isDeleting } = useDeleteClass();
-
   const classes = classesData?.data || [];
-    
+  
   // Filter classes by search
   const filteredClasses = classes.filter((cls: Class) =>
     cls.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -280,8 +279,8 @@ export default function ClassesList() {
           <h1 className="text-3xl font-bold">Manage Classes</h1>
           <p className="text-muted-foreground">
             View and manage academic classes
-            {activeYearData?.data && (
-              <> • Academic Year: {activeYearData.data.year}</>
+            {activeYearData?.year && (
+              <> • Academic Year: {activeYearData.year}</>
             )}
           </p>
         </div>

@@ -29,17 +29,20 @@ export function ReportsPage() {
   const [selectedStudent, setSelectedStudent] = useState<string>('');
 
   const { data: activeYear, isLoading: yearLoading } = useActiveAcademicYear();
-  const { data: classesData, isLoading: classesLoading } = useClasses(activeYear?.id);
-  const { data: studentsData, isLoading: studentsLoading } = useClassStudents(selectedClass, activeYear?.id);
+  const { data: classes, isLoading: classesLoading } = useClasses(activeYear?.id);
+  const { data: studentsData, isLoading: studentsLoading } = useClassStudents(
+    selectedClass,
+    activeYear?.id ?? ''
+  );
 
-  const terms = activeYear?.terms || [];
- console.log(useActiveAcademicYear());
- console.log(useClasses(activeYear?.id));
+  const terms: Term[] = activeYear?.terms ?? [];
   const termsLoading = yearLoading;
-  const classes = classesData?.data;
+
+  console.log("Classes data:", classes);
+  console.log("Students data:", studentsData);
+
 
   useEffect(() => {
-    // Reset student when class changes
     setSelectedStudent('');
   }, [selectedClass]);
 
@@ -66,7 +69,7 @@ export function ReportsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Student Report Tab */}
+        {/* ── Student Report Tab ── */}
         <TabsContent value="student" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -77,30 +80,36 @@ export function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Term */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Term</label>
                   <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                     <SelectTrigger>
-                      <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
+                      <SelectValue
+                        placeholder={termsLoading ? 'Loading…' : 'Select term'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {terms.map((term: Term) => (
+                      {terms.map((term) => (
                         <SelectItem key={term.id} value={term.id}>
-                          {term.name}
+                          {term.name.replace('_', ' ')}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
 
+                {/* Class */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Class</label>
                   <Select value={selectedClass} onValueChange={setSelectedClass}>
                     <SelectTrigger>
-                      <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
+                      <SelectValue
+                        placeholder={classesLoading ? 'Loading…' : 'Select class'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {classes?.data?.map((classItem: Class) => (
+                      {classes?.data.map((classItem: Class) => (
                         <SelectItem key={classItem.id} value={classItem.id}>
                           {classItem.name}
                         </SelectItem>
@@ -109,24 +118,25 @@ export function ReportsPage() {
                   </Select>
                 </div>
 
+                {/* Student */}
                 <div>
-                  <label className="text-sm font-medium mb-2 block">
-                    Student
-                  </label>
+                  <label className="text-sm font-medium mb-2 block">Student</label>
                   <Select
                     value={selectedStudent}
                     onValueChange={setSelectedStudent}
                     disabled={!selectedClass || studentsLoading}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={studentsLoading ? 'Loading...' : 'Select student'} />
+                      <SelectValue
+                        placeholder={studentsLoading ? 'Loading…' : 'Select student'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {studentsData?.data?.map((item: any) => {
-                        const student = item.student || item;
+                        const student = item.student ?? item;
                         return (
                           <SelectItem key={student.id} value={student.id}>
-                            {student.admissionNo} - {student.firstName} {student.lastName}
+                            {student.admissionNo} – {student.firstName} {student.lastName}
                           </SelectItem>
                         );
                       })}
@@ -137,18 +147,13 @@ export function ReportsPage() {
             </CardContent>
           </Card>
 
-          {/* Student Report Display */}
-          {selectedStudent && selectedTerm && (
+          {selectedStudent && selectedTerm ? (
             <StudentReportCard studentId={selectedStudent} termId={selectedTerm} />
-          )}
-
-          {!selectedStudent && !selectedTerm && (
+          ) : (
             <Card>
               <CardContent className="py-12 text-center">
                 <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-4 text-lg font-semibold">
-                  Select Student and Term
-                </h3>
+                <h3 className="mt-4 text-lg font-semibold">Select Student and Term</h3>
                 <p className="mt-2 text-sm text-gray-500">
                   Choose a student and term above to generate their report card
                 </p>
@@ -157,7 +162,7 @@ export function ReportsPage() {
           )}
         </TabsContent>
 
-        {/* Class Report Tab */}
+        {/* ── Class Report Tab ── */}
         <TabsContent value="class" className="space-y-6 mt-6">
           <Card>
             <CardHeader>
@@ -168,14 +173,17 @@ export function ReportsPage() {
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Term */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Term</label>
                   <Select value={selectedTerm} onValueChange={setSelectedTerm}>
                     <SelectTrigger>
-                      <SelectValue placeholder={termsLoading ? 'Loading...' : 'Select term'} />
+                      <SelectValue
+                        placeholder={termsLoading ? 'Loading…' : 'Select term'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {terms.map((term: Term) => (
+                      {terms.map((term) => (
                         <SelectItem key={term.id} value={term.id}>
                           {term.name.replace('_', ' ')}
                         </SelectItem>
@@ -184,14 +192,17 @@ export function ReportsPage() {
                   </Select>
                 </div>
 
+                {/* Class — NOTE: fixed from classes?.data?.map → classes?.map */}
                 <div>
                   <label className="text-sm font-medium mb-2 block">Class</label>
                   <Select value={selectedClass} onValueChange={setSelectedClass}>
                     <SelectTrigger>
-                      <SelectValue placeholder={classesLoading ? 'Loading...' : 'Select class'} />
+                      <SelectValue
+                        placeholder={classesLoading ? 'Loading…' : 'Select class'}
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {classes?.data?.map((classItem: Class) => (
+                      {classes?.data.map((classItem: Class) => (
                         <SelectItem key={classItem.id} value={classItem.id}>
                           {classItem.name}
                         </SelectItem>
@@ -203,18 +214,13 @@ export function ReportsPage() {
             </CardContent>
           </Card>
 
-          {/* Class Report Display */}
-          {selectedClass && selectedTerm && (
+          {selectedClass && selectedTerm ? (
             <ClassPerformanceReport classId={selectedClass} termId={selectedTerm} />
-          )}
-
-          {!selectedClass && !selectedTerm && (
+          ) : (
             <Card>
               <CardContent className="py-12 text-center">
                 <Users className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-4 text-lg font-semibold">
-                  Select Class and Term
-                </h3>
+                <h3 className="mt-4 text-lg font-semibold">Select Class and Term</h3>
                 <p className="mt-2 text-sm text-gray-500">
                   Choose a class and term above to view performance analytics
                 </p>
