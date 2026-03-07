@@ -20,8 +20,10 @@ import { SubjectsList } from './pages/subjects/SubjectsList';
 import { AssessmentsPage } from './pages/assessments/AssessmentsPage';
 import { GradeEntryPage } from './pages/assessments/GradeEntryPage';
 import { ReportsPage } from './pages/assessments/ReportsPage';
+import StrandManagementPage from './pages/assessments/StrandManagementPage';
 import { StudentSubjectManagementPage } from './pages/subjects/StudentSubjectManagementPage';
 import { StudentSubjectEnrollmentPage } from './pages/students/SubjectEnrollment';
+import ClassSubjectStrandsPage from '@/pages/assessments/ClassSubjectStrands';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -224,6 +226,43 @@ function App() {
               <ProtectedRoute>
                 <DashboardLayout>
                   < GradeEntryPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* new management page for finding a class‑subject and editing strands */}
+          <Route
+            path="/assessments/strands/manage"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <StrandManagementPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Route for managing class subject strands (optional params via query)
+              admins/teachers can land here and then provide classSubjectId, schoolId, subjectId
+              or arrive via navigation from a class-subject context */}
+          <Route
+            path="/assessments/class-subject-strands"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ClassSubjectStrandsPage />
+                </DashboardLayout>
+              </ProtectedRoute>
+            }
+          />
+          {/* allow parameter variant so urls containing an id don't 404 */}
+          <Route
+            path="/assessments/class-subject-strands/:classSubjectId"
+            element={
+              <ProtectedRoute>
+                <DashboardLayout>
+                  <ClassSubjectStrandsPage />
                 </DashboardLayout>
               </ProtectedRoute>
             }

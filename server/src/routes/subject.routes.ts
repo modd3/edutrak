@@ -26,6 +26,10 @@ router.get('/schools/:schoolId/offerings', validateUUIDParam, subjectController.
 router.get('/:subjectId/performance', validateUUIDParam, subjectController.getSubjectPerformance);
 router.get('/curriculum/:curriculum', subjectController.getCurriculumSubjects);
 
+// Subject-level strands
+router.post('/:subjectId/strands', authorize('ADMIN', 'SUPER_ADMIN'), subjectController.createSubjectStrand);
+router.get('/:subjectId/strands', authorize('ADMIN', 'SUPER_ADMIN', 'TEACHER'), subjectController.getSubjectStrands);
+
 // Curriculum-specific
 router.get('/cbc/learning-area/:learningArea', subjectController.getCBCSubjectsByLearningArea);
 router.get('/844/group/:subjectGroup', subjectController.get844SubjectsByGroup);

@@ -18,14 +18,27 @@ export class SubjectService {
     subjectGroup?: SubjectGroup;
     curriculum: Curriculum[];
     description?: string;
+    strands?: { name: string; description?: string }[];
   }): Promise<Subject> {
     if ((data as any).subjectGroup === '') {
       (data as any).subjectGroup = undefined;
     }
+    const { strands, ...subjectData } = data as any;
     const subject = await this.prisma.subject.create({
       data: {
         id: uuidv4(),
-        ...data,
+        ...subjectData,
+        ...(Array.isArray(strands) && strands.length > 0
+          ? {
+              strands: {
+                create: strands.map((s: { name: string; description?: string }) => ({
+                  id: uuidv4(),
+                  name: s.name,
+                  description: s.description,
+                })),
+              },
+            }
+          : {}),
       },
     });
 

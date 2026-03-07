@@ -162,6 +162,12 @@ export const sidebarConfig: NavItem[] = [
         roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
       },
       {
+        title: 'Strand Management',
+        href: '/assessments/strands/manage',
+        icon: TestTubes,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
         title: 'Assessment Reports',
         href: '/reports',
         icon: BarChart3,

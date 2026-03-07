@@ -9,13 +9,28 @@ const subjectService = new SubjectService();
 export class SubjectController {
   async createSubject(req: Request, res: Response): Promise<Response> {
     try {
-      const { name, code, category, curriculum, learningArea, subjectGroup, description } = req.body;
+      const { name, code, category, curriculum, learningArea, subjectGroup, description, strands } = req.body;
       
       if (!name || !code || !category || !curriculum) {
         return ResponseUtil.validationError(res, 'Required fields: name, code, category, curriculum');
       }
 
-      const subject = await subjectService.createSubject(req.body);
+      // Optional validation for strands array
+      if (strands !== undefined) {
+        if (!Array.isArray(strands)) {
+          return ResponseUtil.validationError(res, 'strands must be an array of { name, description? }');
+        }
+        for (const s of strands) {
+          if (!s || typeof s !== 'object' || typeof s.name !== 'string' || !s.name.trim()) {
+            return ResponseUtil.validationError(res, 'Each strand must include a non-empty name');
+          }
+          if (s.description !== undefined && typeof s.description !== 'string') {
+            return ResponseUtil.validationError(res, 'strand.description, if provided, must be a string');
+          }
+        }
+      }
+
+      const subject = await subjectService.createSubject({ name, code, category, curriculum, learningArea, subjectGroup, description, strands });
       return ResponseUtil.created(res, 'Subject created successfully', subject);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -254,6 +269,45 @@ export class SubjectController {
 
       const subjects = await subjectService.getCurriculumSubjects(curriculum as Curriculum);
       return ResponseUtil.success(res, 'Curriculum subjects retrieved successfully', subjects, subjects.length);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  // ===== Subject-level strand endpoints =====
+  async createSubjectStrand(req: Request, res: Response): Promise<Response> {
+    try {
+      const { subjectId } = req.params;
+      const { name, description } = req.body as { name?: string; description?: string };
+
+      if (!subjectId) {
+        return ResponseUtil.validationError(res, 'Subject ID is required');
+      }
+      if (!name || typeof name !== 'string' || !name.trim()) {
+        return ResponseUtil.validationError(res, 'Strand name is required');
+      }
+
+      const strand = await subjectService.createStrand({ subjectId, name: name.trim(), description });
+      return ResponseUtil.created(res, 'Strand created successfully', strand);
+    } catch (error: any) {
+      if (error.code === 'P2003') {
+        // Foreign key violation: subject not found
+        return ResponseUtil.notFound(res, 'Subject');
+      }
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async getSubjectStrands(req: Request, res: Response): Promise<Response> {
+    try {
+      const { subjectId } = req.params;
+
+      if (!subjectId) {
+        return ResponseUtil.validationError(res, 'Subject ID is required');
+      }
+
+      const strands = await subjectService.getSubjectStrands(subjectId);
+      return ResponseUtil.success(res, 'Subject strands retrieved successfully', strands, strands.length);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
     }
