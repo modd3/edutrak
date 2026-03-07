@@ -78,6 +78,7 @@ export class SubjectService {
               },
             },
           },
+          strands: true,
         },
         skip,
         take: limit,

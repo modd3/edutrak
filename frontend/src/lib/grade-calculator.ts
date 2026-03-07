@@ -29,3 +29,28 @@ export interface GradeScale {
       ) || GRADE_SCALES[GRADE_SCALES.length - 1]
     );
   }
+
+  export function getGradeAndRemarks(score: number): { grade: string; remarks: string } {
+    const scale = GRADE_SCALES.find(
+        (s) => score >= s.minScore && score <= s.maxScore
+    );
+    if (scale) {
+        return { grade: scale.grade, remarks: scale.remarks };
+    }
+    return { grade: 'E', remarks: 'Failed' };
+  }
+
+  export function getKCSEGrade(meanPoints: number): string {
+      if (meanPoints > 11.5) return 'A';
+      if (meanPoints > 10.5) return 'A-';
+      if (meanPoints > 9.5) return 'B+';
+      if (meanPoints > 8.5) return 'B';
+      if (meanPoints > 7.5) return 'B-';
+      if (meanPoints > 6.5) return 'C+';
+      if (meanPoints > 5.5) return 'C';
+      if (meanPoints > 4.5) return 'C-';
+      if (meanPoints > 3.5) return 'D+';
+      if (meanPoints > 2.5) return 'D';
+      if (meanPoints > 1.5) return 'D-';
+      return 'E';
+  }
