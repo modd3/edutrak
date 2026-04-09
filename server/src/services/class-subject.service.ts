@@ -157,13 +157,44 @@ export class ClassSubjectService {
   /**
    * Get all subjects assigned to a specific class (for the UI list)
    */
-  async getClassSubjects(classId: string, academicYearId: string, termId: string) {
+  async getClassSubjects(
+    classId: string,
+    academicYearId: string, 
+    termId: string, 
+    role?, 
+    userId?
+  ) {
+    const isTeacher = role === 'TEACHER';
+
+    let teacherProfileId: string | null = null;
+
+    if (isTeacher && userId) {
+      const teacherProfile = await this.prisma.teacher.findUnique({
+        where: { userId },
+        select: { id: true}
+      });
+
+      if (!teacherProfile) {
+        throw new Error(
+          'Techer profile not found for this user.'
+        )
+      }
+
+      teacherProfileId = teacherProfile.id;
+    }
+
+    const where: any = {
+      classId,
+      academicYearId,
+      termId,
+      ...(isTeacher && teacherProfileId
+         ? { teacherId: teacherProfileId}
+        : {}
+      )
+    };
+
     return await this.prisma.classSubject.findMany({
-      where: {
-        classId,
-        academicYearId,
-        termId
-      },
+      where,
       include: {
         subject: true,
         term: true,

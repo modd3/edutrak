@@ -108,8 +108,8 @@ export const schoolService = {
       success: boolean;
       message: string;
       data: SchoolStats;
-    }>('/schools/statistics', {
-      params: { schoolId },
+    }>(`/schools/${schoolId}/statistics`, {
+     // params: { schoolId },
     }),
 
   /**

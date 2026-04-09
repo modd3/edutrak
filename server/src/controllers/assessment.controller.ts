@@ -38,11 +38,13 @@ export class AssessmentController {
       const data = createAssessmentDefinitionSchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
       const userId = req.user!.userId;
+      const role = req.user!.role
 
       const assessment = await this.assessmentService.createAssessment(
         data,
         schoolId,
-        userId
+        userId,
+        role
       );
 
       res.status(201).json({
@@ -231,11 +233,15 @@ export class AssessmentController {
     try {
       const { classId, termId } = req.params;
       const schoolId = req.user!.schoolId!;
+      const role = req.user!.role;
+      const userId = req.user!.userId
 
       const assessments = await this.assessmentService.getClassAssessments(
         classId,
         termId,
-        schoolId
+        schoolId,
+        role,
+        userId
       );
 
       res.json({

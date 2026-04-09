@@ -305,6 +305,28 @@ model ClassSubject {
   @@index([schoolId, termId])
 }
 
+model Strand {
+  id                    String                 @id @default(uuid())
+  name                  String
+  description           String?
+  subjectId             String
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  assessmentDefinitions AssessmentDefinition[]
+  classSubjects         ClassSubjectStrand[]
+  subject               Subject                @relation(fields: [subjectId], references: [id])
+}
+
+model ClassSubjectStrand {
+  id             String       @id @default(uuid())
+  classSubjectId String
+  strandId       String
+  classSubject   ClassSubject @relation(fields: [classSubjectId], references: [id])
+  strand         Strand       @relation(fields: [strandId], references: [id])
+
+  @@unique([classSubjectId, strandId])
+}
+
 model StudentClass {
   id               String           @id @default(uuid())
   studentId        String
@@ -359,28 +381,6 @@ model StudentClassSubject {
   @@index([status])
 }
 
-
-model Strand {
-  id                    String                 @id @default(uuid())
-  name                  String
-  description           String?
-  subjectId             String
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  assessmentDefinitions AssessmentDefinition[]
-  classSubjects         ClassSubjectStrand[]
-  subject               Subject                @relation(fields: [subjectId], references: [id])
-}
-
-model ClassSubjectStrand {
-  id             String       @id @default(uuid())
-  classSubjectId String
-  strandId       String
-  classSubject   ClassSubject @relation(fields: [classSubjectId], references: [id])
-  strand         Strand       @relation(fields: [strandId], references: [id])
-
-  @@unique([classSubjectId, strandId])
-}
 
 model AssessmentDefinition {
   id             String             @id @default(uuid())

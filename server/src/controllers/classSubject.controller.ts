@@ -61,6 +61,8 @@ export class ClassSubjectController {
     try {
       const { classId } = req.params;
       const { academicYearId, termId } = req.query;
+      const role = req.user?.role;
+      const userId =req.user?.userId;
 
       if (!academicYearId || !termId) {
         return ResponseUtil.error(res, 'Academic Year and Term are required', 400);
@@ -69,7 +71,9 @@ export class ClassSubjectController {
       const result = await service.getClassSubjects(
         classId, 
         academicYearId as string, 
-        termId as string
+        termId as string,
+        role,
+        userId
       );
 
       return ResponseUtil.success(res, 'Class subjects fetched successfully', result);

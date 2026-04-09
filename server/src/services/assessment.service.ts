@@ -19,8 +19,17 @@ export class AssessmentService {
   async createAssessment(
     data: CreateAssessmentDefinitionInput,
     schoolId: string,
-    userId: string
+    userId: string,
+    role: string
   ): Promise<AssessmentDefinition> {
+
+    const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
+
+    const teacherProfile = !isAdmin ? await this.prisma.teacher.findUnique({
+      where: {userId},
+      select: {id: true},
+    }) : null;
+
     // Verify class subject belongs to this school
     const classSubject = await this.prisma.classSubject.findFirst({
       where: {
@@ -35,6 +44,27 @@ export class AssessmentService {
 
     if (!classSubject) {
       throw new Error('Class subject not found or does not belong to your school');
+    }
+
+    if (!isAdmin && classSubject.teacherId === null) {
+      throw new Error(
+        'This class Subject has no assigned teacher yet. ' +
+        'Ask an admin to assign you before creating this assessment.'
+      )
+    }
+
+    if (!isAdmin) {
+      if (!teacherProfile) {
+        throw new Error(
+          'Teacher Profile not found for this user.'
+        )
+      }
+      if (classSubject.teacherId !== teacherProfile.id) {
+        throw new Error(
+          'You are not assigned to this class subject. ' +
+          'Only the assigned teacher can create the assessment for it.'
+        );
+      }
     }
 
     // Verify term belongs to school
@@ -326,14 +356,31 @@ export class AssessmentService {
   async getClassAssessments(
     classId: string,
     termId: string,
-    schoolId: string
+    schoolId: string,
+    role,
+    userId
   ): Promise<AssessmentDefinition[]> {
+    const isTeacher = role === 'TEACHER';
+    let teacherProfileId: string | null = null;
+
+    if (isTeacher && userId) {
+      const teacher = await this.prisma.teacher.findUnique({
+        where: { userId },
+        select: { id: true}
+      });
+      teacherProfileId = teacher?.id ?? null;
+    }
+
     return this.prisma.assessmentDefinition.findMany({
       where: {
         schoolId,
         termId,
         classSubject: {
           classId,
+          ...(isTeacher && teacherProfileId
+            ? {teacherId: teacherProfileId}
+            : {}
+          ),
         },
       },
       include: {

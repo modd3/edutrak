@@ -8,22 +8,22 @@ import { AssessmentType, CompetencyLevel } from '@prisma/client';
  */
 export const createAssessmentDefinitionSchema = z.object({
   name: z.string().min(1, 'Assessment name is required').max(100),
-  type: z.nativeEnum(AssessmentType),
+  type: z.enum(AssessmentType),
   maxMarks: z.number().positive('Max marks must be positive').optional(),
-  termId: z.string().uuid('Invalid term ID'),
-  classSubjectId: z.string().uuid('Invalid class subject ID'),
-  strandId: z.string().uuid('Invalid strand ID').optional(),
-  academicYearId: z.string().uuid('Invalid academic year ID').optional(),
+  termId: z.uuid('Invalid term ID'),
+  classSubjectId: z.uuid('Invalid class subject ID'),
+  strandId: z.uuid('Invalid strand ID').optional(),
+  academicYearId: z.uuid('Invalid academic year ID').optional(),
 });
 
 export const updateAssessmentDefinitionSchema = z.object({
   name: z.string().min(1).max(100).optional(),
-  type: z.nativeEnum(AssessmentType).optional(),
+  type: z.enum(AssessmentType).optional(),
   maxMarks: z.number().positive().optional(),
-  termId: z.string().uuid().optional(),
-  classSubjectId: z.string().uuid().optional(),
-  strandId: z.string().uuid().optional(),
-  academicYearId: z.string().uuid().optional(),
+  termId: z.uuid().optional(),
+  classSubjectId: z.uuid().optional(),
+  strandId: z.uuid().optional(),
+  academicYearId: z.uuid().optional(),
 });
 
 export const bulkCreateAssessmentsSchema = z.object({
@@ -34,11 +34,11 @@ export const bulkCreateAssessmentsSchema = z.object({
  * Assessment Result Schemas
  */
 export const createAssessmentResultSchema = z.object({
-  studentId: z.string().uuid('Invalid student ID'),
-  assessmentDefId: z.string().uuid('Invalid assessment definition ID'),
+  studentId: z.uuid('Invalid student ID'),
+  assessmentDefId: z.uuid('Invalid assessment definition ID'),
   numericValue: z.number().min(0, 'Score cannot be negative').optional(),
   grade: z.string().max(5).optional(),
-  competencyLevel: z.nativeEnum(CompetencyLevel).optional(),
+  competencyLevel: z.enum(CompetencyLevel).optional(),
   comment: z.string().max(500).optional(),
 }).refine(
   (data) => data.numericValue !== undefined || data.grade !== undefined || data.competencyLevel !== undefined,
@@ -48,7 +48,7 @@ export const createAssessmentResultSchema = z.object({
 export const updateAssessmentResultSchema = z.object({
   numericValue: z.number().min(0).optional(),
   grade: z.string().max(5).optional(),
-  competencyLevel: z.nativeEnum(CompetencyLevel).optional(),
+  competencyLevel: z.enum(CompetencyLevel).optional(),
   comment: z.string().max(500).optional(),
 });
 
@@ -60,10 +60,10 @@ export const bulkCreateResultsSchema = z.object({
  * Grade Entry Schemas
  */
 export const gradeEntrySchema = z.object({
-  assessmentDefId: z.string().uuid('Invalid assessment ID'),
+  assessmentDefId: z.uuid('Invalid assessment ID'),
   entries: z.array(
     z.object({
-      studentId: z.string().uuid('Invalid student ID'),
+      studentId: z.uuid('Invalid student ID'),
       marks: z.number().min(0, 'Marks cannot be negative'),
       comment: z.string().max(500).optional(),
     })
@@ -74,20 +74,20 @@ export const gradeEntrySchema = z.object({
  * Query Schemas
  */
 export const getAssessmentsQuerySchema = z.object({
-  termId: z.string().uuid().optional(),
-  classSubjectId: z.string().uuid().optional(),
-  type: z.nativeEnum(AssessmentType).optional(),
-  academicYearId: z.string().uuid().optional(),
+  termId: z.uuid().optional(),
+  classSubjectId: z.uuid().optional(),
+  type: z.enum(AssessmentType).optional(),
+  academicYearId: z.uuid().optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
 
 export const getResultsQuerySchema = z.object({
-  studentId: z.string().uuid().optional(),
-  assessmentDefId: z.string().uuid().optional(),
-  classId: z.string().uuid().optional(),
-  termId: z.string().uuid().optional(),
-  academicYearId: z.string().uuid().optional(),
+  studentId: z.uuid().optional(),
+  assessmentDefId: z.uuid().optional(),
+  classId: z.uuid().optional(),
+  termId: z.uuid().optional(),
+  academicYearId: z.uuid().optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
 });
