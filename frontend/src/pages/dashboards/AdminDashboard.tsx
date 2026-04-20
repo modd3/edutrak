@@ -4,10 +4,24 @@ import { useNavigate } from 'react-router-dom';
 import {useSchoolStatistics} from '@/hooks/use-schools';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
+
+  // Check authorization for management features
+  const { hasAccess: canManageStudents } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
+
+  const { hasAccess: canManageTeachers } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
+
+  const { hasAccess: canManageClasses } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
 
   const statistics = useSchoolStatistics(user?.schoolId);
   console.log("Statistics: ", statistics);
@@ -114,26 +128,32 @@ export function AdminDashboard() {
     
           {/* Quick Actions */}
           <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <GraduationCap className="mx-auto mb-2 text-blue-600" size={24} />
-            <p className="text-sm font-medium">Add Student</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <Users className="mx-auto mb-2 text-green-600" size={24} />
-            <p className="text-sm font-medium">Add Teacher</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <BookOpen className="mx-auto mb-2 text-purple-600" size={24} />
-            <p className="text-sm font-medium">Create Class</p>
-          </button>
-          <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-            <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
-            <p className="text-sm font-medium">View Reports</p>
-          </button>
-        </div>
-      </div>
+            <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {canManageStudents && (
+                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <GraduationCap className="mx-auto mb-2 text-blue-600" size={24} />
+                  <p className="text-sm font-medium">Add Student</p>
+                </button>
+              )}
+              {canManageTeachers && (
+                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <Users className="mx-auto mb-2 text-green-600" size={24} />
+                  <p className="text-sm font-medium">Add Teacher</p>
+                </button>
+              )}
+              {canManageClasses && (
+                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                  <BookOpen className="mx-auto mb-2 text-purple-600" size={24} />
+                  <p className="text-sm font-medium">Create Class</p>
+                </button>
+              )}
+              <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
+                <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
+                <p className="text-sm font-medium">View Reports</p>
+              </button>
+            </div>
+          </div>
     </div>
   );
 }

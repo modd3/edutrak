@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Filter } from 'lucide-react';
 import { AssessmentList } from '@/components/assessments/AssessmentList';
+import { AssessmentForm } from '@/components/assessments/AssessmentForm';
 import { useAssessmentStats } from '@/hooks/use-assessments';
 import { useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { useClassSubjects } from '@/hooks/use-class-subjects';
@@ -31,6 +32,8 @@ export function AssessmentsPage() {
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedClassSubject, setSelectedClassSubject] = useState<string>('');
+  const [showForm, setShowForm] = useState(false);
+  const [editingAssessment, setEditingAssessment] = useState<any>(null);
 
   // Fetch active academic year with terms
   const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
@@ -77,19 +80,23 @@ export function AssessmentsPage() {
     navigate(`/assessments/${assessmentId}/grades`);
   };
 
+  const handleEdit = (assessment: any) => {
+    setEditingAssessment(assessment);
+    setShowForm(true);
+  }
+
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingAssessment(null);
+  };
+
   const handleCreateAssessment = () => {
     if (!selectedClass || !selectedTerm) {
       toast.error('Please select a class and term first');
       return;
     }
 
-    navigate('/assessments/new', {
-      state: {
-        classId: selectedClass,
-        termId: selectedTerm,
-        classSubjectId: selectedClassSubject || null
-      }
-    });
+    setShowForm(true);
   };
 
   const handleClassChange = (classId: string) => {
@@ -381,6 +388,17 @@ export function AssessmentsPage() {
           </TabsContent>
         ))}
       </Tabs>
+
+      {/* Assessment Form */}
+      <AssessmentForm
+        open={showForm}
+        onOpenChange={handleCloseForm}
+        mode={editingAssessment ? 'edit' : 'create'}
+        assessment={editingAssessment}
+        termId={selectedTerm}
+        classSubjectId={selectedClassSubject || ''}
+      />
+
     </div>
   );
 }

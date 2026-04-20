@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useSchoolContext } from '@/hooks/use-school-context';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 
 const CURRICULUM_LABELS = {
   CBC: 'CBC',
@@ -68,6 +69,11 @@ export default function ClassesList() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+
+  // Check authorization for class management
+  const { hasAccess: canManageClasses } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
 
   // Get active academic year
   const { data: activeYearData } = useActiveAcademicYear();
@@ -232,18 +238,22 @@ export default function ClassesList() {
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEditClick(classData)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Class
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDeleteClick(classData)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete Class
-              </DropdownMenuItem>
+              {canManageClasses && (
+                <>
+                  <DropdownMenuItem onClick={() => handleEditClick(classData)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Class
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => handleDeleteClick(classData)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete Class
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -284,10 +294,12 @@ export default function ClassesList() {
             )}
           </p>
         </div>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Class
-        </Button>
+        {canManageClasses && (
+          <Button onClick={() => setShowCreateModal(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" />
+            Add Class
+          </Button>
+        )}
       </div>
 
       {/* Filters */}

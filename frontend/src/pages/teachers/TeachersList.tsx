@@ -15,6 +15,7 @@ import {
 import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 import {
   Select,
   SelectContent,
@@ -57,6 +58,11 @@ export default function TeachersList() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | undefined>();
   const { schoolId, schoolName } = useSchoolContext();
+  
+  // Check if user can manage teachers
+  const { hasAccess: canManageTeachers } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
   
   // Fetch teachers using the service
   const { 
@@ -227,18 +233,22 @@ export default function TeachersList() {
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEdit(teacher)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Teacher
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem 
-                className="text-destructive focus:text-destructive"
-                onClick={() => handleDeleteClick(teacher)}
-              >
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete Teacher
-              </DropdownMenuItem>
+              {canManageTeachers && (
+                <>
+                  <DropdownMenuItem onClick={() => handleEdit(teacher)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Teacher
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => handleDeleteClick(teacher)}
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Teacher
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -278,13 +288,15 @@ export default function TeachersList() {
             View and manage teaching staff records
           </p>
         </div>
-        <Button onClick={() => {
-          setSelectedTeacher(undefined);
-          setIsFormOpen(true);
-        }}>
-          <Plus className="mr-2 h-4 w-4" />
-          Add Teacher
-        </Button>
+        {canManageTeachers && (
+          <Button onClick={() => {
+            setSelectedTeacher(undefined);
+            setIsFormOpen(true);
+          }}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Teacher
+          </Button>
+        )}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4">

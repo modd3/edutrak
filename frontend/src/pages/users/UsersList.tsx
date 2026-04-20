@@ -36,15 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-
-const ROLE_LABELS = {
-  SUPER_ADMIN: 'Super Admin',
-  ADMIN: 'Admin',
-  TEACHER: 'Teacher',
-  STUDENT: 'Student',
-  PARENT: 'Parent',
-  SUPPORT_STAFF: 'Support Staff',
-};
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 
 const ROLE_COLORS = {
   SUPER_ADMIN: 'destructive',
@@ -66,6 +58,11 @@ export default function UsersList() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Check authorization for user management
+  const { hasAccess: canManageUsers } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
 
   // Fetch users with filters
   const { data: usersData, isLoading, isError } = useUsers({
@@ -212,34 +209,39 @@ export default function UsersList() {
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleEditClick(user)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit User
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-              className={user.isActive ? "text-destructive border" : "text-blue-500 bg-green-100"}
-              onClick={() => handleToggleActive(user)}>
-                {user.isActive ? (
-                  <>
-                  <XCircleIcon className="mr-2 h-4 w-4" />
-                  Deactivate User
-                  </>
-                  ) : (
-                    <>
-                    <CheckCheckIcon className="mr-2 h-4 w-4"/>
-                    Activate User
-                    </>
+              {canManageUsers && (
+                <>
+                  <DropdownMenuItem onClick={() => handleEditClick(user)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit User
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className={user.isActive ? "text-destructive border" : "text-blue-500 bg-green-100"}
+                    onClick={() => handleToggleActive(user)}
+                  >
+                    {user.isActive ? (
+                      <>
+                        <XCircleIcon className="mr-2 h-4 w-4" />
+                        Deactivate User
+                      </>
+                    ) : (
+                      <>
+                        <CheckCheckIcon className="mr-2 h-4 w-4"/>
+                        Activate User
+                      </>
                     )}
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDeleteClick(user)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete User
-              </DropdownMenuItem>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => handleDeleteClick(user)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete User
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );
@@ -275,19 +277,23 @@ export default function UsersList() {
           <h1 className="text-3xl font-bold">Manage Users</h1>
           <p className="text-muted-foreground">View and manage user accounts</p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => setShowBulkUploadModal(true)}>
-            <Upload className="mr-2 h-4 w-4" />
-            Bulk Upload
-          </Button>
-          <Button
-           onClick={() => {
-            setSelectedUser(null);
-            setShowCreateModal(true)}}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add User
-          </Button>
-        </div>
+        {canManageUsers && (
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setShowBulkUploadModal(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Bulk Upload
+            </Button>
+            <Button
+              onClick={() => {
+                setSelectedUser(null);
+                setShowCreateModal(true);
+              }}
+            >
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add User
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

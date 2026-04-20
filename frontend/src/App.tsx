@@ -6,9 +6,13 @@ import { useAuthStore } from '@/store/auth-store';
 // Layouts
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 
+// Components
+import { RoleGuard } from '@/components/RoleGuard';
+
 // Pages
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
+import { Unauthorized } from './pages/Unauthorized';
 import ClassesList from '@/pages/classes/ClassesList';
 import StudentsList from '@/pages/students/StudentsList';
 import SchoolsList from './pages/schools/SchoolsList';
@@ -34,17 +38,6 @@ const queryClient = new QueryClient({
     },
   },
 });
-
-// Protected Route Component
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-}
 
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -72,210 +65,219 @@ function App() {
             }
           />
 
-          {/* Protected Routes */}
+          {/* Auth Error Pages */}
+          <Route path="/unauthorized" element={<Unauthorized />} />
+
+          {/* Dashboard - All authenticated users */}
           <Route
             path="/dashboard"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPPORT_STAFF']}>
                 <DashboardLayout>
                   <Dashboard />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
-          {/* Add more protected routes here */}
 
+          {/* SUPER_ADMIN ONLY: Schools Management */}
           <Route
             path="/schools"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <SchoolsList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
           <Route
             path="/schools/new"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <CreateSchool />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
+          {/* ADMIN & SUPER_ADMIN: User Management */}
           <Route
             path="/users"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <UsersList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Students */}
           <Route
             path="/students"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <StudentsList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-
-
+          {/* ADMIN, SUPER_ADMIN: Teachers Management */}
           <Route
             path="/teachers"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <TeachersList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Classes */}
+          <Route
+            path="/classes"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <ClassesList />
+                </DashboardLayout>
+              </RoleGuard>
             }
           />
 
           <Route
             path="/classes/new"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < ClassesList />
+                  <ClassesList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-          <Route
-            path="/classes"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  < ClassesList />
-                </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Subjects */}
           <Route
             path="/subjects"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < SubjectsList />
+                  <SubjectsList />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-<Route
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Student Subject Management */}
+          <Route
             path="/students/subjects"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < StudentSubjectManagementPage />
+                  <StudentSubjectManagementPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
+          {/* All authenticated users: Student Subject Enrollment */}
           <Route
             path="/students/:studentId/subjects"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <StudentSubjectEnrollmentPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
+          {/* ADMIN, SUPER_ADMIN: Academic Years */}
           <Route
             path="/academic-year"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < AcademicYearsPage />
+                  <AcademicYearsPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
+          {/* ADMIN, SUPER_ADMIN, TEACHER, STUDENT, PARENT: Assessments */}
           <Route
             path="/assessments"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < AssessmentsPage />
+                  <AssessmentsPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
+          {/* TEACHER ONLY: Grade Entry */}
           <Route
             path="/assessments/:assessmentId/grades"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < GradeEntryPage />
+                  <GradeEntryPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-          {/* new management page for finding a class‑subject and editing strands */}
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Strand Management */}
           <Route
             path="/assessments/strands/manage"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <StrandManagementPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
-          {/* Route for managing class subject strands (optional params via query)
-              admins/teachers can land here and then provide classSubjectId, schoolId, subjectId
-              or arrive via navigation from a class-subject context */}
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Class Subject Strands */}
           <Route
             path="/assessments/class-subject-strands"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <ClassSubjectStrandsPage />
                 </DashboardLayout>
-              </ProtectedRoute>
-            }
-          />
-          {/* allow parameter variant so urls containing an id don't 404 */}
-          <Route
-            path="/assessments/class-subject-strands/:classSubjectId"
-            element={
-              <ProtectedRoute>
-                <DashboardLayout>
-                  <ClassSubjectStrandsPage />
-                </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 
           <Route
+            path="/assessments/class-subject-strands/:classSubjectId"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <ClassSubjectStrandsPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Reports */}
+          <Route
             path="/reports"
             element={
-              <ProtectedRoute>
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'PARENT']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  < ReportsPage />
+                  <ReportsPage />
                 </DashboardLayout>
-              </ProtectedRoute>
+              </RoleGuard>
             }
           />
 

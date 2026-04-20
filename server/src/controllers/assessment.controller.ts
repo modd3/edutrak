@@ -126,7 +126,7 @@ export class AssessmentController {
         res.status(400).json({
           error: 'VALIDATION_ERROR',
           message: 'Invalid query parameters',
-          details: error,
+          details: error.message.toString(),
         });
       } else {
         res.status(500).json({

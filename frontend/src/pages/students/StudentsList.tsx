@@ -25,6 +25,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useStudents } from '@/hooks/use-students';
+import { usePermission } from '@/hooks/use-permission';
 import { Student } from '@/types';
 import { StudentDetailsModal } from '@/components/students/StudentDetailsModal';
 import { StudentFormModal } from '@/components/students/StudentFormModal';
@@ -63,6 +64,7 @@ const ENROLLMENT_STATUS_COLORS = {
 
 export default function StudentsList() {
   const { schoolId } = useSchoolContext();
+  const { can } = usePermission();
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
@@ -248,6 +250,8 @@ export default function StudentsList() {
     const student = row.original;
     const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
     const hasActiveEnrollment = !!activeEnrollment;
+    const canEditStudent = can('edit_student');
+    const canDeleteStudent = can('delete_student');
     
     return (
       <DropdownMenu>
@@ -264,10 +268,14 @@ export default function StudentsList() {
             <Eye className="mr-2 h-4 w-4" />
             View Details
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => handleEditClick(student)}>
-            <Edit className="mr-2 h-4 w-4" />
-            Edit Student
-          </DropdownMenuItem>
+          {canEditStudent && (
+            <>
+              <DropdownMenuItem onClick={() => handleEditClick(student)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Student
+              </DropdownMenuItem>
+            </>
+          )}
           {hasActiveEnrollment ? (
             <DropdownMenuItem onClick={() => handleEnrollClick(student, 'edit')}>
               <Pencil className="mr-2 h-4 w-4" />
@@ -279,14 +287,18 @@ export default function StudentsList() {
               Enroll in Class
             </DropdownMenuItem>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-destructive"
-            onClick={() => handleDeleteClick(student)}
-          >
-            <Trash className="mr-2 h-4 w-4" />
-            Delete Student
-          </DropdownMenuItem>
+          {canDeleteStudent && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => handleDeleteClick(student)}
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete Student
+              </DropdownMenuItem>
+            </>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -324,16 +336,18 @@ export default function StudentsList() {
             View and manage student records
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline">
-            <Upload className="mr-2 h-4 w-4" />
-            Bulk Upload
-          </Button>
-          <Button onClick={() => setShowCreateModal(true)}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Student
-          </Button>
-        </div>
+        {can('create_student') && (
+          <div className="flex gap-2">
+            <Button variant="outline">
+              <Upload className="mr-2 h-4 w-4" />
+              Bulk Upload
+            </Button>
+            <Button onClick={() => setShowCreateModal(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Student
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Filters */}

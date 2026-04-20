@@ -33,6 +33,7 @@ import { SubjectDetailsModal } from '@/components/subjects/SubjectDetailsModal';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
+import { useAuthGuard } from '@/hooks/use-auth-guard';
 
 const CATEGORY_LABELS: Record<string, string> = {
   CORE: 'Core',
@@ -56,6 +57,11 @@ export function SubjectsList() {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [deleteSubjectId, setDeleteSubjectId] = useState<string | null>(null);
+
+  // Check authorization for subject management
+  const { hasAccess: canManageSubjects } = useAuthGuard({
+    requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
+  });
 
   const { data, isLoading, error } = useSubjects({
     page,
@@ -157,17 +163,21 @@ export function SubjectsList() {
               <Eye className="mr-2 h-4 w-4" />
               View Details
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleEditClick(row.original)}>
-              <Edit className="mr-2 h-4 w-4" />
-              Edit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              className="text-red-600"
-              onClick={() => handleDeleteClick(row.original.id)}
-            >
-              <Trash className="mr-2 h-4 w-4" />
-              Delete
-            </DropdownMenuItem>
+            {canManageSubjects && (
+              <>
+                <DropdownMenuItem onClick={() => handleEditClick(row.original)}>
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="text-red-600"
+                  onClick={() => handleDeleteClick(row.original.id)}
+                >
+                  <Trash className="mr-2 h-4 w-4" />
+                  Delete
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       ),
@@ -183,20 +193,24 @@ export function SubjectsList() {
           title="Subjects"
           description="Manage school subjects and learning areas"
           action={
-            <Button onClick={handleCreateClick}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Add Subject
-            </Button>
+            canManageSubjects && (
+              <Button onClick={handleCreateClick}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Add Subject
+              </Button>
+            )
           }
         />
         <EmptyState
           title="No subjects found"
           description="Get started by creating your first subject."
           action={
-            <Button onClick={handleCreateClick}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Subject
-            </Button>
+            canManageSubjects && (
+              <Button onClick={handleCreateClick}>
+                <PlusCircle className="mr-2 h-4 w-4" />
+                Create Subject
+              </Button>
+            )
           }
         />
         <SubjectFormModal
@@ -214,10 +228,12 @@ export function SubjectsList() {
         title="Subjects"
         description="Manage school subjects and learning areas"
         action={
-          <Button onClick={handleCreateClick}>
-            <PlusCircle className="mr-2 h-4 w-4" />
-            Add Subject
-          </Button>
+          canManageSubjects && (
+            <Button onClick={handleCreateClick}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Subject
+            </Button>
+          )
         }
       />
 
