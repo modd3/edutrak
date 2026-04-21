@@ -47,6 +47,15 @@ const ROLE_COLORS = {
   SUPPORT_STAFF: 'outline',
 } as const;
 
+const ROLE_LABELS = {
+  SUPER_ADMIN: 'SUPER ADMIN',
+  ADMIN: 'ADMIN',
+  TEACHER: 'TEACHER',
+  STUDENT: 'STUDENT',
+  PARENT: 'PARENT',
+  SUPPORT_STAFF: 'SUPPORT STAFF',
+} as const;
+
 export default function UsersList() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
