@@ -22,8 +22,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
-import { useGetPayments } from '@/hooks/use-fees';
-import { useSchoolContext } from '@/hooks/use-school-context';
+import { useGetPayments, useReversePayment } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
 import { RoleGuard } from '@/components/RoleGuard';
 import { PageHeader } from '@/components/shared/PageHeader';
@@ -35,6 +34,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -58,13 +58,14 @@ const STATUS_VARIANTS: Record<string, any> = {
 };
 
 export default function PaymentsPage() {
-  const { schoolId } = useSchoolContext();
   const { can } = usePermission();
   const [methodFilter, setMethodFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [studentSearch, setStudentSearch] = useState('');
   const [showReverseDialog, setShowReverseDialog] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
+  const [reversalReason, setReversalReason] = useState('');
+  const { mutate: reversePayment, isPending: isReversing } = useReversePayment();
 
   // Fetch payments
   const { data: paymentsData, isLoading } = useGetPayments({
@@ -90,10 +91,10 @@ export default function PaymentsPage() {
   // Table columns
   const columns: ColumnDef<any>[] = [
     {
-      accessorKey: 'receiptNumber',
+      accessorKey: 'receiptNo',
       header: 'Receipt Number',
       cell: ({ row }) => (
-        <div className="font-mono font-semibold text-sm">{row.original.receiptNumber}</div>
+        <div className="font-mono font-semibold text-sm">{row.original.receiptNo}</div>
       ),
     },
     {
@@ -111,11 +112,11 @@ export default function PaymentsPage() {
       ),
     },
     {
-      accessorKey: 'invoice.invoiceNumber',
+      accessorKey: 'invoice.invoiceNo',
       header: 'Invoice',
       cell: ({ row }) => (
         <div className="font-mono text-sm text-gray-600">
-          {row.original.invoice?.invoiceNumber}
+          {row.original.invoice?.invoiceNo}
         </div>
       ),
     },
@@ -271,25 +272,57 @@ export default function PaymentsPage() {
         <DataTable columns={columns} data={filteredPayments} isLoading={isLoading} />
 
         {/* Reverse Payment Dialog */}
-        <AlertDialog open={showReverseDialog} onOpenChange={setShowReverseDialog}>
+        <AlertDialog
+          open={showReverseDialog}
+          onOpenChange={(open) => {
+            setShowReverseDialog(open);
+            if (!open) setReversalReason('');
+          }}
+        >
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Reverse Payment</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to reverse payment {selectedPayment?.receiptNumber}? This
+                <AlertDialogDescription>
+                Are you sure you want to reverse payment {selectedPayment?.receiptNo}? This
                 will restore the outstanding balance on the invoice.
               </AlertDialogDescription>
+              <div className="space-y-2 mt-2">
+                <label className="text-sm font-medium">Reversal Reason *</label>
+                <Textarea
+                  value={reversalReason}
+                  onChange={(e) => setReversalReason(e.target.value)}
+                  placeholder="Provide a reason for reversing this payment..."
+                  rows={3}
+                />
+              </div>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Keep Payment</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => {
-                  toast.info('Reverse payment dialog would appear here');
-                  setShowReverseDialog(false);
+                  if (!selectedPayment?.id) return;
+                  if (!reversalReason.trim()) {
+                    toast.error('Reversal reason is required');
+                    return;
+                  }
+                  reversePayment(
+                    {
+                      id: selectedPayment.id,
+                      data: { reason: reversalReason.trim() },
+                    },
+                    {
+                      onSuccess: () => {
+                        setShowReverseDialog(false);
+                        setSelectedPayment(null);
+                        setReversalReason('');
+                      },
+                    }
+                  );
                 }}
+                disabled={isReversing}
                 className="bg-red-600 hover:bg-red-700"
               >
-                Reverse Payment
+                {isReversing ? 'Reversing...' : 'Reverse Payment'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

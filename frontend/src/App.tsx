@@ -28,6 +28,9 @@ import StrandManagementPage from './pages/assessments/StrandManagementPage';
 import { StudentSubjectManagementPage } from './pages/subjects/StudentSubjectManagementPage';
 import { StudentSubjectEnrollmentPage } from './pages/students/SubjectEnrollment';
 import ClassSubjectStrandsPage from '@/pages/assessments/ClassSubjectStrands';
+import FeeStructuresPage from '@/pages/fees/FeeStructuresPage';
+import InvoicesPage from '@/pages/fees/InvoicesPage';
+import PaymentsPage from '@/pages/fees/PaymentsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -276,6 +279,42 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'PARENT']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <ReportsPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Fee Structures */}
+          <Route
+            path="/fees/structures"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <FeeStructuresPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Fee Invoices */}
+          <Route
+            path="/fees/invoices"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <InvoicesPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Fee Payments */}
+          <Route
+            path="/fees/payments"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <PaymentsPage />
                 </DashboardLayout>
               </RoleGuard>
             }

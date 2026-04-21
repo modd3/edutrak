@@ -271,7 +271,6 @@ export function BulkGenerateInvoicesModal({
             {form.formState.errors.studentIds && (
               <p className="text-xs text-red-500">{form.formState.errors.studentIds.message}</p>
             )}
-          </div>
 
           {/* Due Date */}
           <div className="space-y-2">
