@@ -274,4 +274,6 @@ export const usersApi = {
     api.post(`/users/${id}/deactivate`),
 };
 
+export { feesApi } from './fees-api';
+
 export default api;

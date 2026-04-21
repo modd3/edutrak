@@ -19,6 +19,7 @@ import {
   BookMarked,
   UserCheck,
   TestTubes,
+  DollarSign,
 } from 'lucide-react';
 import { UserRole } from '../store/auth-store';
 
