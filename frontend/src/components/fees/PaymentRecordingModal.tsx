@@ -173,7 +173,7 @@ export function PaymentRecordingModal({
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>
-            Record a payment for invoice {invoice.invoiceNumber}
+            Record a payment for invoice {invoice.invoiceNo}
           </DialogDescription>
         </DialogHeader>
 

@@ -23,7 +23,6 @@ import {
 import { DataTable } from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { useGetInvoices, useCancelInvoice } from '@/hooks/use-fees';
-import { useSchoolContext } from '@/hooks/use-school-context';
 import { usePermission } from '@/hooks/use-permission';
 import { RoleGuard } from '@/components/RoleGuard';
 import { InvoiceDetailsModal } from '@/components/fees/InvoiceDetailsModal';
@@ -44,7 +43,6 @@ import { toast } from 'sonner';
 // ══════════════════════════════════════════════════════════════════════════
 
 export default function InvoicesPage() {
-  const { schoolId } = useSchoolContext();
   const { can } = usePermission();
   const queryClient = useQueryClient();
   const [showDetailsModal, setShowDetailsModal] = useState(false);
@@ -71,16 +69,16 @@ export default function InvoicesPage() {
       invoice.student?.firstName?.toLowerCase().includes(studentSearch.toLowerCase()) ||
       invoice.student?.lastName?.toLowerCase().includes(studentSearch.toLowerCase()) ||
       invoice.student?.admissionNo?.includes(studentSearch) ||
-      invoice.invoiceNumber?.includes(studentSearch)
+      invoice.invoiceNo?.includes(studentSearch)
   );
 
   // Table columns
   const columns: ColumnDef<any>[] = [
     {
-      accessorKey: 'invoiceNumber',
+      accessorKey: 'invoiceNo',
       header: 'Invoice Number',
       cell: ({ row }) => (
-        <div className="font-mono font-semibold text-sm">{row.original.invoiceNumber}</div>
+        <div className="font-mono font-semibold text-sm">{row.original.invoiceNo}</div>
       ),
     },
     {
@@ -220,7 +218,7 @@ export default function InvoicesPage() {
   };
 
   return (
-    <RoleGuard allowedRoles={['ADMIN', 'SUPER_ADMIN', 'TEACHER']}>
+    <RoleGuard roles={['ADMIN', 'SUPER_ADMIN', 'TEACHER']}>
       <div className="space-y-6">
         <PageHeader
           title="Fee Invoices"
@@ -275,8 +273,8 @@ export default function InvoicesPage() {
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Cancel Invoice</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to cancel invoice {selectedInvoice?.invoiceNumber}? This
+                <AlertDialogDescription>
+                Are you sure you want to cancel invoice {selectedInvoice?.invoiceNo}? This
                 action cannot be undone, and it cannot be cancelled if payments have been recorded.
               </AlertDialogDescription>
             </AlertDialogHeader>

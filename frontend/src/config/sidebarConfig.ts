@@ -195,6 +195,32 @@ export const sidebarConfig: NavItem[] = [
     ],
   },
   {
+    title: 'Fees',
+    href: '/fees/structures',
+    icon: DollarSign,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+    children: [
+      {
+        title: 'Fee Structures',
+        href: '/fees/structures',
+        icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Fee Invoices',
+        href: '/fees/invoices',
+        icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
+        title: 'Fee Payments',
+        href: '/fees/payments',
+        icon: DollarSign,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+    ],
+  },
+  {
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,
