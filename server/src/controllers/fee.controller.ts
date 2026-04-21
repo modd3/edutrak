@@ -122,8 +122,15 @@ export class FeeController {
       const invoice = await service.generateInvoice(data);
       return ResponseUtil.created(res, 'Invoice generated successfully', invoice);
     } catch (error: any) {
-      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
-      logger.error('Error generating invoice', { error: error.message });
+      if (error instanceof z.ZodError) {
+        const message = error.issues
+        .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
+        .join("//")
+        .replace('\"', '');
+        logger.error('Error generating invoice', { error: message });
+        return ResponseUtil.validationError(res, JSON.stringify(message, null, 2));
+      }
+    //  if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues, null, 2));
       // Duplicate invoice is a conflict, not a server error
       if (error.message.includes('already exists')) return ResponseUtil.conflict(res, error.message);
       return ResponseUtil.error(res, error.message, 400);

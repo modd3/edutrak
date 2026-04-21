@@ -25,8 +25,8 @@ export const PaymentStatusEnum = z.enum([
 export const createFeeStructureSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
   description: z.string().max(500).optional(),
-  academicYearId: z.string().uuid('Invalid academic year ID'),
-  termId: z.string().uuid().optional(),
+  academicYearId: z.uuid('Invalid academic year ID'),
+  termId: z.uuid().optional(),
   classLevel: z.string().max(20).optional(),
   boardingStatus: z.enum(['DAY', 'BOARDING', 'BOTH']).optional(),
   currency: z.string().length(3).default('KES'),
@@ -70,15 +70,15 @@ export const updateFeeItemSchema = z.object({
 // ── Invoice ───────────────────────────────────────────────────────────────────
 
 export const generateInvoiceSchema = z.object({
-  studentId: z.string().uuid('Invalid student ID'),
-  feeStructureId: z.string().uuid('Invalid fee structure ID'),
-  dueDate: z.string().datetime({ offset: true }).optional(),
+  studentId: z.uuid('Invalid student ID'),
+  feeStructureId: z.uuid('Invalid fee structure ID'),
+  dueDate: z.iso.datetime({ offset: true }).optional(),
   notes: z.string().max(500).optional(),
   // Optional per-item overrides — e.g. waive boarding for a day student
   waivers: z
     .array(
       z.object({
-        feeItemId: z.string().uuid(),
+        feeItemId: z.uuid(),
         waiverNote: z.string().max(300).optional(),
       })
     )
@@ -88,14 +88,14 @@ export const generateInvoiceSchema = z.object({
 });
 
 export const bulkGenerateInvoicesSchema = z.object({
-  feeStructureId: z.string().uuid('Invalid fee structure ID'),
-  studentIds: z.array(z.string().uuid()).min(1, 'At least one student required'),
-  dueDate: z.string().datetime({ offset: true }).optional(),
+  feeStructureId: z.uuid('Invalid fee structure ID'),
+  studentIds: z.array(z.uuid()).min(1, 'At least one student required'),
+  dueDate: z.iso.datetime({ offset: true }).optional(),
   notes: z.string().max(500).optional(),
 });
 
 export const updateInvoiceSchema = z.object({
-  dueDate: z.string().datetime({ offset: true }).optional(),
+  dueDate: z.iso.datetime({ offset: true }).optional(),
   notes: z.string().max(500).optional(),
   discountAmount: z.number().min(0).optional(),
   status: InvoiceStatusEnum.optional(),
@@ -105,14 +105,14 @@ export const updateInvoiceSchema = z.object({
 
 export const recordPaymentSchema = z
   .object({
-    invoiceId: z.string().uuid('Invalid invoice ID'),
+    invoiceId: z.uuid('Invalid invoice ID'),
     amount: z.number().positive('Payment amount must be positive'),
     method: PaymentMethodEnum,
     transactionRef: z.string().max(100).optional(),
     mpesaCode: z.string().max(50).optional(),
     bankName: z.string().max(100).optional(),
     chequeNo: z.string().max(50).optional(),
-    paidAt: z.string().datetime({ offset: true }).optional(),
+    paidAt: z.iso.datetime({ offset: true }).optional(),
     notes: z.string().max(500).optional(),
   })
   .refine(
@@ -131,8 +131,8 @@ export const reversePaymentSchema = z.object({
 // ── Query Schemas ─────────────────────────────────────────────────────────────
 
 export const getFeeStructuresQuerySchema = z.object({
-  academicYearId: z.string().uuid().optional(),
-  termId: z.string().uuid().optional(),
+  academicYearId: z.uuid().optional(),
+  termId: z.uuid().optional(),
   classLevel: z.string().optional(),
   isActive: z
     .string()
@@ -143,10 +143,10 @@ export const getFeeStructuresQuerySchema = z.object({
 });
 
 export const getInvoicesQuerySchema = z.object({
-  studentId: z.string().uuid().optional(),
-  feeStructureId: z.string().uuid().optional(),
-  academicYearId: z.string().uuid().optional(),
-  termId: z.string().uuid().optional(),
+  studentId: z.uuid().optional(),
+  feeStructureId: z.uuid().optional(),
+  academicYearId: z.uuid().optional(),
+  termId: z.uuid().optional(),
   status: InvoiceStatusEnum.optional(),
   isOverdue: z.string().transform(v => v === 'true').optional(),
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
@@ -154,8 +154,8 @@ export const getInvoicesQuerySchema = z.object({
 });
 
 export const getPaymentsQuerySchema = z.object({
-  studentId: z.string().uuid().optional(),
-  invoiceId: z.string().uuid().optional(),
+  studentId: z.uuid().optional(),
+  invoiceId: z.uuid().optional(),
   method: PaymentMethodEnum.optional(),
   status: PaymentStatusEnum.optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
@@ -165,8 +165,8 @@ export const getPaymentsQuerySchema = z.object({
 });
 
 export const feeReportQuerySchema = z.object({
-  academicYearId: z.string().uuid().optional(),
-  termId: z.string().uuid().optional(),
+  academicYearId: z.uuid().optional(),
+  termId: z.uuid().optional(),
   classLevel: z.string().optional(),
 });
 

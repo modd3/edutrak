@@ -55,6 +55,7 @@ app.use('/api', routes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
+  logger.info("[*] Health Check..", `ip: ${req.url}`);
   res.status(200).json({
     success: true,
     message: 'Kenya School Management API is running',
