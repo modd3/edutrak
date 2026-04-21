@@ -52,7 +52,7 @@ jobs:
           cache: 'npm'
 
       - name: 📦 Install dependencies
-        run: npm i
+        run: npm install --ignore-scripts
 
       - name: 🔍 Type check
         run: npm run type-check
