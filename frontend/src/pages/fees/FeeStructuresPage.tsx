@@ -155,7 +155,7 @@ export default function FeeStructuresPage() {
   ];
 
   return (
-    <RoleGuard allowedRoles={['ADMIN', 'SUPER_ADMIN']}>
+    <RoleGuard roles={['ADMIN', 'SUPER_ADMIN']}>
       <div className="space-y-6">
         <PageHeader
           title="Fee Structures"

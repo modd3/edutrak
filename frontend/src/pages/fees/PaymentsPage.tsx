@@ -211,7 +211,7 @@ export default function PaymentsPage() {
   ];
 
   return (
-    <RoleGuard allowedRoles={['ADMIN', 'SUPER_ADMIN', 'TEACHER']}>
+    <RoleGuard roles={['ADMIN', 'SUPER_ADMIN', 'TEACHER']}>
       <div className="space-y-6">
         <PageHeader
           title="Payment History"
