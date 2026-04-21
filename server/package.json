@@ -25,10 +25,12 @@
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
     
+    
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "format:check": "prettier --check \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
+    "type-check": "npm run type-check --workspace=server",
     
     "security:audit": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
@@ -124,6 +126,10 @@
     ],
     "*.prisma": [
       "prisma format"
-    ]
+    ],
+    "workspaces": [
+    "server",
+    "frontend"
+  ]
   }
 }
