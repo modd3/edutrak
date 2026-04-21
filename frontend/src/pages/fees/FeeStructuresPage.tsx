@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
-import { Plus, MoreHorizontal, Edit, Trash2, FileText } from 'lucide-react';
+import { Plus, MoreHorizontal, Edit, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -10,40 +10,24 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
 import { DataTable } from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { useGetFeeStructures } from '@/hooks/use-fees';
-import { useSchoolContext } from '@/hooks/use-school-context';
 import { usePermission } from '@/hooks/use-permission';
 import { RoleGuard } from '@/components/RoleGuard';
 import { FeeStructureFormModal } from '@/components/fees/FeeStructureFormModal';
 import { GenerateInvoiceModal } from '@/components/fees/GenerateInvoiceModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { feesApi } from '@/api';
-import { toast } from 'sonner';
 
 // ══════════════════════════════════════════════════════════════════════════
 // COMPONENT
 // ══════════════════════════════════════════════════════════════════════════
 
 export default function FeeStructuresPage() {
-  const { schoolId } = useSchoolContext();
   const { can } = usePermission();
-  const queryClient = useQueryClient();
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [showBulkGenerateModal, setShowBulkGenerateModal] = useState(false);
   const [selectedStructure, setSelectedStructure] = useState<any>(null);
@@ -55,24 +39,6 @@ export default function FeeStructuresPage() {
   });
 
   const structures = structuresData?.data || [];
-
-  // Delete mutation (if API supports it)
-  const { mutate: deleteStructure, isPending: isDeleting } = useMutation({
-    mutationFn: async (id: string) => {
-      // Note: Backend doesn't expose delete endpoint, so this would need to be added
-      // For now, we'll just show the intent
-      return Promise.reject(new Error('Delete not yet implemented'));
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['feeStructures'] });
-      toast.success('Fee structure deleted successfully');
-      setShowDeleteDialog(false);
-      setSelectedStructure(null);
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to delete fee structure');
-    },
-  });
 
   // Table columns
   const columns: ColumnDef<any>[] = [
@@ -174,23 +140,11 @@ export default function FeeStructuresPage() {
                 <DropdownMenuItem
                   onClick={() => {
                     setSelectedStructure(row.original);
-                    // Edit modal would be opened here
-                    toast.info('Edit structure feature coming soon');
+                    setShowEditModal(true);
                   }}
                 >
                   <Edit className="w-4 h-4 mr-2" />
                   Edit Structure
-                </DropdownMenuItem>
-
-                <DropdownMenuItem
-                  onClick={() => {
-                    setSelectedStructure(row.original);
-                    setShowDeleteDialog(true);
-                  }}
-                  className="text-red-600"
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
                 </DropdownMenuItem>
               </>
             )}
@@ -231,6 +185,13 @@ export default function FeeStructuresPage() {
 
         {selectedStructure && (
           <>
+            <FeeStructureFormModal
+              open={showEditModal}
+              onOpenChange={setShowEditModal}
+              mode="edit"
+              structureId={selectedStructure.id}
+            />
+
             <GenerateInvoiceModal
               open={showGenerateModal}
               onOpenChange={setShowGenerateModal}
@@ -244,29 +205,6 @@ export default function FeeStructuresPage() {
             />
           </>
         )}
-
-        {/* Delete Confirmation Dialog */}
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Delete Fee Structure</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to delete "{selectedStructure?.name}"? This action cannot
-                be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                onClick={() => selectedStructure && deleteStructure(selectedStructure.id)}
-                disabled={isDeleting}
-                className="bg-red-600 hover:bg-red-700"
-              >
-                {isDeleting ? 'Deleting...' : 'Delete'}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
     </RoleGuard>
   );

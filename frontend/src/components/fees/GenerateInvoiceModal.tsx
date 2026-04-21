@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useGenerateInvoice, useGetFeeStructureById } from '@/hooks/use-fees';
-import { useGetStudents } from '@/hooks/use-students';
+import { useStudents } from '@/hooks/use-students';
 import { useSchoolContext } from '@/hooks/use-school-context';
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -58,7 +58,7 @@ export function GenerateInvoiceModal({
   const { mutate: generateInvoice, isPending: isGenerating } = useGenerateInvoice();
   const { data: structureData, isLoading: isLoadingStructure } =
     useGetFeeStructureById(feeStructureId);
-  const { data: studentsData, isLoading: isLoadingStudents } = useGetStudents({
+  const { data: studentsData, isLoading: isLoadingStudents } = useStudents({
     schoolId,
     page: 1,
     pageSize: 100,
