@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -91,7 +92,7 @@ export function PaymentRecordingModal({
   const { data: invoiceData, isLoading: isLoadingInvoice } =
     useGetInvoiceById(invoiceId);
 
-  const invoice = invoiceData?.data;
+  const invoice = invoiceData?.data?.data;
   const balance = invoice
     ? invoice.totalAmount - invoice.paidAmount - invoice.discountAmount
     : 0;
@@ -169,35 +170,42 @@ export function PaymentRecordingModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>
             Record a payment for invoice {invoice.invoiceNo}
           </DialogDescription>
+          <DialogDescription>
+            {invoice.student.admissionNo}
+          </DialogDescription>
+          <DialogDescription>
+            {invoice.student.firstName} {invoice.student.lastName}
+          </DialogDescription>
         </DialogHeader>
 
+        
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           {/* Invoice Summary */}
           <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Total Amount:</span>
-              <span className="font-medium">KES {invoice.totalAmount.toFixed(2)}</span>
+              <span className="font-medium">KES {invoice.totalAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Paid to Date:</span>
-              <span className="font-medium">KES {invoice.paidAmount.toFixed(2)}</span>
+              <span className="font-medium">KES {invoice.paidAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Discount:</span>
-              <span className="font-medium">KES {invoice.discountAmount.toFixed(2)}</span>
+              <span className="font-medium">KES {invoice.discountAmount}</span>
             </div>
             <div className="border-t pt-2 flex justify-between">
               <span className="font-semibold">Outstanding Balance:</span>
               <span
                 className={`font-semibold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}
               >
-                KES {balance.toFixed(2)}
+                KES {balance}
               </span>
             </div>
           </div>
@@ -210,7 +218,8 @@ export function PaymentRecordingModal({
               </AlertDescription>
             </Alert>
           )}
-
+        <ScrollArea className="h-[calc(60vh-200px)]">
+          <div className="grid grid-cols-2 gap-4">
           {/* Payment Amount */}
           <div className="space-y-2">
             <Label htmlFor="amount">Payment Amount (KES) *</Label>
@@ -226,7 +235,7 @@ export function PaymentRecordingModal({
             )}
             {watchAmount > balance && balance > 0 && (
               <p className="text-xs text-amber-600">
-                Payment exceeds outstanding balance by KES {(watchAmount - balance).toFixed(2)}
+                Payment exceeds outstanding balance by KES {(watchAmount - balance)}
               </p>
             )}
           </div>
@@ -319,6 +328,7 @@ export function PaymentRecordingModal({
             />
             <p className="text-xs text-gray-500">Defaults to current date/time if not specified</p>
           </div>
+          </div>
 
           {/* Notes */}
           <div className="space-y-2">
@@ -331,13 +341,17 @@ export function PaymentRecordingModal({
             />
           </div>
 
+          <div className="space-y-2 p-2">
           {form.formState.errors.method?.message && (
             <Alert variant="destructive">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{form.formState.errors.method.message}</AlertDescription>
             </Alert>
           )}
+          </div>
+        </ScrollArea>
         </form>
+        
 
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>

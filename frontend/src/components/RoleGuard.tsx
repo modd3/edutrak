@@ -37,8 +37,6 @@ export function RoleGuard({
   }
 
   // Check if user has required role
-  console.log('RoleGuard - User Role:', user.role);
-  console.log('RoleGuard - Allowed Roles:', roles);
   const hasAccess = roles.includes(user.role);
 
   if (!hasAccess) {

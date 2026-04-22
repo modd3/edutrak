@@ -60,7 +60,8 @@ export default function InvoicesPage() {
 
   const { mutate: cancelInvoice, isPending: isCancelling } = useCancelInvoice();
 
-  const invoices = invoicesData?.data || [];
+  const invoices = invoicesData?.data?.data || [];
+  console.log("invoicesL: ", invoices);
 
   // Filter by student search
   const filteredInvoices = invoices.filter(
@@ -97,7 +98,7 @@ export default function InvoicesPage() {
       accessorKey: 'totalAmount',
       header: 'Total Amount',
       cell: ({ row }) => (
-        <span className="font-medium">KES {row.original.totalAmount?.toFixed(2) || '0.00'}</span>
+        <span className="font-medium">KES {row.original.totalAmount || '0.00'}</span>
       ),
     },
     {
@@ -106,11 +107,11 @@ export default function InvoicesPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium text-green-600">
-            KES {row.original.paidAmount?.toFixed(2) || '0.00'}
+            KES {row.original.paidAmount || '0.00'}
           </p>
           {row.original.discountAmount > 0 && (
             <p className="text-xs text-gray-600">
-              Discount: KES {row.original.discountAmount?.toFixed(2)}
+              Discount: KES {row.original.discountAmount}
             </p>
           )}
         </div>
@@ -245,7 +246,7 @@ export default function InvoicesPage() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="All">All Statuses</SelectItem>
                   <SelectItem value="UNPAID">Unpaid</SelectItem>
                   <SelectItem value="PARTIAL">Partially Paid</SelectItem>
                   <SelectItem value="PAID">Paid</SelectItem>

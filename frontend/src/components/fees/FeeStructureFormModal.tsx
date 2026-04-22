@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { any, array, z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +26,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button as IconButton } from '@/components/ui/button';
 import { X, Plus } from 'lucide-react';
 import { useCreateFeeStructure, useUpdateFeeStructure, useGetFeeStructureById } from '@/hooks/use-fees';
-import { useAcademicYears } from '@/hooks/use-academic';
+import { useAcademicYear, useAcademicYears } from '@/hooks/use-academic';
 
 // ══════════════════════════════════════════════════════════════════════════
 // ZOD SCHEMA
@@ -95,6 +95,7 @@ export function FeeStructureFormModal({
   mode,
   structureId,
 }: FeeStructureFormModalProps) {
+  const [availableTerms, setAvailableTerms] = useState<string[]>([]);
   const { mutate: createStructure, isPending: isCreating } = useCreateFeeStructure();
   const { mutate: updateStructure, isPending: isUpdating } = useUpdateFeeStructure();
   const { data: structureData } = useGetFeeStructureById(
@@ -104,7 +105,14 @@ export function FeeStructureFormModal({
 
   const [isLoading, setIsLoading] = useState(false);
 
-  const form = useForm<FeeStructureFormData>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    reset,
+    watch,
+    formState: { errors },
+  } = useForm<FeeStructureFormData>({
     resolver: zodResolver(feeStructureSchema),
     defaultValues: {
       name: '',
@@ -119,17 +127,32 @@ export function FeeStructureFormModal({
   });
 
   const { fields, append, remove } = useFieldArray({
-    control: form.control,
+    control: control,
     name: 'items',
   });
 
   const academicYears = academicYearsData?.data || [];
 
+  const selectedAcademicYearId = watch('academicYearId');
+  const selectedAYData = useAcademicYear(selectedAcademicYearId);
+  const selectedAY = selectedAYData.data?.data;
+
+  const selectedCurrency = watch('currency');
+  console.log("Currency: ", selectedCurrency);
+
+  useEffect(() => {
+      if (selectedAY) {
+        setAvailableTerms(selectedAY.terms);
+      } else {
+        setAvailableTerms([]);
+      }
+    }, [selectedAY]);
+
   // Populate form with existing data in edit mode
   useEffect(() => {
     if (mode === 'edit' && structureData?.data) {
       const structure = structureData.data;
-      form.reset({
+      reset({
         name: structure.name,
         description: structure.description || '',
         academicYearId: structure.academicYearId,
@@ -142,7 +165,7 @@ export function FeeStructureFormModal({
         ],
       });
     }
-  }, [structureData, mode, form]);
+  }, [structureData, mode]);
 
   const onSubmit = (data: FeeStructureFormData) => {
     setIsLoading(true);
@@ -151,7 +174,7 @@ export function FeeStructureFormModal({
       createStructure(data, {
         onSuccess: () => {
           onOpenChange(false);
-          form.reset();
+          reset();
           setIsLoading(false);
         },
         onError: () => {
@@ -172,7 +195,7 @@ export function FeeStructureFormModal({
         {
           onSuccess: () => {
             onOpenChange(false);
-            form.reset();
+            reset();
             setIsLoading(false);
           },
           onError: () => {
@@ -182,6 +205,13 @@ export function FeeStructureFormModal({
       );
     }
   };
+
+  useEffect(() => {
+      if (!open) {
+        reset();
+        setAvailableTerms([]);
+      }
+    }, [open, reset]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -198,7 +228,7 @@ export function FeeStructureFormModal({
         </DialogHeader>
 
         <ScrollArea className="h-[calc(90vh-180px)]">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="p-4 space-y-6">
+          <form onSubmit={handleSubmit(onSubmit)} className="p-4 space-y-6">
             {/* Basic Information */}
             <div className="space-y-4">
               <h3 className="font-semibold">Basic Information</h3>
@@ -208,12 +238,12 @@ export function FeeStructureFormModal({
                   <Label htmlFor="name">Structure Name *</Label>
                   <Input
                     id="name"
-                    {...form.register('name')}
+                    {...register('name')}
                     placeholder="e.g., Form 1-2 Day Students"
                   />
-                  {form.formState.errors.name && (
+                  {errors.name && (
                     <p className="text-xs text-red-500">
-                      {form.formState.errors.name.message}
+                      {errors.name.message}
                     </p>
                   )}
                 </div>
@@ -222,7 +252,7 @@ export function FeeStructureFormModal({
                   <Label htmlFor="academicYear">Academic Year *</Label>
                   <Controller
                     name="academicYearId"
-                    control={form.control}
+                    control={control}
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger>
@@ -233,14 +263,43 @@ export function FeeStructureFormModal({
                             <SelectItem key={year.id} value={year.id}>
                               {year.year}
                             </SelectItem>
+                          
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   />
-                  {form.formState.errors.academicYearId && (
+                  {errors.academicYearId && (
                     <p className="text-xs text-red-500">
-                      {form.formState.errors.academicYearId.message}
+                      {errors.academicYearId.message}
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="term">Term *</Label>
+                  <Controller
+                    name="termId"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select Term" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableTerms.map((term: any) => (
+                            <SelectItem key={term.id} value={term.id}>
+                              {term.name.replace("_", " ")}
+                            </SelectItem>
+                          
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                  {errors.termId && (
+                    <p className="text-xs text-red-500">
+                      {errors.termId.message}
                     </p>
                   )}
                 </div>
@@ -249,7 +308,7 @@ export function FeeStructureFormModal({
                   <Label htmlFor="classLevel">Class Level</Label>
                   <Controller
                     name="classLevel"
-                    control={form.control}
+                    control={control}
                     render={({ field }) => (
                       <Select value={field.value || ''} onValueChange={field.onChange}>
                         <SelectTrigger>
@@ -271,7 +330,7 @@ export function FeeStructureFormModal({
                   <Label htmlFor="boardingStatus">Boarding Status</Label>
                   <Controller
                     name="boardingStatus"
-                    control={form.control}
+                    control={control}
                     render={({ field }) => (
                       <Select value={field.value || ''} onValueChange={field.onChange}>
                         <SelectTrigger>
@@ -286,13 +345,24 @@ export function FeeStructureFormModal({
                     )}
                   />
                 </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="name">Currency</Label>
+                  <Input
+                    id="currency"
+                    {...register('currency')}
+                    placeholder="e.g., KES/USD"
+                  />
+                  
+                </div>
+
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Textarea
                   id="description"
-                  {...form.register('description')}
+                  {...register('description')}
                   placeholder="Optional description"
                   rows={2}
                 />
@@ -337,13 +407,13 @@ export function FeeStructureFormModal({
                           <Label htmlFor={`items.${index}.name`}>Item Name</Label>
                           <Input
                             id={`items.${index}.name`}
-                            {...form.register(`items.${index}.name`)}
+                            {...register(`items.${index}.name`)}
                             placeholder="e.g., Tuition"
                             disabled={mode === 'edit'}
                           />
-                          {form.formState.errors.items?.[index]?.name && (
+                          {errors.items?.[index]?.name && (
                             <p className="text-xs text-red-500">
-                              {form.formState.errors.items[index]?.name?.message}
+                              {errors.items[index]?.name?.message}
                             </p>
                           )}
                         </div>
@@ -352,7 +422,7 @@ export function FeeStructureFormModal({
                           <Label htmlFor={`items.${index}.category`}>Category</Label>
                           <Controller
                             name={`items.${index}.category`}
-                            control={form.control}
+                            control={control}
                             render={({ field }) => (
                               <Select
                                 value={field.value}
@@ -372,26 +442,26 @@ export function FeeStructureFormModal({
                               </Select>
                             )}
                           />
-                          {form.formState.errors.items?.[index]?.category && (
+                          {errors.items?.[index]?.category && (
                             <p className="text-xs text-red-500">
-                              {form.formState.errors.items[index]?.category?.message}
+                              {errors.items[index]?.category?.message}
                             </p>
                           )}
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor={`items.${index}.amount`}>Amount (KES)</Label>
+                          <Label htmlFor={`items.${index}.amount`}>Amount ({selectedCurrency})</Label>
                           <Input
                             id={`items.${index}.amount`}
                             type="number"
                             step="0.01"
-                            {...form.register(`items.${index}.amount`)}
+                            {...register(`items.${index}.amount`)}
                             placeholder="0.00"
                             disabled={mode === 'edit'}
                           />
-                          {form.formState.errors.items?.[index]?.amount && (
+                          {errors.items?.[index]?.amount && (
                             <p className="text-xs text-red-500">
-                              {form.formState.errors.items[index]?.amount?.message}
+                              {errors.items[index]?.amount?.message}
                             </p>
                           )}
                         </div>
@@ -400,7 +470,7 @@ export function FeeStructureFormModal({
                           <Label className="flex items-center gap-2">
                             <input
                               type="checkbox"
-                              {...form.register(`items.${index}.isOptional`)}
+                              {...register(`items.${index}.isOptional`)}
                               disabled={mode === 'edit'}
                             />
                             Optional
@@ -423,8 +493,8 @@ export function FeeStructureFormModal({
                 ))}
               </div>
 
-              {form.formState.errors.items && (
-                <p className="text-xs text-red-500">{form.formState.errors.items.message}</p>
+              {errors.items && (
+                <p className="text-xs text-red-500">{errors.items.message}</p>
               )}
             </div>
           </form>
@@ -435,7 +505,7 @@ export function FeeStructureFormModal({
             Cancel
           </Button>
           <Button
-            onClick={form.handleSubmit(onSubmit)}
+            onClick={handleSubmit(onSubmit)}
             disabled={isLoading || isCreating || isUpdating}
           >
             {isLoading || isCreating || isUpdating

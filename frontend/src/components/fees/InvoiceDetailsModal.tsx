@@ -52,8 +52,8 @@ export function InvoiceDetailsModal({
   const { data: invoiceData, isLoading } = useGetInvoiceById(invoiceId);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  const invoice = invoiceData?.data;
-
+  const invoice = invoiceData?.data?.data
+  
   if (isLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
@@ -163,7 +163,7 @@ export function InvoiceDetailsModal({
                               <p className="font-medium text-sm">{item.name}</p>
                               <p className="text-xs text-gray-600">{item.category}</p>
                             </div>
-                            <p className="font-semibold">KES {item.amount?.toFixed(2)}</p>
+                            <p className="font-semibold">KES {item.amount}</p>
                           </div>
                         ))}
                       </div>
@@ -173,20 +173,20 @@ export function InvoiceDetailsModal({
                         <div className="flex justify-between">
                           <span className="text-gray-600">Subtotal</span>
                           <span className="font-medium">
-                            KES {(invoice.totalAmount - invoice.discountAmount)?.toFixed(2)}
+                            KES {(invoice.totalAmount - invoice.discountAmount)}
                           </span>
                         </div>
                         {invoice.discountAmount > 0 && (
                           <div className="flex justify-between text-green-600">
                             <span>Discount</span>
                             <span className="font-medium">
-                              -KES {invoice.discountAmount?.toFixed(2)}
+                              -KES {invoice.discountAmount}
                             </span>
                           </div>
                         )}
                         <div className="flex justify-between font-semibold border-t pt-2">
                           <span>Total Amount</span>
-                          <span>KES {invoice.totalAmount?.toFixed(2)}</span>
+                          <span>KES {invoice.totalAmount}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -217,13 +217,13 @@ export function InvoiceDetailsModal({
                         <div className="p-3 bg-blue-50 rounded">
                           <p className="text-gray-600 text-xs">Total Amount</p>
                           <p className="font-semibold">
-                            KES {invoice.totalAmount?.toFixed(2)}
+                            KES {invoice.totalAmount}
                           </p>
                         </div>
                         <div className="p-3 bg-green-50 rounded">
                           <p className="text-gray-600 text-xs">Paid Amount</p>
                           <p className="font-semibold text-green-600">
-                            KES {invoice.paidAmount?.toFixed(2)}
+                            KES {invoice.paidAmount}
                           </p>
                         </div>
                         <div
@@ -290,7 +290,7 @@ export function InvoiceDetailsModal({
                                   {payment.transactionRef || payment.mpesaCode || '-'}
                                 </span>
                                 <span className="font-semibold text-green-600">
-                                  +KES {payment.amount?.toFixed(2)}
+                                  +KES {payment.amount}
                                 </span>
                               </div>
                               {payment.notes && (

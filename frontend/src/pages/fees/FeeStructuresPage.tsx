@@ -38,7 +38,8 @@ export default function FeeStructuresPage() {
     limit: 20,
   });
 
-  const structures = structuresData?.data || [];
+  const structures = structuresData?.data?.data || [];
+  console.log("Structures: ", structures)
 
   // Table columns
   const columns: ColumnDef<any>[] = [
@@ -48,7 +49,7 @@ export default function FeeStructuresPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium">{row.original.name}</p>
-          <p className="text-xs text-gray-600">{row.original.description}</p>
+        {/*  <p className="text-xs text-gray-600">{row.original.description}</p>*/}
         </div>
       ),
     },
@@ -79,10 +80,10 @@ export default function FeeStructuresPage() {
       header: 'Total Amount',
       cell: ({ row }) => {
         const total = row.original.items?.reduce(
-          (sum: number, item: any) => sum + item.amount,
+          (sum: number, item: any) => Number(sum) + Number(item.amount),
           0
         ) || 0;
-        return <span className="font-medium">KES {total.toFixed(2)}</span>;
+        return <span className="font-medium">{row.original.currency} {total.toFixed(2)}</span>;
       },
     },
     {
@@ -173,7 +174,7 @@ export default function FeeStructuresPage() {
         <DataTable
           columns={columns}
           data={structures}
-          isLoading={isLoading}
+          //isLoading={isLoading}
         />
 
         {/* Modals */}
