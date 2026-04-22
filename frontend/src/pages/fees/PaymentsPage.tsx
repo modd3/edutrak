@@ -67,15 +67,35 @@ export default function PaymentsPage() {
   const [reversalReason, setReversalReason] = useState('');
   const { mutate: reversePayment, isPending: isReversing } = useReversePayment();
 
+  let filteredMethod;
+  let filteredStatus;
+
+  if (methodFilter === "All") {
+    filteredMethod = ""
+  }
+  else {
+    filteredMethod = methodFilter;
+  }
+
+  if (statusFilter === "All") {
+    filteredStatus = ""
+  }
+  else {
+    filteredStatus = statusFilter;
+  }
+  
   // Fetch payments
   const { data: paymentsData, isLoading } = useGetPayments({
-    method: methodFilter || undefined,
-    status: statusFilter || undefined,
+    method: filteredMethod || undefined,
+    status: filteredStatus || undefined,
     page: 1,
     limit: 20,
   });
 
-  const payments = paymentsData?.data || [];
+  const payments = paymentsData?.data?.data || [];
+  console.log("Payments: ", payments)
+  console.log("Method Filter:", methodFilter);
+  console.log("Status Filter:", statusFilter);
 
   // Filter by student search
   const filteredPayments = payments.filter(
@@ -103,10 +123,10 @@ export default function PaymentsPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium">
-            {row.original.invoice?.student?.firstName} {row.original.invoice?.student?.lastName}
+            {row.original.student?.firstName} {row.original.student?.lastName}
           </p>
           <p className="text-xs text-gray-600">
-            {row.original.invoice?.student?.admissionNo}
+            {row.original.student?.admissionNo}
           </p>
         </div>
       ),
@@ -125,7 +145,7 @@ export default function PaymentsPage() {
       header: 'Amount',
       cell: ({ row }) => (
         <span className="font-semibold text-green-600">
-          KES {row.original.amount?.toFixed(2) || '0.00'}
+          {row.original.invoice?.feeStructure?.currency} {row.original.amount || '0.00'}
         </span>
       ),
     },
@@ -239,7 +259,7 @@ export default function PaymentsPage() {
                     <SelectValue placeholder="All methods" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Methods</SelectItem>
+                    <SelectItem value="All">All Methods</SelectItem>
                     <SelectItem value="CASH">Cash</SelectItem>
                     <SelectItem value="MPESA">M-Pesa</SelectItem>
                     <SelectItem value="BANK_TRANSFER">Bank Transfer</SelectItem>
@@ -257,7 +277,7 @@ export default function PaymentsPage() {
                     <SelectValue placeholder="All statuses" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Statuses</SelectItem>
+                    <SelectItem value="All">All Statuses</SelectItem>
                     <SelectItem value="PENDING">Pending</SelectItem>
                     <SelectItem value="COMPLETED">Completed</SelectItem>
                     <SelectItem value="REVERSED">Reversed</SelectItem>

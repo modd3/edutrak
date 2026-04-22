@@ -190,22 +190,22 @@ export function PaymentRecordingModal({
           <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-600">Total Amount:</span>
-              <span className="font-medium">KES {invoice.totalAmount}</span>
+              <span className="font-medium">{invoice.feeStructure.currency} {invoice.totalAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Paid to Date:</span>
-              <span className="font-medium">KES {invoice.paidAmount}</span>
+              <span className="font-medium">{invoice.feeStructure.currency} {invoice.paidAmount}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Discount:</span>
-              <span className="font-medium">KES {invoice.discountAmount}</span>
+              <span className="font-medium">{invoice.feeStructure.currency} {invoice.discountAmount}</span>
             </div>
             <div className="border-t pt-2 flex justify-between">
               <span className="font-semibold">Outstanding Balance:</span>
               <span
                 className={`font-semibold ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}
               >
-                KES {balance}
+                {invoice.feeStructure.currency} {balance}
               </span>
             </div>
           </div>
@@ -222,7 +222,7 @@ export function PaymentRecordingModal({
           <div className="grid grid-cols-2 gap-4">
           {/* Payment Amount */}
           <div className="space-y-2">
-            <Label htmlFor="amount">Payment Amount (KES) *</Label>
+            <Label htmlFor="amount">Payment Amount ({invoice.feeStructure.currency}) *</Label>
             <Input
               id="amount"
               type="number"
@@ -235,7 +235,7 @@ export function PaymentRecordingModal({
             )}
             {watchAmount > balance && balance > 0 && (
               <p className="text-xs text-amber-600">
-                Payment exceeds outstanding balance by KES {(watchAmount - balance)}
+                Payment exceeds outstanding balance by {invoice.feeStructure.currency} {(watchAmount - balance)}
               </p>
             )}
           </div>

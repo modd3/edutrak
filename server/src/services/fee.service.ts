@@ -509,7 +509,7 @@ export class FeeService extends BaseService {
         where,
         include: {
           student: { select: { id: true, admissionNo: true, firstName: true, lastName: true } },
-          feeStructure: { select: { name: true } },
+          feeStructure: { select: { name: true, currency: true } },
           items: true,
           _count: { select: { payments: true } },
         },
@@ -721,7 +721,7 @@ export class FeeService extends BaseService {
         where,
         include: {
           student: { select: { id: true, admissionNo: true, firstName: true, lastName: true } },
-          invoice: { select: { invoiceNo: true, totalAmount: true } },
+          invoice: { select: { invoiceNo: true, totalAmount: true, feeStructure: true } },
         },
         orderBy: { paidAt: 'desc' },
         skip,

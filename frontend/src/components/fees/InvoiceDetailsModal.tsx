@@ -163,7 +163,7 @@ export function InvoiceDetailsModal({
                               <p className="font-medium text-sm">{item.name}</p>
                               <p className="text-xs text-gray-600">{item.category}</p>
                             </div>
-                            <p className="font-semibold">KES {item.amount}</p>
+                            <p className="font-semibold">{invoice.feeStructure.currency} {item.amount}</p>
                           </div>
                         ))}
                       </div>
@@ -173,20 +173,20 @@ export function InvoiceDetailsModal({
                         <div className="flex justify-between">
                           <span className="text-gray-600">Subtotal</span>
                           <span className="font-medium">
-                            KES {(invoice.totalAmount - invoice.discountAmount)}
+                            {invoice.feeStructure.currency} {(invoice.totalAmount - invoice.discountAmount)}
                           </span>
                         </div>
                         {invoice.discountAmount > 0 && (
                           <div className="flex justify-between text-green-600">
                             <span>Discount</span>
                             <span className="font-medium">
-                              -KES {invoice.discountAmount}
+                              -{invoice.feeStructure.currency} {invoice.discountAmount}
                             </span>
                           </div>
                         )}
                         <div className="flex justify-between font-semibold border-t pt-2">
                           <span>Total Amount</span>
-                          <span>KES {invoice.totalAmount}</span>
+                          <span>{invoice.feeStructure.currency} {invoice.totalAmount}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -217,13 +217,13 @@ export function InvoiceDetailsModal({
                         <div className="p-3 bg-blue-50 rounded">
                           <p className="text-gray-600 text-xs">Total Amount</p>
                           <p className="font-semibold">
-                            KES {invoice.totalAmount}
+                            {invoice.feeStructure.currency} {invoice.totalAmount}
                           </p>
                         </div>
                         <div className="p-3 bg-green-50 rounded">
                           <p className="text-gray-600 text-xs">Paid Amount</p>
                           <p className="font-semibold text-green-600">
-                            KES {invoice.paidAmount}
+                            {invoice.feeStructure.currency} {invoice.paidAmount}
                           </p>
                         </div>
                         <div
@@ -237,7 +237,7 @@ export function InvoiceDetailsModal({
                               balance > 0 ? 'text-red-600' : 'text-green-600'
                             }`}
                           >
-                            KES {balance.toFixed(2)}
+                            {invoice.feeStructure.currency} {balance.toFixed(2)}
                           </p>
                         </div>
                       </div>
@@ -290,7 +290,7 @@ export function InvoiceDetailsModal({
                                   {payment.transactionRef || payment.mpesaCode || '-'}
                                 </span>
                                 <span className="font-semibold text-green-600">
-                                  +KES {payment.amount}
+                                  +{invoice.feeStructure.currency} {payment.amount}
                                 </span>
                               </div>
                               {payment.notes && (

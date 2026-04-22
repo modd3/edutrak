@@ -153,6 +153,8 @@ export class FeeController {
   async getInvoices(req: RequestWithUser, res: Response) {
     try {
       const query = getInvoicesQuerySchema.parse(req.query);
+     // if (query.status.toString() == 'All') query.status = undefined;
+      console.log("Query: ", query);
       const service = FeeService.withRequest(req);
       const result = await service.getInvoices(query);
       return ResponseUtil.paginated(res, 'Invoices retrieved', result.invoices, result.pagination);

@@ -51,9 +51,18 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [studentSearch, setStudentSearch] = useState('');
 
+  let filteredStatus;
+  if (statusFilter === "All") {
+    filteredStatus = ""
+  }
+
+  else {
+    filteredStatus = statusFilter
+  }
+  
   // Fetch invoices
-  const { data: invoicesData, isLoading } = useGetInvoices({
-    status: statusFilter || undefined,
+   const { data: invoicesData, isLoading } = useGetInvoices({
+    status: filteredStatus || undefined,
     page: 1,
     limit: 20,
   });
@@ -61,8 +70,7 @@ export default function InvoicesPage() {
   const { mutate: cancelInvoice, isPending: isCancelling } = useCancelInvoice();
 
   const invoices = invoicesData?.data?.data || [];
-  console.log("invoicesL: ", invoices);
-
+    
   // Filter by student search
   const filteredInvoices = invoices.filter(
     (invoice: any) =>
@@ -98,7 +106,7 @@ export default function InvoicesPage() {
       accessorKey: 'totalAmount',
       header: 'Total Amount',
       cell: ({ row }) => (
-        <span className="font-medium">KES {row.original.totalAmount || '0.00'}</span>
+        <span className="font-medium">{row.original.feeStructure.currency} {row.original.totalAmount || '0.00'}</span>
       ),
     },
     {
@@ -107,11 +115,11 @@ export default function InvoicesPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium text-green-600">
-            KES {row.original.paidAmount || '0.00'}
+            {row.original.feeStructure.currency} {row.original.paidAmount || '0.00'}
           </p>
           {row.original.discountAmount > 0 && (
             <p className="text-xs text-gray-600">
-              Discount: KES {row.original.discountAmount}
+              Discount: {row.original.feeStructure.currency} {row.original.discountAmount}
             </p>
           )}
         </div>
@@ -125,7 +133,7 @@ export default function InvoicesPage() {
           row.original.totalAmount - row.original.paidAmount - row.original.discountAmount;
         return (
           <span className={balance > 0 ? 'font-medium text-red-600' : 'font-medium text-green-600'}>
-            KES {balance.toFixed(2)}
+            {row.original.feeStructure.currency} {balance.toFixed(2)}
           </span>
         );
       },
