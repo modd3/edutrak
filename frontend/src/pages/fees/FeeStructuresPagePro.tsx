@@ -70,7 +70,7 @@ import { usePermission } from '@/hooks/use-permission';
 import { RoleGuard } from '@/components/RoleGuard';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { FeeStructureViewerModal } from '@/components/fees/FeeStructureViewerModal';
-import { FeeStructureFormModal } from '@/components/fees/FeeStructureFormModal';
+import  FeeStructureFormModal  from '@/components/fees/FeeStructureFormModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
 import { toast } from 'sonner';
 
