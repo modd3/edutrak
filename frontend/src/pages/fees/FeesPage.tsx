@@ -60,9 +60,19 @@ export default function FeesPage() {
   const [viewingInvoiceId, setViewingInvoiceId] = useState<string | null>(null);
   const [recordingPaymentInvoiceId, setRecordingPaymentInvoiceId] = useState<string | null>(null);
  
+    let filteredTerms;
+  if (selectedTermId === "All") {
+    filteredTerms = ""
+  }
+
+  else {
+    filteredTerms = selectedTermId
+  } 
+console.log("Selected Term Id: ", selectedTermId);
+console.log("FIltered Terms: ", filteredTerms)
   const { data: defaultersData } = useGetDefaultersReport({
     academicYearId: activeYear?.id,
-    termId: selectedTermId || undefined,
+    termId: filteredTerms || undefined,
   });
   const defaulters: any[] = defaultersData?.data?.data ?? defaultersData?.data ?? [];
   const criticalCount = defaulters.filter((d: any) => {
@@ -71,7 +81,7 @@ export default function FeesPage() {
       : 0;
     return days > 30;
   }).length;
- 
+
   function setTab(tab: FeeTab) {
     setSearchParams({ tab });
   }
@@ -89,12 +99,12 @@ export default function FeesPage() {
         <div className="flex items-center gap-2">
           {/* Term filter — shared across dashboard + reports */}
           {terms.length > 0 && (
-            <Select value={selectedTermId} onValueChange={setSelectedTermId}>
+            <Select value={filteredTerms} onValueChange={setSelectedTermId}>
               <SelectTrigger className="w-36 h-9">
                 <SelectValue placeholder="All terms" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Terms</SelectItem>
+                <SelectItem value="All">All Terms</SelectItem>
                 {terms.map((t: any) => (
                   <SelectItem key={t.id} value={t.id}>
                     Term {t.termNumber}
@@ -151,14 +161,14 @@ export default function FeesPage() {
         <TabsContent value="dashboard" className="space-y-5 mt-4">
           <FeeDashboardCards
             academicYearId={activeYear?.id}
-            termId={selectedTermId || undefined}
+            termId={filteredTerms || undefined}
           />
  
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2">
               <CollectionsChart
                 academicYearId={activeYear?.id}
-                termId={selectedTermId || undefined}
+                termId={filteredTerms || undefined}
               />
             </div>
  
@@ -207,7 +217,7 @@ export default function FeesPage() {
           {/* Arrears preview */}
           <FeeArrearsTable
             academicYearId={activeYear?.id}
-            termId={selectedTermId || undefined}
+            termId={filteredTerms || undefined}
             limit={5}
             onViewInvoice={(id) => setViewingInvoiceId(id)}
             onRecordPayment={(id) => setRecordingPaymentInvoiceId(id)}
@@ -233,11 +243,11 @@ export default function FeesPage() {
         <TabsContent value="reports" className="space-y-5 mt-4">
           <CollectionsChart
             academicYearId={activeYear?.id}
-            termId={selectedTermId || undefined}
+            termId={filteredTerms || undefined}
           />
           <FeeArrearsTable
             academicYearId={activeYear?.id}
-            termId={selectedTermId || undefined}
+            termId={filteredTerms || undefined}
             onViewInvoice={(id) => setViewingInvoiceId(id)}
             onRecordPayment={(id) => setRecordingPaymentInvoiceId(id)}
           />

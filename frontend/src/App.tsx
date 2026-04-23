@@ -286,6 +286,18 @@ function App() {
           />
 
           {/* ADMIN, SUPER_ADMIN: Fee Structures */}
+
+            <Route
+            path="/fees"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <FeesPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
           <Route
             path="/fees/structures"
             element={
