@@ -31,6 +31,7 @@ import ClassSubjectStrandsPage from '@/pages/assessments/ClassSubjectStrands';
 import FeeStructuresPage from '@/pages/fees/FeeStructuresPage';
 import InvoicesPage from '@/pages/fees/InvoicesPage';
 import PaymentsPage from '@/pages/fees/PaymentsPage';
+import FeesPage from './pages/fees/FeesPage';
 
 // Create a client
 const queryClient = new QueryClient({
