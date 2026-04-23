@@ -32,6 +32,7 @@ import { useSchoolContext } from '@/hooks/use-school-context';
 import { useAuthStore } from '@/store/auth-store';
 import { useState } from 'react';
 import { formatCurrency, amountInWords } from '@/lib/utils'; 
+import { ScrollArea } from '../ui/scroll-area';
  
 // ─── Receipt component (hidden, for printing only) ────────────────────────
  
@@ -356,7 +357,7 @@ export function PaymentRecordingModal({
   // ── Payment form ──────────────────────────────────────────────────────────
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl max-h-[90vh]">
         <DialogHeader>
           <DialogTitle>Record Payment</DialogTitle>
           <DialogDescription>
@@ -364,7 +365,7 @@ export function PaymentRecordingModal({
             {invoice.student?.firstName} {invoice.student?.lastName}
           </DialogDescription>
         </DialogHeader>
- 
+  
         {/* Invoice balance summary */}
         <div className="bg-gray-50 border rounded-lg p-3 space-y-1.5 text-sm">
           <div className="flex justify-between">
@@ -397,7 +398,9 @@ export function PaymentRecordingModal({
           </Alert>
         )}
  
+      <ScrollArea className="max-h-[50vh] pr-4">
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           {/* Amount */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
@@ -499,6 +502,7 @@ export function PaymentRecordingModal({
               {...form.register('paidAt')}
             />
           </div>
+          </div>
  
           {/* Notes */}
           <div className="space-y-1.5">
@@ -511,6 +515,8 @@ export function PaymentRecordingModal({
             />
           </div>
         </form>
+      
+      </ScrollArea>
  
         <DialogFooter>
           <Button variant="outline" onClick={handleClose} disabled={isRecording}>Cancel</Button>

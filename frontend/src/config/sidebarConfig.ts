@@ -20,6 +20,8 @@ import {
   UserCheck,
   TestTubes,
   DollarSign,
+  CreditCard,
+  AlertCircle,
 } from 'lucide-react';
 import { UserRole } from '../store/auth-store';
 
@@ -196,26 +198,38 @@ export const sidebarConfig: NavItem[] = [
   },
   {
     title: 'Fees',
-    href: '/fees/structures',
-    icon: DollarSign,
+    href: '/fees',
+    icon: CreditCard,
     roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
     children: [
       {
+        title: 'Fee Dashboard',
+        href: '/fees',
+        icon: LayoutDashboard,
+        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+      },
+      {
         title: 'Fee Structures',
-        href: '/fees/structures',
+        href: '/fees?tab=structures',
         icon: FileText,
         roles: ['SUPER_ADMIN', 'ADMIN'],
       },
       {
         title: 'Fee Invoices',
-        href: '/fees/invoices',
-        icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER'],
+        href: '/fees?tab=invoices',
+        icon: ClipboardCheck,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
       },
       {
         title: 'Fee Payments',
-        href: '/fees/payments',
+        href: '/fees?tab=payments',
         icon: DollarSign,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Fee Arrears & Reports',
+        href: '/fees?tab=reports',
+        icon: AlertCircle,
         roles: ['SUPER_ADMIN', 'ADMIN'],
       },
     ],
