@@ -28,10 +28,10 @@ import StrandManagementPage from './pages/assessments/StrandManagementPage';
 import { StudentSubjectManagementPage } from './pages/subjects/StudentSubjectManagementPage';
 import { StudentSubjectEnrollmentPage } from './pages/students/SubjectEnrollment';
 import ClassSubjectStrandsPage from '@/pages/assessments/ClassSubjectStrands';
-import FeeStructuresPage from '@/pages/fees/FeeStructuresPage';
-import InvoicesPage from '@/pages/fees/InvoicesPage';
-import PaymentsPage from '@/pages/fees/PaymentsPage';
-import FeesPage from './pages/fees/FeesPage';
+import FeesPagePro from '@/pages/fees/FeesPagePro';
+import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPagePro';
+import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
+import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -287,23 +287,25 @@ function App() {
 
           {/* ADMIN, SUPER_ADMIN: Fee Structures */}
 
-            <Route
+            {/* ADMIN, SUPER_ADMIN, TEACHER: Fee Management Hub */}
+          <Route
             path="/fees"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  <FeesPage />
+                  <FeesPagePro />
                 </DashboardLayout>
               </RoleGuard>
             }
           />
 
+          {/* ADMIN, SUPER_ADMIN: Fee Structures (separate route if direct access needed) */}
           <Route
             path="/fees/structures"
             element={
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  <FeeStructuresPage />
+                  <FeeStructuresPagePro />
                 </DashboardLayout>
               </RoleGuard>
             }
@@ -315,7 +317,7 @@ function App() {
             element={
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  <InvoicesPage />
+                  <InvoicesPagePro />
                 </DashboardLayout>
               </RoleGuard>
             }
@@ -327,7 +329,7 @@ function App() {
             element={
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
-                  <PaymentsPage />
+                  <PaymentsPagePro />
                 </DashboardLayout>
               </RoleGuard>
             }

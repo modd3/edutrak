@@ -23,7 +23,9 @@ type Permission =
   | 'edit_school'
   | 'manage_users'
   | 'view_reports'
-  | 'manage_fees';
+  | 'view_fees'
+  | 'manage_fees'
+  | 'record_payment';
 
 /**
  * Permission Matrix: Maps roles to allowed permissions
@@ -41,6 +43,8 @@ const permissionMatrix: Record<UserRole, Permission[]> = {
     'manage_users',
     'view_reports',
     'manage_fees',
+    'view_fees',
+    'record_payment',
   ],
   ADMIN: [
     'create_student', 'edit_student', 'delete_student', 'enroll_student',
@@ -52,20 +56,26 @@ const permissionMatrix: Record<UserRole, Permission[]> = {
     'manage_users',
     'view_reports',
     'manage_fees',
+    'view_fees',
+    'record_payment',
   ],
   TEACHER: [
     'view_grades',
     'grade_students',
     'view_reports',
+    'view_fees',
   ],
   STUDENT: [
     'view_grades',
+    'view_fees',
   ],
   PARENT: [
     'view_grades',
+    'view_fees',
   ],
   SUPPORT_STAFF: [
     'view_grades',
+    'view_fees'
   ],
 };
 
