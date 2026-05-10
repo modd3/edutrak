@@ -101,7 +101,7 @@ export function InvoiceDetailsModal({
               <div>
                 <DialogTitle>Invoice Details</DialogTitle>
                 <DialogDescription>
-                  Invoice {invoice.invoiceNumber}
+                  Invoice {invoice.invoiceNo}
                 </DialogDescription>
               </div>
               <Badge variant={STATUS_COLORS[invoice.status] as any}>

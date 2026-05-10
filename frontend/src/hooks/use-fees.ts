@@ -202,8 +202,8 @@ export function useBulkGenerateInvoices() {
       feesApi.bulkGenerateInvoices(data),
     onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
-      const successCount = response.data?.data?.successCount || 0;
-      const skippedCount = response.data?.data?.skipped?.length || 0;
+      const successCount = response.data?.data?.generated || 0;
+      const skippedCount = response.data?.data?.skipped || 0;
       
       let message = `${successCount} invoice(s) generated successfully`;
       if (skippedCount > 0) {
