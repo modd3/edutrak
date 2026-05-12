@@ -19,13 +19,13 @@
 - Tenant-owned tables include `schoolId` and indexing for scoped queries.
 
 ## Milestone 2 — Subscription Runtime Guards
-- [ ] Create entitlement service (`canUseFeature`, `withinQuota`).
-- [ ] Add middleware-level feature gate for protected routes.
-- [ ] Integrate in fees module as pilot.
-- [ ] Add tests for ACTIVE/TRIALING/GRACE/SUSPENDED behavior.
+- [x] Create entitlement service (`canUseFeature`, `withinQuota`).
+- [x] Add middleware-level feature gate for protected routes.
+- [x] Integrate in fees module as pilot.
+- [x] Add tests for ACTIVE/TRIALING/GRACE/SUSPENDED behavior.
 
 ## Milestone 3 — Billing Operations
-- [ ] Add subscription CRUD and state transitions.
+- [x] Add subscription CRUD and state transitions.
 - [ ] Add billing account APIs.
 - [ ] Add invoice/payment APIs and retry/dunning status transitions.
 - [ ] Add admin billing UI pages (super-admin and school-admin).
