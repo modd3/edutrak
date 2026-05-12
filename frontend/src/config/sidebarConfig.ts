@@ -22,6 +22,7 @@ import {
   DollarSign,
   CreditCard,
   AlertCircle,
+  Receipt,
 } from 'lucide-react';
 import { UserRole } from '../store/auth-store';
 
@@ -233,6 +234,12 @@ export const sidebarConfig: NavItem[] = [
         roles: ['SUPER_ADMIN', 'ADMIN'],
       },
     ],
+  },
+  {
+    title: 'Billing Admin',
+    href: '/billing-admin',
+    icon: Receipt,
+    roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
     title: 'Reports',

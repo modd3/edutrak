@@ -27,8 +27,8 @@
 ## Milestone 3 — Billing Operations
 - [x] Add subscription CRUD and state transitions.
 - [x] Add billing account APIs.
-- [ ] Add invoice/payment APIs and retry/dunning status transitions.
-- [ ] Add admin billing UI pages (super-admin and school-admin).
+- [x] Add invoice/payment APIs and retry/dunning status transitions.
+- [x] Add admin billing UI pages (super-admin and school-admin).
 
 ## Milestone 4 — Tenant Branding Runtime
 - [ ] Add branding config API.

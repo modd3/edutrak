@@ -13,6 +13,7 @@ import studentClassRoutes from './studentClass.routes';
 import feeRoutes from './fee.routes';
 import subscriptionRoutes from './subscription.routes';
 import billingAccountRoutes from './billing-account.routes';
+import billingInvoiceRoutes from './billing-invoice.routes';
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use('/assessments', assessmentRoutes);
 router.use('/fees', feeRoutes);
 router.use('/subscriptions', subscriptionRoutes);
 router.use('/billing-accounts', billingAccountRoutes);
+router.use('/billing', billingInvoiceRoutes);
 
 export default router;
