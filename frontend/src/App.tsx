@@ -32,6 +32,7 @@ import FeesPagePro from '@/pages/fees/FeesPagePro';
 import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPagePro';
 import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
 import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
+import BillingAdminPage from '@/pages/billing/BillingAdminPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -79,6 +80,17 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPPORT_STAFF']}>
                 <DashboardLayout>
                   <Dashboard />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/billing-admin"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <BillingAdminPage />
                 </DashboardLayout>
               </RoleGuard>
             }
