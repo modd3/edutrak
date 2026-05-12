@@ -22,7 +22,7 @@
 - [x] Create entitlement service (`canUseFeature`, `withinQuota`).
 - [x] Add middleware-level feature gate for protected routes.
 - [x] Integrate in fees module as pilot.
-- [ ] Add tests for ACTIVE/TRIALING/GRACE/SUSPENDED behavior.
+- [x] Add tests for ACTIVE/TRIALING/GRACE/SUSPENDED behavior.
 
 ## Milestone 3 — Billing Operations
 - [ ] Add subscription CRUD and state transitions.
