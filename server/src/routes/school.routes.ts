@@ -21,6 +21,8 @@ router.delete('/:id', authorize('SUPER_ADMIN'), validateUUIDParam, schoolControl
 // School access (Admin and above)
 router.get('/', validatePagination, schoolController.getSchools);
 router.get('/:id', validateUUIDParam, schoolController.getSchoolById);
+router.get('/:id/branding', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolBranding);
+router.put('/:id/branding', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.upsertSchoolBranding);
 router.get('/:id/statistics', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolStatistics);
 router.get('/:id/performance', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolPerformance);
 

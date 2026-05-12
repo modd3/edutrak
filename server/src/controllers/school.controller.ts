@@ -3,10 +3,34 @@ import { SchoolService } from '../services/school.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
+import { BrandingService } from '../services/branding.service';
 
 const schoolService = new SchoolService();
+const brandingService = new BrandingService();
 
 export class SchoolController {
+  async getSchoolBranding(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) return ResponseUtil.error(res, 'School ID is required', 400);
+      const branding = await brandingService.getBySchoolId(id);
+      return ResponseUtil.success(res, 'School branding retrieved successfully', branding);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async upsertSchoolBranding(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      if (!id) return ResponseUtil.error(res, 'School ID is required', 400);
+      const branding = await brandingService.upsertBySchoolId(id, req.body);
+      return ResponseUtil.success(res, 'School branding saved successfully', branding);
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
   async createSchool(req: Request, res: Response): Promise<Response> {
     try {
       const currentUser = req.user!;
