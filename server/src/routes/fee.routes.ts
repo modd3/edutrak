@@ -3,11 +3,13 @@ import { Router } from 'express';
 import { feeController } from '../controllers/fee.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { requireFeature } from '../middleware/entitlement.middleware';
 
 const router = Router();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(requireFeature('fees.core'));
 
 // ── Fee Structures ────────────────────────────────────────────────────────────
 
