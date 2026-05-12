@@ -31,8 +31,8 @@
 - [x] Add admin billing UI pages (super-admin and school-admin).
 
 ## Milestone 4 — Tenant Branding Runtime
-- [ ] Add branding config API.
-- [ ] Load branding on auth bootstrap.
+- [x] Add branding config API.
+- [x] Load branding on auth bootstrap.
 - [ ] Apply CSS variables with accessibility validation.
 - [ ] Add safe default/fallback theme behavior.
 

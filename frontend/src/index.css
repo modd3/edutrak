@@ -4,6 +4,10 @@
 
 @layer base {
   :root {
+    --primary-brand: #2563eb;
+    --secondary-brand: #e2e8f0;
+    --accent-brand: #cbd5e1;
+    --brand-font-family: Inter, system-ui, sans-serif;
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
@@ -56,6 +60,7 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-family: var(--brand-font-family);
   }
 }
 

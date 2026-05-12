@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
@@ -56,6 +57,34 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  const { user, token } = useAuthStore();
+
+  useEffect(() => {
+    const applyBranding = async () => {
+      if (!user?.schoolId || !token) return;
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/schools/${user.schoolId}/branding`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        const branding = json?.data;
+        if (!branding) return;
+
+        const root = document.documentElement;
+        if (branding.primaryColor) root.style.setProperty('--primary-brand', branding.primaryColor);
+        if (branding.secondaryColor) root.style.setProperty('--secondary-brand', branding.secondaryColor);
+        if (branding.accentColor) root.style.setProperty('--accent-brand', branding.accentColor);
+        if (branding.fontFamily) root.style.setProperty('--brand-font-family', branding.fontFamily);
+        if (branding.borderRadiusScale) root.style.setProperty('--radius', branding.borderRadiusScale);
+        if (branding.appDisplayName) document.title = branding.appDisplayName;
+      } catch (e) {
+        // fallback to defaults silently
+      }
+    };
+
+    applyBranding();
+  }, [user?.schoolId, token]);
+
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
