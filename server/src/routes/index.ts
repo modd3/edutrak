@@ -12,6 +12,7 @@ import sequenceRoutes from './sequence.routes';
 import studentClassRoutes from './studentClass.routes';
 import feeRoutes from './fee.routes';
 import subscriptionRoutes from './subscription.routes';
+import billingAccountRoutes from './billing-account.routes';
 
 const router = Router();
 
@@ -29,5 +30,6 @@ router.use('/assessments', assessmentRoutes);
 //router.use('/attendance', attendanceRoutes);
 router.use('/fees', feeRoutes);
 router.use('/subscriptions', subscriptionRoutes);
+router.use('/billing-accounts', billingAccountRoutes);
 
 export default router;

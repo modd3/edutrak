@@ -26,7 +26,7 @@
 
 ## Milestone 3 — Billing Operations
 - [x] Add subscription CRUD and state transitions.
-- [ ] Add billing account APIs.
+- [x] Add billing account APIs.
 - [ ] Add invoice/payment APIs and retry/dunning status transitions.
 - [ ] Add admin billing UI pages (super-admin and school-admin).
 
