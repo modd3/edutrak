@@ -22,6 +22,14 @@ export function formatCurrency(amount: number) {
   }).format(amount);
 }
 
+export type PaginatedResult<T> = T[] | { data: T[] } | undefined | null;
+
+export function unwrapPaginated<T>(value: PaginatedResult<T>): T[] {
+  if (!value) return [];
+  if (Array.isArray(value)) return value;
+  return value.data ?? [];
+}
+
 /**
  * Convert a number to KES words for receipt printing
  * e.g., 10500 → "Kenya Shillings Ten Thousand Five Hundred Only"

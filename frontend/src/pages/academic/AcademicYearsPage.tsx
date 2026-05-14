@@ -1,6 +1,6 @@
 // src/pages/academic/AcademicYearsPage.tsx
 import { useState } from 'react';
-import { Plus, Calendar, CheckCircle2, Users, BookOpen } from 'lucide-react';
+import { Plus, Calendar, CheckCircle2, Users, BookOpen, ShieldX, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +16,7 @@ export function AcademicYearsPage() {
   const [selectedYear, setSelectedYear] = useState<AcademicYear | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
-  const { data: response, isLoading } = useAcademicYears();
+  const { data: response, isLoading, error, refetch } = useAcademicYears();
   const { mutate: setActive } = useSetActiveAcademicYear();
 
   // Extract academicYears from the response
@@ -43,6 +43,34 @@ export function AcademicYearsPage() {
             </div>
           );
   }
+
+ if (error) {
+    return (
+      <div className='flex h-full w-full items-center justify-center bg-grey-50 p-4'>
+        <div
+          role='alert'
+          aria-live='assertive' 
+          className='flex flex-col items-center max-w-s rounded-lg border border-red-200 bg-red-50 p-8 text-center shadow-md'
+          >
+            <div className='mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100'>
+              <AlertCircle className='h-6 w-6 text-red-600' aria-hidden="true"/>
+            </div>
+
+            <h2 className='mb-2 font-bold text-red-800'>Something Went Wrong!</h2>
+            <p className='text-red-600'>{error.message}</p>
+
+            <button
+              onClick={() => {
+                refetch()
+              }}
+              className='mt-4 rounded bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700'
+              >
+              Try Again
+          </button>
+        </div>
+      </div>
+    )
+  } 
 
   return (
     <div className="space-y-6">

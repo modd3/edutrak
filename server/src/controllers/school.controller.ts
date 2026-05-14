@@ -122,6 +122,9 @@ export class SchoolController {
       if (error.code === 'P2025') {
         return ResponseUtil.notFound(res, 'School');
       }
+      if (error.message.includes('Cannot delete school')) {
+        return ResponseUtil.error(res, error.message, 400);
+      }
       return ResponseUtil.serverError(res, error.message);
     }
   }

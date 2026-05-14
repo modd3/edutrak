@@ -14,9 +14,11 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { useGetFeeStructures } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
+import { useAcademicYears, useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { RoleGuard } from '@/components/RoleGuard';
-import { FeeStructureFormModal } from '@/components/fees/FeeStructureFormModal';
-import { GenerateInvoiceModal } from '@/components/fees/GenerateInvoiceModal';
+import { unwrapPaginated } from '@/lib/utils';
+import FeeStructureFormModal from '@/components/fees/FeeStructureFormModal';
+import GenerateInvoiceModal from '@/components/fees/GenerateInvoiceModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
 import { PageHeader } from '@/components/shared/PageHeader';
 
@@ -33,13 +35,24 @@ export default function FeeStructuresPage() {
   const [selectedStructure, setSelectedStructure] = useState<any>(null);
 
   // Fetch fee structures
-  const { data: structuresData, isLoading } = useGetFeeStructures({
+  const { data: structuresData } = useGetFeeStructures({
     page: 1,
     limit: 20,
   });
 
   const structures = structuresData?.data?.data || [];
-  console.log("Structures: ", structures)
+
+  const { data: academicYearsData } = useAcademicYears();
+  const academicYears = academicYearsData?.data || [];
+
+  const { data: activeAcademicYear } = useActiveAcademicYear();
+  const termOptions = activeAcademicYear?.terms ?? [];
+
+  const classesQuery = useClasses(activeAcademicYear?.id);
+  const classesData = unwrapPaginated<any>(classesQuery.data);
+  const classLevels = Array.from(
+    new Set(classesData.map((c: any) => String(c.level)))
+  ).sort() as string[];
 
   // Table columns
   const columns: ColumnDef<any>[] = [
@@ -174,7 +187,6 @@ export default function FeeStructuresPage() {
         <DataTable
           columns={columns}
           data={structures}
-          //isLoading={isLoading}
         />
 
         {/* Modals */}
@@ -182,6 +194,9 @@ export default function FeeStructuresPage() {
           open={showCreateModal}
           onOpenChange={setShowCreateModal}
           mode="create"
+          academicYears={academicYears}
+          terms={termOptions}
+          classLevels={classLevels}
         />
 
         {selectedStructure && (
@@ -191,12 +206,18 @@ export default function FeeStructuresPage() {
               onOpenChange={setShowEditModal}
               mode="edit"
               structureId={selectedStructure.id}
+              academicYears={academicYears}
+              terms={termOptions}
+              classLevels={classLevels}
             />
 
             <GenerateInvoiceModal
               open={showGenerateModal}
               onOpenChange={setShowGenerateModal}
-              feeStructureId={selectedStructure.id}
+              defaultAcademicYearId={activeAcademicYear?.id}
+              academicYears={academicYears}
+              terms={termOptions}
+              classLevels={classLevels}
             />
 
             <BulkGenerateInvoicesModal

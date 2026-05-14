@@ -17,7 +17,6 @@ import { Unauthorized } from './pages/Unauthorized';
 import ClassesList from '@/pages/classes/ClassesList';
 import StudentsList from '@/pages/students/StudentsList';
 import SchoolsList from './pages/schools/SchoolsList';
-import CreateSchool from './pages/schools/CreateSchool';
 import UsersList from './pages/users/UsersList';
 import { AcademicYearsPage } from './pages/academic/AcademicYearsPage';
 import TeachersList from './pages/teachers/TeachersList';
@@ -132,17 +131,6 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <SchoolsList />
-                </DashboardLayout>
-              </RoleGuard>
-            }
-          />
-
-          <Route
-            path="/schools/new"
-            element={
-              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
-                <DashboardLayout>
-                  <CreateSchool />
                 </DashboardLayout>
               </RoleGuard>
             }

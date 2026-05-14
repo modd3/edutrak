@@ -19,14 +19,6 @@ import {
   Badge,
 } from '@/components/ui/badge';
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -61,14 +53,14 @@ import {
   Edit2,
   Trash2,
   FileText,
-  Printer,
   Settings,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGetFeeStructures } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
+import { useAcademicYears, useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { RoleGuard } from '@/components/RoleGuard';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, unwrapPaginated } from '@/lib/utils';
 import { FeeStructureViewerModal } from '@/components/fees/FeeStructureViewerModal';
 import  FeeStructureFormModal  from '@/components/fees/FeeStructureFormModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
@@ -108,6 +100,18 @@ export function FeeStructuresPage() {
 
   const structures: StructureWithActions[] =
     structuresData?.data?.data || structuresData?.data || [];
+
+  const { data: academicYearsData } = useAcademicYears();
+  const academicYears = academicYearsData?.data || [];
+
+  const { data: activeAcademicYear } = useActiveAcademicYear();
+  const termOptions = activeAcademicYear?.terms ?? [];
+
+  const classesQuery = useClasses(activeAcademicYear?.id);
+  const classesData = unwrapPaginated<any>(classesQuery.data);
+  const classLevels = Array.from(
+    new Set(classesData.map((c: any) => String(c.level)))
+  ).sort() as string[];
 
   // Filter structures by search
   const filteredStructures = structures.filter((s) =>
@@ -396,6 +400,9 @@ export function FeeStructuresPage() {
             open={showCreateModal}
             onOpenChange={setShowCreateModal}
             mode="create"
+            academicYears={academicYears}
+            terms={termOptions}
+            classLevels={classLevels}
           />
         )}
 
@@ -405,6 +412,9 @@ export function FeeStructuresPage() {
             onOpenChange={setShowEditModal}
             mode="edit"
             structureId={selectedStructure.id}
+            academicYears={academicYears}
+            terms={termOptions}
+            classLevels={classLevels}
           />
         )}
 

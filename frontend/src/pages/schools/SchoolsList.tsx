@@ -47,13 +47,13 @@ export default function SchoolsList() {
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
 
   // Fetch schools with filters
-  const { data: response, isLoading, isError } = useSchools({
+  const { data: response, isLoading, isError,  } = useSchools({
     page,
     limit: 20,
     search,
     type: typeFilter === 'all' ? undefined : typeFilter as SchoolType,
   });
-  const { mutate: deleteSchool, isPending: isDeleting } = useDeleteSchool();
+  const { mutate: deleteSchool, isPending: isDeleting, error} = useDeleteSchool();
 
   // Extract schools array from response
   const schools = response?.data?.data || [];
@@ -83,11 +83,13 @@ export default function SchoolsList() {
           setSelectedSchool(null);
         },
         onError: (error: any) => {
+          console.log("Error: ", error)
           toast.error(error?.response?.data?.message || 'Failed to delete school');
         },
       });
     }
   };
+  
 
   const columns: ColumnDef<School>[] = [
     {

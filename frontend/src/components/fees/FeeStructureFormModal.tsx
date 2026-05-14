@@ -2,7 +2,7 @@
 // Create or edit a fee structure, including dynamic fee item rows.
 
 import { useEffect } from 'react';
-import { useForm, useFieldArray, Controller } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -33,7 +33,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, GripVertical } from 'lucide-react';
-import { useCreateFeeStructure, useUpdateFeeStructure } from '@/hooks/use-fees';
+import { useCreateFeeStructure, useGetFeeStructureById, useUpdateFeeStructure } from '@/hooks/use-fees';
 import { useSchoolContext } from '@/hooks/use-school-context';
 
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
@@ -66,6 +66,8 @@ type FeeStructureFormValues = z.infer<typeof feeStructureSchema>;
 interface FeeStructureFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  mode?: 'create' | 'edit';
+  structureId?: string;
   /** Pass existing structure data to switch into edit mode */
   initialData?: {
     id: string;
@@ -84,9 +86,9 @@ interface FeeStructureFormModalProps {
     }>;
   };
   /** Injected dropdown options — fetch from your academic year / term hooks */
-  academicYears: Array<{ id: string; name: string }>;
-  terms: Array<{ id: string; name: string }>;
-  classLevels: string[];   // e.g. ['Grade 1', 'Grade 2', ...]
+  academicYears?: Array<{ id: string; name: string }>;
+  terms?: Array<{ id: string; name: string }>;
+  classLevels?: string[];   // e.g. ['Grade 1', 'Grade 2', ...]
   onSuccess?: () => void;
 }
 
@@ -123,17 +125,27 @@ const EMPTY_ITEM = {
 export default function FeeStructureFormModal({
   open,
   onOpenChange,
+  mode = 'create',
+  structureId,
   initialData,
   academicYears,
   terms,
   classLevels,
   onSuccess,
 }: FeeStructureFormModalProps) {
-  const isEditMode = !!initialData;
+  const isEditMode = mode === 'edit' || !!initialData;
   const { schoolId } = useSchoolContext();
+
+  const { data: structureData } = useGetFeeStructureById(structureId ?? '');
+  const fetchedStructure = structureData?.data || structureData;
+  const editSource = initialData ?? (mode === 'edit' ? fetchedStructure : undefined);
 
   const createStructure = useCreateFeeStructure();
   const updateStructure = useUpdateFeeStructure();
+
+  const academicYearOptions = academicYears ?? [];
+  const termOptions = terms ?? [];
+  const classLevelOptions = classLevels ?? [];
 
   const form = useForm<FeeStructureFormValues>({
     resolver: zodResolver(feeStructureSchema),
@@ -154,14 +166,16 @@ export default function FeeStructureFormModal({
 
   // Populate form when editing
   useEffect(() => {
-    if (open && initialData) {
+    if (!open) return;
+
+    if (editSource) {
       form.reset({
-        name: initialData.name,
-        academicYearId: initialData.academicYearId,
-        termId: initialData.termId ?? '',
-        classLevel: initialData.classLevel,
-        isActive: initialData.isActive,
-        items: initialData.items.map((i) => ({
+        name: editSource.name,
+        academicYearId: editSource.academicYearId,
+        termId: editSource.termId ?? '',
+        classLevel: editSource.classLevel,
+        isActive: editSource.isActive,
+        items: editSource.items.map((i: any) => ({
           id: i.id,
           name: i.name,
           amount: i.amount,
@@ -170,18 +184,18 @@ export default function FeeStructureFormModal({
           description: i.description ?? '',
         })),
       });
+      return;
     }
-    if (open && !initialData) {
-      form.reset({
-        name: '',
-        academicYearId: '',
-        termId: '',
-        classLevel: '',
-        isActive: true,
-        items: [{ ...EMPTY_ITEM }],
-      });
-    }
-  }, [open, initialData]);
+
+    form.reset({
+      name: '',
+      academicYearId: '',
+      termId: '',
+      classLevel: '',
+      isActive: true,
+      items: [{ ...EMPTY_ITEM }],
+    });
+  }, [open, editSource]);
 
   // Calculate running total
   const watchedItems = form.watch('items');
@@ -249,7 +263,7 @@ export default function FeeStructureFormModal({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {academicYears.map((y) => (
+                        {academicYearOptions.map((y) => (
                           <SelectItem key={y.id} value={y.id}>{y.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -274,7 +288,7 @@ export default function FeeStructureFormModal({
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="">All terms</SelectItem>
-                        {terms.map((t) => (
+                        {termOptions.map((t) => (
                           <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
                         ))}
                       </SelectContent>
@@ -298,7 +312,7 @@ export default function FeeStructureFormModal({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {classLevels.map((cl) => (
+                        {classLevelOptions.map((cl) => (
                           <SelectItem key={cl} value={cl}>{cl}</SelectItem>
                         ))}
                       </SelectContent>

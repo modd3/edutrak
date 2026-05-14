@@ -84,7 +84,13 @@ export class UserService extends BaseService {
               include: {
                 student: {
                   include: {
-                    school: true,
+                    school: {select: {
+                      id: true,
+                      name: true,
+                      type: true,
+                      county: true,
+                      gender: true
+                    }},
                     enrollments: {
                       where: { status: 'ACTIVE' },
                       include: {
@@ -166,16 +172,13 @@ export class UserService extends BaseService {
     requestingUserRole?: string;
   }) {
     const where: any = {};
-    console.log('🔍 UserService.getUsers - Input filters:', filters);
-
+    
     // Apply school filter (critical for multi-tenancy)
     if (filters?.schoolId) {
       where.schoolId = filters.schoolId;
-      console.log('✅ School filter applied:', filters.schoolId);
     } else if (filters?.requestingUserRole !== 'SUPER_ADMIN') {
       // Force no results if no school context for non-super-admin
       where.schoolId = 'NONE';
-      console.log('❌ No school context for non-super-admin');
     }
 
     // Apply other filters
@@ -196,12 +199,7 @@ export class UserService extends BaseService {
     const page = filters?.page || 1;
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
-    console.log('📊 Final query params:', {
-      where,
-      skip,
-      take: limit,
-    });
-
+    
     const [users, total] = await Promise.all([
       this.prisma.user.findMany({
         where,
@@ -256,11 +254,7 @@ export class UserService extends BaseService {
       }),
       this.prisma.user.count({ where }),
     ]);
-    console.log('✅ Query results:', {
-      usersFound: users.length,
-      totalCount: total,
-    });
-   
+     
     return {
       data: users,
       pagination: {

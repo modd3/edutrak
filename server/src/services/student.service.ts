@@ -518,6 +518,16 @@ async updateEnrollment(
     streamId?: string;
     selectedSubjects?: string[];
   }) {
+    // Fetch the student's schoolId — never trust the caller to supply it correctly
+    const student = await this.prisma.student.findUnique({
+      where: { id: data.studentId },
+      select: { schoolId: true },
+    });
+
+    if (!student) {
+      throw new Error('Student not found');
+    }
+
     const transaction = await this.prisma.$transaction([
       // Update current enrollment status to PROMOTED
       this.prisma.studentClass.updateMany({
@@ -532,7 +542,7 @@ async updateEnrollment(
           promotionDate: new Date(),
         },
       }),
-      // Create new enrollment (without selectedSubjects - handled via StudentClassSubjectService)
+      // Create new enrollment
       this.prisma.studentClass.create({
         data: {
           id: uuidv4(),
@@ -540,7 +550,7 @@ async updateEnrollment(
           classId: data.newClassId,
           streamId: data.streamId,
           academicYearId: data.academicYearId,
-          schoolId: data.studentId, // Will be populated from context
+          schoolId: student.schoolId,
           status: 'ACTIVE',
         },
         include: {

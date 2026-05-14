@@ -206,6 +206,7 @@ export class SchoolService {
     });
 
     logger.info('School deleted successfully', { schoolId: id });
+    logger.info("Deleted: ", deleted)
     return deleted;
   }
 

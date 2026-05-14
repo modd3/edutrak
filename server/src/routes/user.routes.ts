@@ -8,6 +8,7 @@ import {
   requestLogger
 } from '../middleware/auth.middleware';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
+import { validateUUIDParam } from '../middleware/validation';
 
 const router = Router();
 const userCreationController = new UserCreationController();
@@ -25,25 +26,39 @@ router.post(
   '/bulk',
   authorize('SUPER_ADMIN', 'ADMIN'),
   validateResourceOwnership,
+  enforceSchoolContext,
   userCreationController.bulkCreateUsers.bind(userCreationController)
 );
 router.get('/', authorize('ADMIN', 'SUPER_ADMIN'), enforceSchoolContext, UserController.getUsers);
 router.get('/stats', authorize('ADMIN', 'SUPER_ADMIN'), enforceSchoolContext, UserController.getUserStatistics);
+router.get('/school/:id', authorize('SUPER_ADMIN'), enforceSchoolContext, validateUUIDParam, UserController.getUsersBySchool);
 
 
 // User profile and management
 router.get('/profile', enforceSchoolContext, UserController.getUserProfile);
-router.get('/:id', UserController.getUserById);
+router.get('/:id', validateUUIDParam, UserController.getUserById);
 router.put(
   '/:id',
   authorize('SUPER_ADMIN', 'ADMIN'),
   validateResourceOwnership,
+  validateUUIDParam,
   userCreationController.updateUserWithProfile.bind(userCreationController)
 );
 
 
 // User activation (Admin only)
-router.patch('/:id/activate', authorize('ADMIN', 'SUPER_ADMIN'), validateResourceOwnership, UserController.activateUser);
-router.patch('/:id/deactivate', authorize('ADMIN', 'SUPER_ADMIN'), validateResourceOwnership, UserController.deactivateUser);
+router.patch(
+  '/:id/activate',
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  validateUUIDParam,
+  validateResourceOwnership, 
+  UserController.activateUser);
+
+router.patch(
+  '/:id/deactivate', 
+  authorize('ADMIN', 'SUPER_ADMIN'), 
+  validateUUIDParam,
+  validateResourceOwnership, 
+  UserController.deactivateUser);
 
 export default router;

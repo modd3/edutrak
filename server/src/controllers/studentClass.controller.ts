@@ -3,6 +3,7 @@ import { RequestWithUser } from '../middleware/school-context';
 import prisma from '../database/client';
 import { ResponseUtil, ErrorMessages } from '../utils/response';
 import logger from '../utils/logger';
+import { StudentClassSubjectService } from '../services/student-class-subject.service';
 
 /**
  * Assign a student to a class for an academic year
@@ -295,6 +296,23 @@ export const promoteStudent = async (req: RequestWithUser, res: Response) => {
 
       return promoted;
     });
+
+    // Auto-enroll the promoted student in core subjects for the new class
+    const subjectService = new StudentClassSubjectService();
+    try {
+      await subjectService.autoEnrollCoreSubjects(
+        result.id,
+        toClassId,
+        schoolId,
+        studentId
+      );
+    } catch (error: any) {
+      logger.warn('Failed to auto-enroll core subjects after promotion', {
+        studentId,
+        enrollmentId: result.id,
+        error: error.message,
+      });
+    }
 
     logger.info('Student promoted successfully', {
       studentId,

@@ -8,7 +8,7 @@ export const requestLogger = (req: Request, res: Response, next: NextFunction) =
     const duration = Date.now() - start;
     logger.info('HTTP request: ', {
       method: req.method,
-      url: req.url,
+      url: req.originalUrl,
       status: res.statusCode,
       duration: `${duration}ms`,
       ip: req.ip,

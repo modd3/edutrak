@@ -37,6 +37,7 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { useDebounce } from '@/hooks/use-debounce';
 
 const ROLE_COLORS = {
   SUPER_ADMIN: 'destructive',
@@ -59,6 +60,7 @@ const ROLE_LABELS = {
 export default function UsersList() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
+  const debouncedSearchTerm = useDebounce(search, 500);
   const [roleFilter, setRoleFilter] = useState<string>('');
   const [activeTab, setActiveTab] = useState('all');
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -77,7 +79,7 @@ export default function UsersList() {
   const { data: usersData, isLoading, isError } = useUsers({
     page,
     limit: 20,
-    search,
+    search: debouncedSearchTerm,
     role: roleFilter === 'all' ? undefined : roleFilter as Role,
     isActive: activeTab === 'all' ? undefined : activeTab === 'active',
   });
@@ -192,7 +194,7 @@ export default function UsersList() {
       cell: ({ row }) => {
         const isActive = row.getValue('isActive');
         return (
-          <Badge variant={isActive ? 'default' : 'secondary'}>
+          <Badge variant={isActive ? 'default' : 'destructive'}>
             {isActive ? 'Active' : 'Inactive'}
           </Badge>
         );
@@ -232,12 +234,12 @@ export default function UsersList() {
                     {user.isActive ? (
                       <>
                         <XCircleIcon className="mr-2 h-4 w-4" />
-                        Deactivate User
+                        {isDeactivating ? "Deactivating User..." : "Deactivate User"}
                       </>
                     ) : (
                       <>
                         <CheckCheckIcon className="mr-2 h-4 w-4"/>
-                        Activate User
+                        {isActivating ?'Activating User...' : 'Activate User'}
                       </>
                     )}
                   </DropdownMenuItem>

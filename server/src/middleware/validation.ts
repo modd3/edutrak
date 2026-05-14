@@ -10,7 +10,7 @@ export const handleValidationErrors = (req: Request, res: Response, next: NextFu
       message: error.msg,
       value: error.value
     }));
-    
+    console.log("Errors: ", errors)
     ResponseUtil.validationError(res, JSON.stringify(errorMessages));
     return;
   }
@@ -86,7 +86,7 @@ export const validateChangePassword = [
 
 export const validateUUIDParam = [
   param('id')
-    .isUUID().withMessage('Invalid ID format'),
+    .isUUID(4).withMessage('Invalid ID format'),
   handleValidationErrors
 ];
 

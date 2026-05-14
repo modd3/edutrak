@@ -44,6 +44,8 @@ model School {
   brandingConfig       SchoolBrandingConfig?
   subscriptions        TenantSubscription[]
   billingAccount       BillingAccount?
+  billingInvoices      BillingInvoice[]
+  billingPayments      BillingPayment[]
   documentTemplates    DocumentTemplate[]
   usageMetrics         UsageMetric[]
 
@@ -353,7 +355,7 @@ model Sequence {
 
 model AcademicYear {
   id                    String                 @id @default(uuid())
-  year                  Int                    @unique
+  year                  Int
   startDate             DateTime
   endDate               DateTime
   isActive              Boolean                @default(false)
@@ -369,6 +371,7 @@ model AcademicYear {
   feeStructures        FeeStructure[]
   feeInvoices          FeeInvoice[]
 
+  @@unique([year, schoolId])
   @@index([isActive])
   @@index([schoolId])
 }

@@ -292,7 +292,7 @@ export const deactivateUser = async (req: RequestWithUser, res: Response) => {
     const user = await userService.deactivateUser(id);
 
     logger.info('User deactivated', { 
-      userId: id, 
+      userId: id,  
       deactivatedBy: req.user?.userId,
       schoolId,
     });
@@ -381,6 +381,8 @@ export const getUsersBySchool = async (req: RequestWithUser, res: Response) => {
     const { schoolId } = req.params;
     const { role } = req.query;
     const isSuperAdmin = req.isSuperAdmin || false;
+    console.log("Params", req.params)
+    console.log("Requesting school id: ", req.schoolId)
 
     // Validate school access
     if (!isSuperAdmin && req.schoolId !== schoolId) {
