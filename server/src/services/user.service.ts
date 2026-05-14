@@ -58,6 +58,7 @@ export class UserService extends BaseService {
         teacher: {
           include: {
             teachingSubjects: {
+              where: { term: { academicYear: { isActive: true } } },
               include: {
                 class: true,
                 subject: true,
@@ -65,12 +66,18 @@ export class UserService extends BaseService {
               },
             },
             classTeacherOf: {
+              where: { academicYear: { isActive: true } },
               include: {
                 school: true,
                 academicYear: true,
               },
             },
             streamTeacherOf: {
+              where: {
+                class: {
+                  academicYear: { isActive: true }
+                }
+              },
               include: {
                 class: true,
                 school: true,
@@ -417,6 +424,7 @@ export class UserService extends BaseService {
         teacher: {
           include: {
             teachingSubjects: {
+              where: { term: { academicYear: { isActive: true } } },
               include: {
                 class: true,
                 subject: true,
@@ -424,6 +432,7 @@ export class UserService extends BaseService {
               },
             },
             classTeacherOf: {
+              where: { academicYear: { isActive: true } },
               include: {
                 school: true,
                 academicYear: true,
@@ -435,6 +444,11 @@ export class UserService extends BaseService {
               },
             },
             streamTeacherOf: {
+              where: {
+                class: {
+                  academicYear: { isActive: true }
+                }
+              },
               include: {
                 class: true,
                 school: true,
