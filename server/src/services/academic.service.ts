@@ -352,6 +352,7 @@ export class AcademicService extends BaseService {
     academicYearId: string;
     classTeacherId?: string;
     pathway?: Pathway;
+    isFinal?: boolean;
   }): Promise<Class> {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
 
@@ -822,5 +823,254 @@ export class AcademicService extends BaseService {
   // Static method to create service with request context
   static withRequest(req: RequestWithUser): AcademicService {
     return new AcademicService(req);
+  }
+
+  /**
+   * Promote all active students in a class to a target class in the new academic year.
+   * Marks old enrollments as PROMOTED and creates new ones, then carries forward subjects.
+   */
+  async bulkPromoteClass(data: {
+    fromClassId: string;
+    toClassId: string;
+    toAcademicYearId: string;
+  }): Promise<{ promoted: number; skipped: number }> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) throw new Error('School context required');
+
+    // Verify both classes belong to this school
+    const [fromClass, toClass] = await Promise.all([
+      this.prisma.class.findFirst({ where: this.buildWhereClause({ id: data.fromClassId }, schoolId, isSuperAdmin) }),
+      this.prisma.class.findFirst({ where: this.buildWhereClause({ id: data.toClassId }, schoolId, isSuperAdmin) }),
+    ]);
+    if (!fromClass) throw new Error('Source class not found or access denied');
+    if (!toClass) throw new Error('Target class not found or access denied');
+
+    const activeEnrollments = await this.prisma.studentClass.findMany({
+      where: { classId: data.fromClassId, status: 'ACTIVE', schoolId: schoolId ?? undefined },
+    });
+
+    if (activeEnrollments.length === 0) return { promoted: 0, skipped: 0 };
+
+    // Filter out students already enrolled in the target year
+    const alreadyEnrolled = await this.prisma.studentClass.findMany({
+      where: {
+        studentId: { in: activeEnrollments.map(e => e.studentId) },
+        academicYearId: data.toAcademicYearId,
+        status: 'ACTIVE',
+      },
+      select: { studentId: true },
+    });
+    const alreadyEnrolledIds = new Set(alreadyEnrolled.map(e => e.studentId));
+
+    const toPromote = activeEnrollments.filter(e => !alreadyEnrolledIds.has(e.studentId));
+    const skipped = activeEnrollments.length - toPromote.length;
+
+    if (toPromote.length === 0) return { promoted: 0, skipped };
+
+    const { StudentClassSubjectService } = await import('./student-class-subject.service');
+    const subjectService = new StudentClassSubjectService();
+
+    const now = new Date();
+    let promoted = 0;
+
+    for (const enrollment of toPromote) {
+      try {
+        const newEnrollment = await this.prisma.$transaction(async (tx) => {
+          await tx.studentClass.update({
+            where: { id: enrollment.id },
+            data: { status: 'PROMOTED', promotedToId: data.toClassId, promotionDate: now },
+          });
+          return tx.studentClass.create({
+            data: {
+              id: uuidv4(),
+              studentId: enrollment.studentId,
+              classId: data.toClassId,
+              academicYearId: data.toAcademicYearId,
+              schoolId: enrollment.schoolId,
+              status: 'ACTIVE',
+            },
+          });
+        });
+
+        await subjectService.autoEnrollCoreSubjects(
+          newEnrollment.id, data.toClassId, schoolId!, enrollment.studentId
+        );
+        await subjectService.carryForwardElectiveSubjects(
+          enrollment.id, newEnrollment.id, data.toClassId, enrollment.studentId, schoolId!
+        );
+        promoted++;
+      } catch (err: any) {
+        logger.warn('Failed to promote student during bulk promotion', {
+          studentId: enrollment.studentId, error: err.message,
+        });
+      }
+    }
+
+    logger.info('Bulk promotion complete', { fromClassId: data.fromClassId, toClassId: data.toClassId, promoted, skipped });
+    return { promoted, skipped };
+  }
+
+  /**
+   * Mark all active students in a class as GRADUATED.
+   * Only allowed on classes marked isFinal=true.
+   */
+  async graduateClass(classId: string): Promise<{ graduated: number }> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) throw new Error('School context required');
+
+    const cls = await this.prisma.class.findFirst({
+      where: this.buildWhereClause({ id: classId }, schoolId, isSuperAdmin),
+      select: { isFinal: true },
+    });
+    if (!cls) throw new Error('Class not found or access denied');
+    if (!cls.isFinal) throw new Error('Only classes marked as final-year (isFinal=true) can be graduated');
+
+    const result = await this.prisma.studentClass.updateMany({
+      where: { classId, status: 'ACTIVE', schoolId: schoolId ?? undefined },
+      data: { status: 'GRADUATED', promotionDate: new Date() },
+    });
+
+    logger.info('Class graduated', { classId, count: result.count, schoolId });
+    return { graduated: result.count };
+  }
+
+  /**
+   * Clone all classes, streams, and ClassSubject assignments from one academic year
+   * to another. Teacher assignments are preserved. Skips duplicates silently.
+   * Returns counts of what was created.
+   */
+  async cloneYearStructure(data: {
+    fromAcademicYearId: string;
+    toAcademicYearId: string;
+  }): Promise<{ classes: number; streams: number; classSubjects: number }> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    if (!isSuperAdmin && !schoolId) throw new Error('School context required');
+
+    // Verify both years belong to this school
+    const [fromYear, toYear] = await Promise.all([
+      this.prisma.academicYear.findFirst({ where: this.buildWhereClause({ id: data.fromAcademicYearId }, schoolId, isSuperAdmin) }),
+      this.prisma.academicYear.findFirst({ where: this.buildWhereClause({ id: data.toAcademicYearId }, schoolId, isSuperAdmin) }),
+    ]);
+    if (!fromYear) throw new Error('Source academic year not found or access denied');
+    if (!toYear) throw new Error('Target academic year not found or access denied');
+
+    // Fetch the target year's terms (needed for ClassSubject cloning)
+    const toTerms = await this.prisma.term.findMany({
+      where: { academicYearId: data.toAcademicYearId },
+      orderBy: { termNumber: 'asc' },
+    });
+
+    // Fetch source classes with their streams and subjects
+    const sourceClasses = await this.prisma.class.findMany({
+      where: { academicYearId: data.fromAcademicYearId, schoolId: schoolId ?? undefined },
+      include: {
+        streams: true,
+        subjects: {
+          include: { term: { select: { termNumber: true } } },
+        },
+      },
+    });
+
+    let classCount = 0;
+    let streamCount = 0;
+    let subjectCount = 0;
+
+    // Map: old classId → new classId (for stream/subject cloning)
+    const classIdMap = new Map<string, string>();
+
+    for (const src of sourceClasses) {
+      // Final-year classes don't carry forward — they don't exist in the next year
+      if (src.isFinal) continue;
+      const existing = await this.prisma.class.findFirst({
+        where: { name: src.name, academicYearId: data.toAcademicYearId, schoolId: schoolId! },
+      });
+
+      let newClassId: string;
+      if (existing) {
+        newClassId = existing.id;
+      } else {
+        const newClass = await this.prisma.class.create({
+          data: {
+            id: uuidv4(),
+            name: src.name,
+            level: src.level,
+            curriculum: src.curriculum,
+            pathway: src.pathway,
+            academicYearId: data.toAcademicYearId,
+            schoolId: schoolId!,
+            classTeacherId: src.classTeacherId, // preserve class teacher
+          },
+        });
+        newClassId = newClass.id;
+        classCount++;
+      }
+      classIdMap.set(src.id, newClassId);
+
+      // Clone streams
+      for (const stream of src.streams) {
+        const existingStream = await this.prisma.stream.findFirst({
+          where: { classId: newClassId, name: stream.name },
+        });
+        if (!existingStream) {
+          await this.prisma.stream.create({
+            data: {
+              id: uuidv4(),
+              name: stream.name,
+              capacity: stream.capacity,
+              classId: newClassId,
+              schoolId: schoolId!,
+              streamTeacherId: stream.streamTeacherId, // preserve stream teacher
+            },
+          });
+          streamCount++;
+        }
+      }
+
+      // Clone ClassSubject assignments, mapping to the corresponding term in the new year
+      for (const cs of src.subjects) {
+        const targetTerm = toTerms.find(t => t.termNumber === cs.term.termNumber);
+        if (!targetTerm) continue; // target year has no matching term, skip
+
+        const existingCs = await this.prisma.classSubject.findFirst({
+          where: {
+            classId: newClassId,
+            subjectId: cs.subjectId,
+            termId: targetTerm.id,
+            academicYearId: data.toAcademicYearId,
+            streamId: cs.streamId ?? null,
+          },
+        });
+        if (!existingCs) {
+          await this.prisma.classSubject.create({
+            data: {
+              id: uuidv4(),
+              classId: newClassId,
+              subjectId: cs.subjectId,
+              termId: targetTerm.id,
+              academicYearId: data.toAcademicYearId,
+              schoolId: schoolId!,
+              subjectCategory: cs.subjectCategory,
+              teacherId: cs.teacherId, // preserve teacher assignment
+              streamId: cs.streamId,
+            },
+          });
+          subjectCount++;
+        }
+      }
+    }
+
+    logger.info('Year structure cloned', {
+      from: data.fromAcademicYearId,
+      to: data.toAcademicYearId,
+      classes: classCount,
+      streams: streamCount,
+      classSubjects: subjectCount,
+      schoolId,
+    });
+
+    return { classes: classCount, streams: streamCount, classSubjects: subjectCount };
   }
 }

@@ -314,6 +314,23 @@ export const promoteStudent = async (req: RequestWithUser, res: Response) => {
       });
     }
 
+    // Carry forward elective/optional subject selections from the previous enrollment
+    try {
+      await subjectService.carryForwardElectiveSubjects(
+        currentEnrollment.id,
+        result.id,
+        toClassId,
+        studentId,
+        schoolId
+      );
+    } catch (error: any) {
+      logger.warn('Failed to carry forward elective subjects after promotion', {
+        studentId,
+        enrollmentId: result.id,
+        error: error.message,
+      });
+    }
+
     logger.info('Student promoted successfully', {
       studentId,
       fromClassId: currentClassId,

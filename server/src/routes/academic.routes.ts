@@ -48,6 +48,11 @@ router.get('/statistics', AcademicController.getAcademicStatistics);
 router.get('/classes/:classId/performance', AcademicController.getClassPerformance);
 router.get('/overview', AcademicController.getAcademicOverview);
 
+// Year-end transitions
+router.post('/years/clone-structure', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.cloneYearStructure);
+router.post('/classes/bulk-promote', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.bulkPromoteClass);
+router.post('/classes/:classId/graduate', authorize('ADMIN', 'SUPER_ADMIN'), AcademicController.graduateClass);
+
 // Assign a subject to a class (Admin/Super Admin only)
 router.post(
   '/class-subject', 

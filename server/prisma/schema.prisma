@@ -408,6 +408,7 @@ model Class {
   schoolId         String
   classTeacherId   String?
   pathway          Pathway?
+  isFinal          Boolean        @default(false)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   academicYear     AcademicYear   @relation(fields: [academicYearId], references: [id])

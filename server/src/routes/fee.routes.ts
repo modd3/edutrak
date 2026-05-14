@@ -24,6 +24,16 @@ router.post(
 );
 
 /**
+ * POST /api/fees/structures/clone
+ * Clone a fee structure to a new academic year (and optionally a new term).
+ */
+router.post(
+  '/structures/clone',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.cloneFeeStructure.bind(feeController)
+);
+
+/**
  * GET /api/fees/structures
  * List fee structures (filter by academicYearId, termId, classLevel, isActive).
  */

@@ -340,14 +340,3 @@ export interface AuthenticatedUser {
   role: string;
   schoolId?: string;
 }
-
-/**
- * Extended Express Request
- */
-declare global {
-  namespace Express {
-    interface Request {
-      user?: AuthenticatedUser;
-    }
-  }
-}

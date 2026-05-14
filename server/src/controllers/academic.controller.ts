@@ -216,7 +216,7 @@ export class AcademicController {
   // Classes
   static async createClass(req: RequestWithUser, res: Response) {
     try {
-      const { name, level, curriculum, academicYearId, classTeacherId, pathway } = req.body;
+      const { name, level, curriculum, academicYearId, classTeacherId, pathway, isFinal } = req.body;
       
       const academicService = AcademicService.withRequest(req);
       const classData = await academicService.createClass({
@@ -226,6 +226,7 @@ export class AcademicController {
         academicYearId,
         classTeacherId,
         pathway: pathway as Pathway,
+        isFinal: Boolean(isFinal),
       });
 
       res.status(201).json({
@@ -544,6 +545,45 @@ export class AcademicController {
       });
     }
     return res.statusMessage;
+  }
+
+  static async bulkPromoteClass(req: RequestWithUser, res: Response) {
+    try {
+      const { fromClassId, toClassId, toAcademicYearId } = req.body;
+      if (!fromClassId || !toClassId || !toAcademicYearId) {
+        return res.status(400).json({ success: false, message: 'fromClassId, toClassId, and toAcademicYearId are required' });
+      }
+      const result = await AcademicService.withRequest(req).bulkPromoteClass({ fromClassId, toClassId, toAcademicYearId });
+      return res.json({ success: true, data: result, message: `Promoted ${result.promoted} students (${result.skipped} skipped)` });
+    } catch (error: any) {
+      logger.error('Error in bulk promotion:', error);
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  static async graduateClass(req: RequestWithUser, res: Response) {
+    try {
+      const { classId } = req.params;
+      const result = await AcademicService.withRequest(req).graduateClass(classId);
+      return res.json({ success: true, data: result, message: `Graduated ${result.graduated} students` });
+    } catch (error: any) {
+      logger.error('Error graduating class:', error);
+      return res.status(400).json({ success: false, error: error.message });
+    }
+  }
+
+  static async cloneYearStructure(req: RequestWithUser, res: Response) {
+    try {
+      const { fromAcademicYearId, toAcademicYearId } = req.body;
+      if (!fromAcademicYearId || !toAcademicYearId) {
+        return res.status(400).json({ success: false, message: 'fromAcademicYearId and toAcademicYearId are required' });
+      }
+      const result = await AcademicService.withRequest(req).cloneYearStructure({ fromAcademicYearId, toAcademicYearId });
+      return res.json({ success: true, data: result, message: `Cloned ${result.classes} classes, ${result.streams} streams, ${result.classSubjects} subject assignments` });
+    } catch (error: any) {
+      logger.error('Error cloning year structure:', error);
+      return res.status(400).json({ success: false, error: error.message });
+    }
   }
 
   // Utility endpoints

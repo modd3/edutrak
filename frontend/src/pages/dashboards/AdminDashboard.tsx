@@ -24,9 +24,7 @@ export function AdminDashboard() {
   });
 
   const statistics = useSchoolStatistics(user?.schoolId);
-  console.log("Statistics: ", statistics);
   const school_stats = statistics.data?.data.data
-  console.log("School Stats: ", school_stats);
 
   const stats = [
     {
@@ -131,27 +129,27 @@ export function AdminDashboard() {
             <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {canManageStudents && (
-                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <GraduationCap className="mx-auto mb-2 text-blue-600" size={24} />
-                  <p className="text-sm font-medium">Add Student</p>
-                </button>
+                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/students')}>
+                  <GraduationCap className="text-blue-600" size={24} />
+                  <span className="text-sm font-medium">Add Student</span>
+                </Button>
               )}
               {canManageTeachers && (
-                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <Users className="mx-auto mb-2 text-green-600" size={24} />
-                  <p className="text-sm font-medium">Add Teacher</p>
-                </button>
+                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/teachers')}>
+                  <Users className="text-green-600" size={24} />
+                  <span className="text-sm font-medium">Add Teacher</span>
+                </Button>
               )}
               {canManageClasses && (
-                <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                  <BookOpen className="mx-auto mb-2 text-purple-600" size={24} />
-                  <p className="text-sm font-medium">Create Class</p>
-                </button>
+                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/classes')}>
+                  <BookOpen className="text-purple-600" size={24} />
+                  <span className="text-sm font-medium">Create Class</span>
+                </Button>
               )}
-              <button className="p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
-                <TrendingUp className="mx-auto mb-2 text-orange-600" size={24} />
-                <p className="text-sm font-medium">View Reports</p>
-              </button>
+              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/assessments/reports')}>
+                <TrendingUp className="text-orange-600" size={24} />
+                <span className="text-sm font-medium">View Reports</span>
+              </Button>
             </div>
           </div>
     </div>

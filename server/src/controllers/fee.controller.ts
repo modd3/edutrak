@@ -277,6 +277,20 @@ export class FeeController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
+
+  async cloneFeeStructure(req: RequestWithUser, res: Response) {
+    try {
+      const { sourceFeeStructureId, toAcademicYearId, toTermId, newName } = req.body;
+      if (!sourceFeeStructureId || !toAcademicYearId) {
+        return ResponseUtil.validationError(res, 'sourceFeeStructureId and toAcademicYearId are required');
+      }
+      const service = FeeService.withRequest(req);
+      const cloned = await service.cloneFeeStructure({ sourceFeeStructureId, toAcademicYearId, toTermId, newName });
+      return ResponseUtil.created(res, 'Fee structure cloned successfully', cloned);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
 }
 
 export const feeController = new FeeController();

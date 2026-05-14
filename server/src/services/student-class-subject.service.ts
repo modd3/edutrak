@@ -442,6 +442,74 @@ export class StudentClassSubjectService {
   }
 
   /**
+   * Carry forward a student's non-core subject enrollments to a new class enrollment.
+   * Matches by subjectId: if the same subject exists in the new class, enroll the student.
+   * Silently skips subjects that don't exist in the new class (curriculum may differ).
+   */
+  async carryForwardElectiveSubjects(
+    oldEnrollmentId: string,
+    newEnrollmentId: string,
+    newClassId: string,
+    studentId: string,
+    schoolId: string
+  ): Promise<number> {
+    // Get the student's active non-core subject enrollments from the old class
+    const oldSubjectEnrollments = await this.prisma.studentClassSubject.findMany({
+      where: {
+        enrollmentId: oldEnrollmentId,
+        studentId,
+        status: 'ACTIVE',
+        classSubject: { subjectCategory: { not: 'CORE' } },
+      },
+      select: { classSubject: { select: { subjectId: true } } },
+    });
+
+    if (oldSubjectEnrollments.length === 0) return 0;
+
+    const subjectIds = oldSubjectEnrollments.map(e => e.classSubject.subjectId);
+
+    // Find matching ClassSubject records in the new class for those subjects
+    const newClassSubjects = await this.prisma.classSubject.findMany({
+      where: {
+        classId: newClassId,
+        schoolId,
+        subjectId: { in: subjectIds },
+        subjectCategory: { not: 'CORE' },
+      },
+      select: { id: true },
+    });
+
+    if (newClassSubjects.length === 0) return 0;
+
+    let enrolled = 0;
+    for (const cs of newClassSubjects) {
+      try {
+        await this.prisma.studentClassSubject.create({
+          data: {
+            id: uuidv4(),
+            studentId,
+            classSubjectId: cs.id,
+            enrollmentId: newEnrollmentId,
+            schoolId,
+            status: 'ACTIVE',
+          },
+        });
+        enrolled++;
+      } catch {
+        // Skip duplicates or constraint violations silently
+      }
+    }
+
+    logger.info('Carried forward elective subjects on promotion', {
+      studentId,
+      newEnrollmentId,
+      count: enrolled,
+    });
+
+    return enrolled;
+  }
+
+  /**
    * Get student count for a subject
    */
   async getSubjectEnrollmentCount(

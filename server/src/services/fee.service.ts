@@ -940,6 +940,83 @@ export class FeeService extends BaseService {
     }));
   }
 
+  /**
+   * Clone a fee structure to a new academic year (and optionally a new term).
+   * Items are copied with the same amounts — admin can edit them after cloning.
+   * Skips if an identical structure (same name + target year + target term) already exists.
+   */
+  async cloneFeeStructure(data: {
+    sourceFeeStructureId: string;
+    toAcademicYearId: string;
+    toTermId?: string;
+    newName?: string;
+  }) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const sid = this.assertSchool(isSuperAdmin ? undefined : schoolId);
+    const effectiveSchoolId = isSuperAdmin ? undefined : sid;
+
+    const source = await this.prisma.feeStructure.findFirst({
+      where: {
+        id: data.sourceFeeStructureId,
+        ...(effectiveSchoolId ? { schoolId: effectiveSchoolId } : {}),
+      },
+      include: { items: true },
+    });
+    if (!source) throw new Error('Source fee structure not found or access denied');
+
+    const toYear = await this.prisma.academicYear.findFirst({
+      where: {
+        id: data.toAcademicYearId,
+        ...(effectiveSchoolId ? { schoolId: effectiveSchoolId } : {}),
+      },
+    });
+    if (!toYear) throw new Error('Target academic year not found or access denied');
+
+    if (data.toTermId) {
+      const term = await this.prisma.term.findFirst({
+        where: { id: data.toTermId, academicYearId: data.toAcademicYearId },
+      });
+      if (!term) throw new Error('Target term not found in the target academic year');
+    }
+
+    const name = data.newName ?? source.name;
+
+    const cloned = await this.prisma.feeStructure.create({
+      data: {
+        id: uuidv4(),
+        name,
+        description: source.description,
+        academicYearId: data.toAcademicYearId,
+        termId: data.toTermId ?? null,
+        classLevel: source.classLevel,
+        boardingStatus: source.boardingStatus,
+        currency: source.currency,
+        schoolId: source.schoolId,
+        isActive: true,
+        items: {
+          create: source.items.map(item => ({
+            id: uuidv4(),
+            name: item.name,
+            category: item.category,
+            amount: item.amount,
+            isOptional: item.isOptional,
+            description: item.description,
+          })),
+        },
+      },
+      include: { items: true, academicYear: { select: { year: true } }, term: { select: { name: true } } },
+    });
+
+    logger.info('Fee structure cloned', {
+      sourceId: data.sourceFeeStructureId,
+      newId: cloned.id,
+      toAcademicYearId: data.toAcademicYearId,
+      schoolId: source.schoolId,
+    });
+
+    return cloned;
+  }
+
   // ── Static factory ────────────────────────────────────────────────────────
 
   static withRequest(req: RequestWithUser): FeeService {
