@@ -1,10 +1,12 @@
-import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, Users2 } from 'lucide-react';
+import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, Users2, Calendar, DollarSign } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useNavigate } from 'react-router-dom';
-import {useSchoolStatistics} from '@/hooks/use-schools';
+import { useSchoolStatistics } from '@/hooks/use-schools';
+import { useAcademicStatistics } from '@/hooks/use-academic';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
@@ -23,45 +25,61 @@ export function AdminDashboard() {
     requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
   });
 
-  const statistics = useSchoolStatistics(user?.schoolId);
-  const school_stats = statistics.data?.data.data
+  const { data: statisticsData } = useSchoolStatistics(user?.schoolId);
+  // The per-school statistics endpoint returns a different shape than SchoolStats type
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const school_stats: any = (statisticsData as any)?.data?.data || (statisticsData as any)?.data || statisticsData;
+
+  // Get academic stats for performance data
+  const { data: academicStatsData } = useAcademicStatistics();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const academicStats: any = (academicStatsData as any)?.data?.data || (academicStatsData as any)?.data || academicStatsData;
+
+  // Build chart data from academic stats if available
+  const classPerformanceData = academicStats?.classPerformance || [];
+  const chartData = classPerformanceData.length > 0
+    ? classPerformanceData.map((item: any) => ({
+        name: item.className || item.class?.name || 'Class',
+        avg: Math.round(item.average || 0),
+      }))
+    : [];
+
+  const avgPerformance = chartData.length > 0
+    ? Math.round(chartData.reduce((sum: number, d: any) => sum + d.avg, 0) / chartData.length)
+    : null;
 
   const stats = [
     {
       title: 'Total Students',
-      value: school_stats?.totalStudents,
-      change: '+12%',
+      value: school_stats?.totalStudents ?? school_stats?._count?.students ?? '—',
+      change: school_stats?.totalStudents ? `Active` : '',
       icon: GraduationCap,
       color: 'bg-blue-500',
     },
     {
       title: 'Teachers',
-      value: school_stats?.usersByRole.TEACHER,
-      change: '+5%',
+      value: school_stats?.usersByRole?.TEACHER ?? school_stats?._count?.teachers ?? '—',
+      change: school_stats?.usersByRole?.TEACHER ? 'On staff' : '',
       icon: Users,
       color: 'bg-green-500',
     },
     {
       title: 'Classes',
-      value: school_stats?.totalClasses,
-      change: '+3',
+      value: school_stats?.totalClasses ?? school_stats?._count?.classes ?? '—',
+      change: school_stats?.totalClasses ? 'This year' : '',
       icon: BookOpen,
       color: 'bg-purple-500',
     },
     {
       title: 'Avg. Performance',
-      value: '78%',
-      change: '+4%',
+      value: avgPerformance !== null ? `${avgPerformance}%` : '—',
+      change: avgPerformance !== null ? 'Mean score' : '',
       icon: TrendingUp,
       color: 'bg-orange-500',
     },
   ];
 
-  const recentActivities = [
-    { action: 'New student enrolled', name: 'John Doe', time: '2 hours ago' },
-    { action: 'Assessment completed', name: 'Form 3 Math', time: '4 hours ago' },
-    { action: 'Teacher assigned', name: 'Jane Smith to Grade 7', time: '1 day ago' },
-  ];
+  const recentActivities = [];
 
   return (
     <div className="space-y-6">
@@ -78,7 +96,7 @@ export function AdminDashboard() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {user?.role === 'ADMIN' && stats.map((stat, index) => (
+        {stats.map((stat, index) => (
           <div key={index} className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between">
               <div>
@@ -94,32 +112,62 @@ export function AdminDashboard() {
           ))}
           </div>
     
-          {/* Charts and Recent Activity */}
+          {/* Charts and Data */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Performance Chart */}
             <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Performance Overview</h2>
-              <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-                <p className="text-gray-500">Chart placeholder - integrate Recharts here</p>
-              </div>
+              <h2 className="text-lg font-semibold mb-4">Class Performance (Mean %)</h2>
+              {chartData.length > 0 ? (
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                      <YAxis domain={[0, 100]} />
+                      <Tooltip />
+                      <Bar dataKey="avg" fill="#2563eb" radius={[4, 4, 0, 0]} name="Average %" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
+                  <p className="text-gray-500">No performance data yet. Add assessment results to see charts.</p>
+                </div>
+              )}
             </div>
     
-            {/* Recent Activities */}
+            {/* Key Metrics */}
             <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Recent Activities</h2>
+              <h2 className="text-lg font-semibold mb-4">Key Metrics</h2>
               <div className="space-y-4">
-                {recentActivities.map((activity, index) => (
-                  <div key={index} className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">
-                        {activity.action}
-                      </p>
-                      <p className="text-sm text-gray-600">{activity.name}</p>
-                      <p className="text-xs text-gray-500 mt-1">{activity.time}</p>
-                    </div>
+                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <span className="text-sm font-medium">Total Students</span>
                   </div>
-                ))}
+                  <span className="font-bold text-lg">{stats[0].value}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-green-600" />
+                    <span className="text-sm font-medium">Teachers</span>
+                  </div>
+                  <span className="font-bold text-lg">{stats[1].value}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-purple-600" />
+                    <span className="text-sm font-medium">Classes</span>
+                  </div>
+                  <span className="font-bold text-lg">{stats[2].value}</span>
+                </div>
+                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 text-orange-600" />
+                    <span className="text-sm font-medium">Avg. Score</span>
+                  </div>
+                  <span className="font-bold text-lg">{stats[3].value}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -146,9 +194,13 @@ export function AdminDashboard() {
                   <span className="text-sm font-medium">Create Class</span>
                 </Button>
               )}
-              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/assessments/reports')}>
+              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/reports')}>
                 <TrendingUp className="text-orange-600" size={24} />
                 <span className="text-sm font-medium">View Reports</span>
+              </Button>
+              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/academic-year/year-end-wizard')}>
+                <Calendar className="text-amber-600" size={24} />
+                <span className="text-sm font-medium">Year-End Wizard</span>
               </Button>
             </div>
           </div>

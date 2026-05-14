@@ -73,3 +73,47 @@
     scrollbar-width: none;
   }
 }
+
+/* ── Print Styles — Report Cards ────────────────────────────────────── */
+@media print {
+  /* Hide everything outside the report card */
+  body * { visibility: hidden; }
+  body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  
+  /* Show only the report card area */
+  .report-card-print-area,
+  .report-card-print-area * { visibility: visible; }
+  .report-card-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+
+  /* Shrink action buttons in header */
+  .report-card-print-area .print\\:hidden { display: none !important; }
+
+  /* Force background colors for dark table headers etc. */
+  * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+
+  /* Page setup */
+  @page {
+    size: A4 portrait;
+    margin: 15mm 12mm 15mm 12mm;
+  }
+
+  /* Avoid page breaks inside tables & sections */
+  table { page-break-inside: auto; }
+  tr    { page-break-inside: avoid; page-break-after: auto; }
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* Typography tweaks */
+  body { font-size: 11pt; line-height: 1.4; color: #000 !important; }
+  h1 { font-size: 18pt; }
+  h2 { font-size: 14pt; }
+  h3 { font-size: 12pt; }
+
+  /* No orphans/widows */
+  p, h2, h3 { orphans: 3; widows: 3; }
+}

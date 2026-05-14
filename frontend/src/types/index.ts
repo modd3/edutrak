@@ -256,6 +256,7 @@ export interface Class {
   schoolId: string;
   classTeacherId?: string;
   pathway?: Pathway;
+  isFinal?: boolean;
   streams?: Stream[];
   school?: School;
   academicYear?: AcademicYear;

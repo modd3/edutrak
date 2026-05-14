@@ -47,6 +47,7 @@ export interface Class {
   academicYearId: string;
   schoolId: string;
   classTeacherId?: string;
+  isFinal?: boolean;
   createdAt: string;
   updatedAt: string;
   academicYear?: AcademicYear;
@@ -107,6 +108,7 @@ export interface CreateClassData {
   academicYearId: string;
   classTeacherId?: string;
   pathway?: string;
+  isFinal?: boolean;
 }
 
 export interface CreateStreamData {
@@ -320,6 +322,61 @@ export function useAcademicStatistics(academicYearId?: string) {
       const params = academicYearId ? { academicYearId } : {};
       const response = await api.get('/academic/statistics', { params });
       return response.data;
+    },
+  });
+}
+
+// Year-End Transition Hooks
+export function useCloneYearStructure() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fromAcademicYearId: string; toAcademicYearId: string }) => {
+      const response = await api.post('/academic/years/clone-structure', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['academic-years'] });
+      toast.success('Year structure cloned successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to clone year structure');
+    },
+  });
+}
+
+export function useBulkPromoteClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { fromClassId: string; toClassId: string; toAcademicYearId: string }) => {
+      const response = await api.post('/academic/classes/bulk-promote', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Students promoted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to promote students');
+    },
+  });
+}
+
+export function useGraduateClass() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (classId: string) => {
+      const response = await api.post(`/academic/classes/${classId}/graduate`);
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes'] });
+      queryClient.invalidateQueries({ queryKey: ['students'] });
+      toast.success('Class graduated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to graduate class');
     },
   });
 }

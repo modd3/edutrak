@@ -1,1160 +1,733 @@
-import { PrismaClient, Role, SchoolType, Ownership, BoardingStatus, SchoolGender, Curriculum, Gender, EmploymentType, TermName, SubjectCategory, LearningArea, SubjectGroup, EnrollmentStatus, SubjectEnrollmentStatus, AssessmentType, CompetencyLevel, FeeCategory, InvoiceStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PrismaClient, Role, SchoolType, Ownership, BoardingStatus, SchoolGender, Curriculum, Gender, EmploymentType, TermName, SubjectCategory, EnrollmentStatus, SubjectEnrollmentStatus, AssessmentType, InvoiceStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { hashPassword } from '../src/utils/hash';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  KENYAN_FIRST_NAMES_MALE, KENYAN_FIRST_NAMES_FEMALE, KENYAN_LAST_NAMES,
+  GUARDIAN_OCCUPATIONS, KENYAN_COUNTIES, TEACHER_SPECIALIZATIONS,
+  SUBJECT_DEFINITIONS, FORM_LEVELS, STREAMS, DEMO_SCHOOL_NAME,
+  pick, pickN, randInt, admissionNo, tscNumber, employeeNumber,
+  generateMarks, markToGrade
+} from './seed-data';
 
 const prisma = new PrismaClient();
 
-// Helper function to create users
-async function createUser(email: string, password: string, firstName: string, lastName: string, role: Role, schoolId?: string, additionalData: any = {}) {
-  const hashedPassword = await hashPassword(password);
-  return await prisma.user.upsert({
-    where: { email },
+// ─── Track created IDs for later reference ─────────────────────────────────
+const state = {
+  schoolId: '',
+  academicYearId: '',
+  term1Id: '' as string | undefined,
+  term2Id: '' as string | undefined,
+  subjectIds: {} as Record<string, string>,        // code → id
+  teacherIds: [] as string[],
+  teacherUserIds: [] as string[],
+  studentIds: [] as string[],
+  studentUserIds: [] as string[],
+  guardianUserIds: [] as string[],
+  guardianIds: [] as string[],
+  classIds: {} as Record<string, string>,          // formName → id
+  streamIds: [] as { id: string; classId: string; name: string }[],
+  classSubjectIds: [] as { id: string; classId: string; subjectId: string; teacherId: string; streamId?: string }[],
+  enrollmentIds: [] as { id: string; studentId: string; classId: string }[],
+  assessmentDefIds: [] as { id: string; classSubjectId: string; type: string }[],
+};
+
+async function main() {
+  console.log('🌱 Seeding Nairobi Premier Secondary School demo data...\n');
+
+  // Step 1: Create the school
+  const school = await prisma.school.create({
+    data: {
+      id: uuidv4(),
+      name: DEMO_SCHOOL_NAME,
+      registrationNo: 'NPS/2024/001',
+      type: SchoolType.SECONDARY,
+      county: 'Nairobi',
+      subCounty: 'Westlands',
+      ward: 'Kitisuru',
+      knecCode: 'NPS001',
+      kemisCode: 'NPSKEM001',
+      phone: '+254700100200',
+      email: 'info@nps.ac.ke',
+      address: 'P.O. Box 100-00100, Nairobi',
+      ownership: Ownership.PUBLIC,
+      boardingStatus: BoardingStatus.BOTH,
+      gender: SchoolGender.MIXED,
+    },
+  });
+  state.schoolId = school.id;
+  console.log('✅ School created:', school.name);
+
+  // Step 2: Create subjects
+  for (const def of SUBJECT_DEFINITIONS) {
+    const subject = await prisma.subject.upsert({
+      where: { code: def.code },
+      update: {},
+      create: {
+        id: uuidv4(),
+        name: def.name,
+        code: def.code,
+        category: def.category as SubjectCategory,
+        curriculum: def.curriculum as Curriculum[],
+      },
+    });
+    state.subjectIds[def.code] = subject.id;
+  }
+  console.log(`✅ ${Object.keys(state.subjectIds).length} subjects ready`);
+
+  // Step 3: Offer all subjects at this school
+  for (const [code, subjectId] of Object.entries(state.subjectIds)) {
+    await prisma.subjectOffering.upsert({
+      where: { schoolId_subjectId: { schoolId: state.schoolId, subjectId } },
+      update: {},
+      create: { id: uuidv4(), schoolId: state.schoolId, subjectId, isActive: true },
+    });
+  }
+  console.log('✅ Subject offerings created');
+
+  // Step 4: Create admin user
+  const adminPassword = await hashPassword('Admin123!');
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@nps.ac.ke' },
     update: {},
     create: {
       id: uuidv4(),
-      email,
-      password: hashedPassword,
-      firstName,
-      lastName,
-      ...additionalData,
-      role,
-      schoolId,
+      email: 'admin@nps.ac.ke',
+      password: adminPassword,
+      firstName: 'School',
+      lastName: 'Admin',
+      role: Role.ADMIN,
+      schoolId: state.schoolId,
       isActive: true,
     },
   });
-}
+  console.log('✅ Admin user created: admin@nps.ac.ke / Admin123!');
 
-// Helper function to create schools
-async function createSchool(name: string, registrationNo: string, type: SchoolType, county: string, subCounty: string, ward: string, knecCode: string, kemisCode: string, phone: string, email: string, address: string, ownership: Ownership, boardingStatus: BoardingStatus, gender: SchoolGender) {
-  return await prisma.school.upsert({
-    where: { knecCode },
+  // Step 5: Create super admin
+  await prisma.user.upsert({
+    where: { email: 'superadmin@edutrak.com' },
     update: {},
     create: {
       id: uuidv4(),
-      name,
-      registrationNo,
-      type,
-      county,
-      subCounty,
-      ward,
-      knecCode,
-      kemisCode,
-      phone,
-      email,
-      address,
-      ownership,
-      boardingStatus,
-      gender,
+      email: 'superadmin@edutrak.com',
+      password: adminPassword,
+      firstName: 'System',
+      lastName: 'Administrator',
+      role: Role.SUPER_ADMIN,
+      isActive: true,
     },
   });
-}
+  console.log('✅ Super admin: superadmin@edutrak.com / Admin123!');
 
-// Helper function to create academic year
-async function createAcademicYear(year: number, startDate: Date, endDate: Date, isActive: boolean, schoolId?: string) {
-  return await prisma.academicYear.upsert({
-    where: { year },
-    update: {},
-    create: {
+  // Step 6: Academic Year 2025 with 2 terms
+  const academicYear = await prisma.academicYear.create({
+    data: {
       id: uuidv4(),
-      year,
-      startDate,
-      endDate,
-      isActive,
-      schoolId,
+      year: 2025,
+      startDate: new Date('2025-01-06'),
+      endDate: new Date('2025-11-28'),
+      isActive: true,
+      schoolId: state.schoolId,
     },
   });
-}
+  state.academicYearId = academicYear.id;
 
-// Helper function to create terms
-async function createTerms(academicYearId: string, schoolId?: string) {
-  const terms = await Promise.all([
-    prisma.term.upsert({
-      where: {
-        academicYearId_termNumber: {
-          academicYearId,
-          termNumber: 1,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: TermName.TERM_1,
-        termNumber: 1,
-        startDate: new Date('2024-01-08'),
-        endDate: new Date('2024-04-05'),
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.term.upsert({
-      where: {
-        academicYearId_termNumber: {
-          academicYearId,
-          termNumber: 2,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: TermName.TERM_2,
-        termNumber: 2,
-        startDate: new Date('2024-05-06'),
-        endDate: new Date('2024-08-02'),
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.term.upsert({
-      where: {
-        academicYearId_termNumber: {
-          academicYearId,
-          termNumber: 3,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: TermName.TERM_3,
-        termNumber: 3,
-        startDate: new Date('2024-08-26'),
-        endDate: new Date('2024-11-22'),
-        academicYearId,
-        schoolId,
-      },
-    }),
-  ]);
-  return terms;
-}
+  const term1 = await prisma.term.create({
+    data: {
+      id: uuidv4(),
+      name: TermName.TERM_1,
+      termNumber: 1,
+      startDate: new Date('2025-01-06'),
+      endDate: new Date('2025-04-04'),
+      academicYearId: state.academicYearId,
+      schoolId: state.schoolId,
+    },
+  });
+  state.term1Id = term1.id;
 
-// Helper function to create subjects
-async function createSubjects() {
-  const subjects = await Promise.all([
-    prisma.subject.upsert({
-      where: { code: 'MATH' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Mathematics',
-        code: 'MATH',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.MATHEMATICS,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Mathematics subject covering various topics',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'ENG' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'English',
-        code: 'ENG',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.LANGUAGES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'English language and literature',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'KIS' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Kiswahili',
-        code: 'KIS',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.LANGUAGES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Kiswahili language and literature',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'SCI' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Science',
-        code: 'SCI',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.SCIENCE_TECHNOLOGY,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Integrated science covering biology, chemistry, and physics',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'SOC' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Social Studies',
-        code: 'SOC',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.SOCIAL_STUDIES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Social studies covering history, geography, and civics',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'CRE' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Christian Religious Education',
-        code: 'CRE',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.RELIGIOUS_EDUCATION,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Christian religious education',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'PHY' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Physical Education',
-        code: 'PHY',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.PHYSICAL_HEALTH_EDUCATION,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Physical education and sports',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'ART' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Art & Craft',
-        code: 'ART',
-        category: SubjectCategory.CORE,
-        learningArea: LearningArea.CREATIVE_ARTS,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Art and craft activities',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'COMP' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Computer Studies',
-        code: 'COMP',
-        category: SubjectCategory.ELECTIVE,
-        learningArea: LearningArea.SCIENCE_TECHNOLOGY,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Computer studies and ICT',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'BUS' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Business Studies',
-        code: 'BUS',
-        category: SubjectCategory.ELECTIVE,
-        subjectGroup: SubjectGroup.BUSINESS_STUDIES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Business studies and entrepreneurship',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'GEO' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Geography',
-        code: 'GEO',
-        category: SubjectCategory.ELECTIVE,
-        learningArea: LearningArea.SOCIAL_STUDIES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Geography and environmental studies',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'HIS' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'History',
-        code: 'HIS',
-        category: SubjectCategory.ELECTIVE,
-        learningArea: LearningArea.SOCIAL_STUDIES,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'History and government',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'AGRI' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Agriculture',
-        code: 'AGRI',
-        category: SubjectCategory.ELECTIVE,
-        subjectGroup: SubjectGroup.TECHNICAL_APPLIED,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Agriculture and nutrition',
-      },
-    }),
-    prisma.subject.upsert({
-      where: { code: 'HOM' },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Home Science',
-        code: 'HOM',
-        category: SubjectCategory.ELECTIVE,
-        subjectGroup: SubjectGroup.TECHNICAL_APPLIED,
-        curriculum: [Curriculum.CBC, Curriculum.EIGHT_FOUR_FOUR],
-        description: 'Home science and management',
-      },
-    }),
-  ]);
-  return subjects;
-}
+  const term2 = await prisma.term.create({
+    data: {
+      id: uuidv4(),
+      name: TermName.TERM_2,
+      termNumber: 2,
+      startDate: new Date('2025-05-05'),
+      endDate: new Date('2025-08-08'),
+      academicYearId: state.academicYearId,
+      schoolId: state.schoolId,
+    },
+  });
+  state.term2Id = term2.id;
+  console.log('✅ Academic Year 2025 with Term 1 & Term 2 created');
 
-// Helper function to create fee structures
-async function createFeeStructures(schoolId: string, academicYearId: string, termId: string) {
-  const feeStructures = await Promise.all([
-    // Primary School Fee Structure
-    prisma.feeStructure.create({
+  // Step 7: Create 12 classes (4 forms × 3 streams)
+  let classIndex = 0;
+  for (const form of FORM_LEVELS) {
+    // Create the class (Form 1, Form 2, etc.)
+    const isFinalForm = form === 'Form 4';
+    const cls = await prisma.class.create({
       data: {
         id: uuidv4(),
-        name: 'Primary - Term 1 2024',
-        description: 'Fee structure for primary school students',
-        academicYearId,
-        termId,
-        schoolId,
-        currency: 'KES',
+        name: form,
+        level: form,
+        curriculum: Curriculum.EIGHT_FOUR_FOUR,
+        academicYearId: state.academicYearId,
+        schoolId: state.schoolId,
+        isFinal: isFinalForm,
+      },
+    });
+    state.classIds[form] = cls.id;
+
+    // Create 3 streams per form
+    for (const streamName of STREAMS) {
+      const stream = await prisma.stream.create({
+        data: {
+          id: uuidv4(),
+          name: streamName,
+          capacity: 45,
+          classId: cls.id,
+          schoolId: state.schoolId,
+        },
+      });
+      state.streamIds.push({ id: stream.id, classId: cls.id, name: streamName });
+    }
+    classIndex++;
+  }
+  console.log(`✅ ${FORM_LEVELS.length} classes with ${STREAMS.length} streams each created`);
+
+  // Step 8: Create 15 teachers with user accounts
+  const teacherSubjectAssignments = [
+    { firstName: 'John', lastName: 'Kamau', subject: 'Mathematics', gender: 'MALE' },
+    { firstName: 'Mary', lastName: 'Wanjiku', subject: 'English', gender: 'FEMALE' },
+    { firstName: 'Peter', lastName: 'Omondi', subject: 'Kiswahili', gender: 'MALE' },
+    { firstName: 'Grace', lastName: 'Chebet', subject: 'Biology', gender: 'FEMALE' },
+    { firstName: 'David', lastName: 'Kiprop', subject: 'Chemistry', gender: 'MALE' },
+    { firstName: 'Sarah', lastName: 'Kosgey', subject: 'Physics', gender: 'FEMALE' },
+    { firstName: 'James', lastName: 'Mwangi', subject: 'Geography', gender: 'MALE' },
+    { firstName: 'Esther', lastName: 'Muthoni', subject: 'History', gender: 'FEMALE' },
+    { firstName: 'Samuel', lastName: 'Njoroge', subject: 'CRE', gender: 'MALE' },
+    { firstName: 'Rebecca', lastName: 'Adhiambo', subject: 'Business Studies', gender: 'FEMALE' },
+    { firstName: 'Daniel', lastName: 'Mutua', subject: 'Agriculture', gender: 'MALE' },
+    { firstName: 'Faith', lastName: 'Wambui', subject: 'Computer Studies', gender: 'FEMALE' },
+    { firstName: 'Patrick', lastName: 'Odhiambo', subject: 'Mathematics', gender: 'MALE' },
+    { firstName: 'Nancy', lastName: 'Akinyi', subject: 'English', gender: 'FEMALE' },
+    { firstName: 'Kevin', lastName: 'Kipkorir', subject: 'Biology', gender: 'MALE' },
+  ];
+
+  for (let i = 0; i < teacherSubjectAssignments.length; i++) {
+    const t = teacherSubjectAssignments[i];
+    const email = `teacher${i + 1}@nps.ac.ke`;
+    const pwd = await hashPassword('Teacher123!');
+    
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        id: uuidv4(),
+        email,
+        password: pwd,
+        firstName: t.firstName,
+        lastName: t.lastName,
+        role: Role.TEACHER,
+        schoolId: state.schoolId,
         isActive: true,
+        phone: `+2547${String(randInt(10000000, 99999999)).padStart(8, '0')}`,
       },
-    }),
+    });
+    state.teacherUserIds.push(user.id);
 
-    // Secondary School Fee Structure
-    prisma.feeStructure.create({
+    const specs = TEACHER_SPECIALIZATIONS[t.subject] || ['BEd Education'];
+    const teacher = await prisma.teacher.create({
       data: {
         id: uuidv4(),
-        name: 'Secondary - Term 1 2024',
-        description: 'Fee structure for secondary school students',
-        academicYearId,
-        termId,
-        schoolId,
-        currency: 'KES',
+        userId: user.id,
+        tscNumber: tscNumber(i + 1),
+        employeeNumber: employeeNumber(i + 1),
+        employmentType: i % 5 === 0 ? EmploymentType.CONTRACT : EmploymentType.PERMANENT,
+        qualification: pick(specs),
+        specialization: t.subject,
+        dateJoined: new Date(`202${randInt(0, 4)}-0${randInt(1, 9)}-${randInt(10, 28)}`),
+      },
+    });
+    state.teacherIds.push(teacher.id);
+  }
+  console.log(`✅ ${state.teacherIds.length} teachers created`);
+
+  // Step 9: Create 80 students (20 per form level)
+  let studentCounter = 1;
+  const studentsPerForm = 20;
+  
+  for (let formIdx = 0; formIdx < FORM_LEVELS.length; formIdx++) {
+    const form = FORM_LEVELS[formIdx];
+    const classId = state.classIds[form];
+
+    for (let s = 0; s < studentsPerForm; s++) {
+      const isMale = randInt(0, 1) === 0;
+      const firstName = isMale
+        ? pick(KENYAN_FIRST_NAMES_MALE)
+        : pick(KENYAN_FIRST_NAMES_FEMALE);
+      const lastName = pick(KENYAN_LAST_NAMES);
+      const middleName = isMale ? pick(KENYAN_FIRST_NAMES_MALE) : pick(KENYAN_FIRST_NAMES_FEMALE);
+      const gender = isMale ? Gender.MALE : Gender.FEMALE;
+      const admNo = `NPS/${2025}/${String(studentCounter).padStart(3, '0')}`;
+      const email = `student${studentCounter}@nps.ac.ke`;
+      const pwd = await hashPassword('Student123!');
+
+      // Create user
+      const user = await prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: {
+          id: uuidv4(),
+          email,
+          password: pwd,
+          firstName,
+          lastName,
+          role: Role.STUDENT,
+          schoolId: state.schoolId,
+          isActive: true,
+        },
+      });
+      state.studentUserIds.push(user.id);
+
+      // Create student record
+      const student = await prisma.student.create({
+        data: {
+          id: uuidv4(),
+          admissionNo: admNo,
+          firstName,
+          middleName,
+          lastName,
+          gender,
+          dob: new Date(`${2005 + formIdx}-${randInt(1, 12)}-${String(randInt(1, 28)).padStart(2, '0')}`),
+          nationality: 'Kenyan',
+          county: pick(KENYAN_COUNTIES),
+          schoolId: state.schoolId,
+          userId: user.id,
+        },
+      });
+      state.studentIds.push(student.id);
+
+      // Assign to a stream (distribute evenly: 6-7 per stream)
+      const streamIndex = s % 3;
+      const streamEntry = state.streamIds.find(
+        st => st.classId === classId && st.name === STREAMS[streamIndex]
+      );
+      const streamId = streamEntry?.id;
+
+      // Enroll in class
+      const enrollment = await prisma.studentClass.create({
+        data: {
+          id: uuidv4(),
+          studentId: student.id,
+          classId,
+          streamId: streamId!,
+          academicYearId: state.academicYearId,
+          schoolId: state.schoolId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
+      state.enrollmentIds.push({ id: enrollment.id, studentId: student.id, classId });
+      
+      studentCounter++;
+    }
+  }
+  console.log(`✅ ${state.studentIds.length} students created and enrolled`);
+
+  // Step 10: Create guardians and link to students
+  // Create ~25 guardians, each linked to 2-4 students
+  const existingGuardianEmails = new Set<string>();
+  for (let g = 0; g < 25; g++) {
+    const isMale = randInt(0, 1) === 0;
+    const firstName = isMale ? pick(KENYAN_FIRST_NAMES_MALE) : pick(KENYAN_FIRST_NAMES_FEMALE);
+    const lastName = pick(KENYAN_LAST_NAMES);
+    const email = `guardian${g + 1}@nps.ac.ke`;
+    const pwd = await hashPassword('Guard123!');
+
+    if (existingGuardianEmails.has(email)) continue;
+    existingGuardianEmails.add(email);
+
+    const user = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {
+        id: uuidv4(),
+        email,
+        password: pwd,
+        firstName,
+        lastName,
+        role: Role.PARENT,
         isActive: true,
+        phone: `+2547${String(randInt(10000000, 99999999)).padStart(8, '0')}`,
       },
-    }),
-  ]);
+    });
+    state.guardianUserIds.push(user.id);
 
-  // Create fee items for each structure
-  await Promise.all([
-    // Primary School Fee Items
-    prisma.feeItem.create({
+    const guardian = await prisma.guardian.create({
       data: {
         id: uuidv4(),
-        feeStructureId: feeStructures[0].id,
-        name: 'Tuition Fee',
-        category: FeeCategory.TUITION,
-        amount: 5000.00,
-        description: 'Tuition fee for primary school',
-      },
-    }),
-    prisma.feeItem.create({
-      data: {
-        id: uuidv4(),
-        feeStructureId: feeStructures[0].id,
-        name: 'Activity Fee',
-        category: FeeCategory.ACTIVITY,
-        amount: 2000.00,
-        description: 'Activity fee for primary school',
-      },
-    }),
-    prisma.feeItem.create({
-      data: {
-        id: uuidv4(),
-        feeStructureId: feeStructures[0].id,
-        name: 'Lunch Fee',
-        category: FeeCategory.LUNCH,
-        amount: 3000.00,
-        description: 'Lunch fee for primary school',
-      },
-    }),
-
-    // Secondary School Fee Items
-    prisma.feeItem.create({
-      data: {
-        id: uuidv4(),
-        feeStructureId: feeStructures[1].id,
-        name: 'Tuition Fee',
-        category: FeeCategory.TUITION,
-        amount: 15000.00,
-        description: 'Tuition fee for secondary school',
-      },
-    }),
-    prisma.feeItem.create({
-      data: {
-        id: uuidv4(),
-        feeStructureId: feeStructures[1].id,
-        name: 'Boarding Fee',
-        category: FeeCategory.BOARDING,
-        amount: 10000.00,
-        description: 'Boarding fee for secondary school',
-      },
-    }),
-    prisma.feeItem.create({
-      data: {
-        id: uuidv4(),
-        feeStructureId: feeStructures[1].id,
-        name: 'Activity Fee',
-        category: FeeCategory.ACTIVITY,
-        amount: 3000.00,
-        description: 'Activity fee for secondary school',
-      },
-    }),
-  ]);
-
-  return feeStructures;
-}
-
-// Helper function to create classes
-async function createClasses(schoolId: string, academicYearId: string) {
-  const classes = await Promise.all([
-    // Primary School Classes
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Grade 1',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Grade 1',
-        level: 'PRIMARY',
-        curriculum: Curriculum.CBC,
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Grade 2',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Grade 2',
-        level: 'PRIMARY',
-        curriculum: Curriculum.CBC,
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Grade 3',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Grade 3',
-        level: 'PRIMARY',
-        curriculum: Curriculum.CBC,
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Form 1',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Form 1',
-        level: 'SECONDARY',
-        curriculum: Curriculum.EIGHT_FOUR_FOUR,
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Form 2',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Form 2',
-        level: 'SECONDARY',
-        curriculum: Curriculum.EIGHT_FOUR_FOUR,
-        academicYearId,
-        schoolId,
-      },
-    }),
-    prisma.class.upsert({
-      where: {
-        name_academicYearId_schoolId: {
-          name: 'Form 3',
-          academicYearId,
-          schoolId,
-        },
-      },
-      update: {},
-      create: {
-        id: uuidv4(),
-        name: 'Form 3',
-        level: 'SECONDARY',
-        curriculum: Curriculum.EIGHT_FOUR_FOUR,
-        academicYearId,
-        schoolId,
-      },
-    }),
-  ]);
-  return classes;
-}
-
-// Helper function to create teachers
-async function createTeachers(schoolId: string) {
-  const users = await Promise.all([
-    createUser('teacher1@school.com', 'Teacher123!', 'John', 'Kamau', Role.TEACHER, schoolId, {
-      idNumber: 'ID123456',
-      phone: '+254712345678',
-    }),
-    createUser('teacher2@school.com', 'Teacher123!', 'Mary', 'Wanjiru', Role.TEACHER, schoolId, {
-      idNumber: 'ID123457',
-      phone: '+254723456789',
-    }),
-    createUser('teacher3@school.com', 'Teacher123!', 'Peter', 'Omondi', Role.TEACHER, schoolId, {
-      idNumber: 'ID123458',
-      phone: '+254734567890',
-    }),
-  ]);
-
-  // Create teacher profiles
-  const profiles = await Promise.all([
-    prisma.teacher.upsert({
-      where: { userId: users[0].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        userId: users[0].id,
-        tscNumber: 'TSC123456',
-        employeeNumber: 'EMP001',
-        employmentType: EmploymentType.PERMANENT,
-        qualification: 'BSc Education',
-        specialization: 'Mathematics',
-        dateJoined: new Date('2020-01-15'),
-      },
-    }),
-    prisma.teacher.upsert({
-      where: { userId: users[1].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        userId: users[1].id,
-        tscNumber: 'TSC123457',
-        employeeNumber: 'EMP002',
-        employmentType: EmploymentType.PERMANENT,
-        qualification: 'BEd Arts',
-        specialization: 'English',
-        dateJoined: new Date('2019-09-01'),
-      },
-    }),
-    prisma.teacher.upsert({
-      where: { userId: users[2].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        userId: users[2].id,
-        tscNumber: 'TSC123458',
-        employeeNumber: 'EMP003',
-        employmentType: EmploymentType.CONTRACT,
-        qualification: 'Diploma in Education',
-        specialization: 'Science',
-        dateJoined: new Date('2021-02-10'),
-      },
-    }),
-  ]);
-
-  return profiles;
-}
-
-// Helper function to create students
-async function createStudents(schoolId: string) {
-  const users = await Promise.all([
-    createUser('student1@school.com', 'Student123!', 'David', 'Mwangi', Role.STUDENT, schoolId, {
-      idNumber: 'ID123459',
-      phone: '+254745678901',
-    }),
-    createUser('student2@school.com', 'Student123!', 'Grace', 'Wangui', Role.STUDENT, schoolId, {
-      idNumber: 'ID123460',
-      phone: '+254756789012',
-    }),
-    createUser('student3@school.com', 'Student123!', 'James', 'Ouko', Role.STUDENT, schoolId, {
-      idNumber: 'ID123461',
-      phone: '+254767890123',
-    }),
-  ]);
-
-  // Create student profiles
-  const profiles = await Promise.all([
-    prisma.student.upsert({
-      where: { userId: users[0].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        admissionNo: 'ADM001',
-        firstName: 'David',
-        middleName: 'Kamau',
-        lastName: 'Mwangi',
-        gender: Gender.MALE,
-        dob: new Date('2010-05-15'),
-        nationality: 'Kenyan',
-        schoolId,
-        userId: users[0].id,
-      },
-    }),
-    prisma.student.upsert({
-      where: { userId: users[1].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        admissionNo: 'ADM002',
-        firstName: 'Grace',
-        middleName: 'Wanjiru',
-        lastName: 'Wangui',
-        gender: Gender.FEMALE,
-        dob: new Date('2011-08-22'),
-        nationality: 'Kenyan',
-        schoolId,
-        userId: users[1].id,
-      },
-    }),
-    prisma.student.upsert({
-      where: { userId: users[2].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        admissionNo: 'ADM003',
-        firstName: 'James',
-        middleName: 'Omondi',
-        lastName: 'Ouko',
-        gender: Gender.MALE,
-        dob: new Date('2009-12-03'),
-        nationality: 'Kenyan',
-        schoolId,
-        userId: users[2].id,
-      },
-    }),
-  ]);
-
-  return profiles;
-}
-
-// Helper function to create guardians
-async function createGuardians() {
-  const guardians = await Promise.all([
-    createUser('guardian1@school.com', 'Guardian123!', 'Joseph', 'Mwangi', Role.PARENT, undefined, {
-      idNumber: 'ID123462',
-      phone: '+254778901234',
-    }),
-    createUser('guardian2@school.com', 'Guardian123!', 'Anne', 'Wangui', Role.PARENT, undefined, {
-      idNumber: 'ID123463',
-      phone: '+254789012345',
-    }),
-  ]);
-
-  // Create guardian profiles
-  const guardianProfiles = await Promise.all([
-    prisma.guardian.upsert({
-      where: { userId: guardians[0].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        userId: guardians[0].id,
-        relationship: 'Father',
-        occupation: 'Businessman',
+        userId: user.id,
+        relationship: isMale ? 'Father' : 'Mother',
+        occupation: pick(GUARDIAN_OCCUPATIONS),
         employer: 'Self-employed',
-        workPhone: '+254712345678',
       },
-    }),
-    prisma.guardian.upsert({
-      where: { userId: guardians[1].id },
-      update: {},
-      create: {
-        id: uuidv4(),
-        userId: guardians[1].id,
-        relationship: 'Mother',
-        occupation: 'Teacher',
-        employer: 'Nairobi County Government',
-        workPhone: '+254723456789',
-      },
-    }),
-  ]);
+    });
+    state.guardianIds.push(guardian.id);
+  }
 
-  return guardianProfiles;
-}
+  // Link guardians to students (each student gets 1-2 guardians)
+  for (let si = 0; si < state.studentIds.length; si++) {
+    const numGuardians = randInt(1, 2);
+    const guardiansForStudent = pickN(state.guardianIds, numGuardians);
+    for (let gi = 0; gi < guardiansForStudent.length; gi++) {
+      await prisma.studentGuardian.create({
+        data: {
+          id: uuidv4(),
+          studentId: state.studentIds[si],
+          guardianId: guardiansForStudent[gi],
+          isPrimary: gi === 0,
+        },
+      }).catch(() => {
+        // Skip duplicate pairs silently
+      });
+    }
+  }
+  console.log(`✅ ${state.guardianIds.length} guardians created and linked`);
 
-// Helper function to create student-guardian relationships
-async function createStudentGuardians(students: any[], guardians: any[]) {
-  const studentGuardians = await Promise.all([
-    prisma.studentGuardian.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[0].id,
-        guardianId: guardians[0].id,
-        isPrimary: true,
-      },
-    }),
-    prisma.studentGuardian.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[1].id,
-        guardianId: guardians[1].id,
-        isPrimary: true,
-      },
-    }),
-  ]);
-  return studentGuardians;
-}
+  // Step 11: Assign subjects to classes & teachers
+  // Form 1 & 2: core subjects (MATH, ENG, KIS, BIO, CHEM, PHY, CRE, GEO, HIST)
+  // Form 3 & 4: all subjects including electives
+  const coreSubjects = ['MATH', 'ENG', 'KIS', 'BIO', 'CHEM', 'PHY', 'CRE', 'GEO', 'HIST'];
+  const electiveSubjects = ['BUS', 'AGRI', 'COMP'];
 
-// Helper function to create class-subject assignments
-async function createClassSubjects(classes: any[], subjects: any[], teachers: any[], termId: string, academicYearId: string, schoolId: string) {
-  const classSubjects = await Promise.all([
-    // Class 1 - Mathematics
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[0].id,
-        subjectId: subjects[0].id,
-        teacherId: teachers[0].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.CORE,
-        schoolId,
-      },
-    }),
-    // Class 1 - English
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[0].id,
-        subjectId: subjects[1].id,
-        teacherId: teachers[1].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.CORE,
-        schoolId,
-      },
-    }),
-    // Class 1 - Science
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[0].id,
-        subjectId: subjects[3].id,
-        teacherId: teachers[2].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.CORE,
-        schoolId,
-      },
-    }),
-    // Form 1 - Mathematics
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[3].id,
-        subjectId: subjects[0].id,
-        teacherId: teachers[0].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.CORE,
-        schoolId,
-      },
-    }),
-    // Form 1 - English
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[3].id,
-        subjectId: subjects[1].id,
-        teacherId: teachers[1].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.CORE,
-        schoolId,
-      },
-    }),
-    // Form 1 - Geography
-    prisma.classSubject.create({
-      data: {
-        id: uuidv4(),
-        classId: classes[3].id,
-        subjectId: subjects[11].id,
-        teacherId: teachers[1].id,
-        termId,
-        academicYearId,
-        subjectCategory: SubjectCategory.ELECTIVE,
-        schoolId,
-      },
-    }),
-  ]);
-  return classSubjects;
-}
+  for (const form of FORM_LEVELS) {
+    const classId = state.classIds[form];
+    const isSenior = form === 'Form 3' || form === 'Form 4';
+    const subjectsForForm = isSenior ? [...coreSubjects, ...electiveSubjects] : coreSubjects;
 
-// Helper function to create student enrollments
-async function createStudentEnrollments(students: any[], classes: any[], academicYearId: string, schoolId: string) {
-  const enrollments = await Promise.all([
-    // Student 1 - Grade 1
-    prisma.studentClass.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[0].id,
-        classId: classes[0].id,
-        academicYearId,
-        schoolId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 2 - Grade 2
-    prisma.studentClass.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[1].id,
-        classId: classes[1].id,
-        academicYearId,
-        schoolId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 3 - Form 1
-    prisma.studentClass.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        classId: classes[3].id,
-        academicYearId,
-        schoolId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    }),
-  ]);
-  return enrollments;
-}
+    // Get the streams for this class
+    const formStreams = state.streamIds.filter(st => st.classId === classId);
 
-// Helper function to create student subject enrollments
-async function createStudentSubjectEnrollments(students: any[], classSubjects: any[], enrollments: any[]) {
-  await Promise.all([
-    // Student 1 - Mathematics
-    prisma.studentClassSubject.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[0].id,
-        classSubjectId: classSubjects[0].id,
-        enrollmentId: enrollments[0].id,
-        status: SubjectEnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 1 - English
-    prisma.studentClassSubject.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[0].id,
-        classSubjectId: classSubjects[1].id,
-        enrollmentId: enrollments[0].id,
-        status: SubjectEnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 3 - Mathematics
-    prisma.studentClassSubject.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        classSubjectId: classSubjects[3].id,
-        enrollmentId: enrollments[2].id,
-        status: SubjectEnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 3 - English
-    prisma.studentClassSubject.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        classSubjectId: classSubjects[4].id,
-        enrollmentId: enrollments[2].id,
-        status: SubjectEnrollmentStatus.ACTIVE,
-      },
-    }),
-    // Student 3 - Geography
-    prisma.studentClassSubject.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        classSubjectId: classSubjects[5].id,
-        enrollmentId: enrollments[2].id,
-        status: SubjectEnrollmentStatus.ACTIVE,
-      },
-    }),
-  ]);
-}
+    for (const stream of formStreams) {
+      for (const subjectCode of subjectsForForm) {
+        const subjectId = state.subjectIds[subjectCode];
+        if (!subjectId) continue;
 
-// Helper function to create assessment definitions
-async function createAssessmentDefinitions(classSubjects: any[]) {
-  const assessmentDefinitions = await Promise.all([
-    // Mathematics Assessment
-    prisma.assessmentDefinition.create({
-      data: {
-        id: uuidv4(),
-        name: 'Mathematics CAT 1',
-        type: AssessmentType.CAT,
-        maxMarks: 100,
-        classSubjectId: classSubjects[0].id,
-        termId: classSubjects[0].termId,
-        academicYearId: classSubjects[0].academicYearId,
-      },
-      include: {
-        classSubject: true,
-      },
-    }),
-    // English Assessment
-    prisma.assessmentDefinition.create({
-      data: {
-        id: uuidv4(),
-        name: 'English CAT 1',
-        type: AssessmentType.CAT,
-        maxMarks: 100,
-        classSubjectId: classSubjects[1].id,
-        termId: classSubjects[1].termId,
-        academicYearId: classSubjects[1].academicYearId,
-      },
-      include: {
-        classSubject: true,
-      },
-    }),
-    // Geography Assessment
-    prisma.assessmentDefinition.create({
-      data: {
-        id: uuidv4(),
-        name: 'Geography CAT 1',
-        type: AssessmentType.CAT,
-        maxMarks: 100,
-        classSubjectId: classSubjects[5].id,
-        termId: classSubjects[5].termId,
-        academicYearId: classSubjects[5].academicYearId,
-      },
-      include: {
-        classSubject: true,
-      },
-    }),
-  ]);
-  return assessmentDefinitions;
-}
+        // Find a teacher for this subject (prefer ones with matching specialization)
+        const subjectName = SUBJECT_DEFINITIONS.find(s => s.code === subjectCode)?.name || '';
+        const matchingTeacherIdx = state.teacherIds.findIndex((_, idx) => {
+          return teacherSubjectAssignments[idx]?.subject === subjectName;
+        });
+        const teacherIdx = matchingTeacherIdx >= 0
+          ? matchingTeacherIdx
+          : randInt(0, state.teacherIds.length - 1);
+        const teacherId = state.teacherIds[teacherIdx];
 
-// Helper function to create assessment results
-async function createAssessmentResults(students: any[], assessmentDefinitions: any[]) {
-  await Promise.all([
-    // Student 1 - Mathematics Result
-    prisma.assessmentResult.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[0].id,
-        assessmentDefId: assessmentDefinitions[0].id,
-        numericValue: 85.5,
-        grade: 'A',
-        competencyLevel: CompetencyLevel.MEETING_EXPECTATIONS,
-        assessedById: assessmentDefinitions[0].classSubject.teacherId,
-      },
-    }),
-    // Student 3 - Mathematics Result
-    prisma.assessmentResult.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        assessmentDefId: assessmentDefinitions[0].id,
-        numericValue: 92.0,
-        grade: 'A',
-        competencyLevel: CompetencyLevel.EXCEEDING_EXPECTATIONS,
-        assessedById: assessmentDefinitions[0].classSubject.teacherId,
-      },
-    }),
-    // Student 3 - Geography Result
-    prisma.assessmentResult.create({
-      data: {
-        id: uuidv4(),
-        studentId: students[2].id,
-        assessmentDefId: assessmentDefinitions[2].id,
-        numericValue: 78.0,
-        grade: 'B',
-        competencyLevel: CompetencyLevel.APPROACHING_EXPECTATIONS,
-        assessedById: assessmentDefinitions[2].classSubject.teacherId,
-      },
-    }),
-  ]);
-}
+        const cs = await prisma.classSubject.create({
+          data: {
+            id: uuidv4(),
+            classId,
+            streamId: stream.id,
+            subjectId,
+            teacherId,
+            termId: state.term1Id!,
+            academicYearId: state.academicYearId,
+            subjectCategory: electiveSubjects.includes(subjectCode) ? SubjectCategory.ELECTIVE : SubjectCategory.CORE,
+            schoolId: state.schoolId,
+          },
+        });
+        state.classSubjectIds.push({
+          id: cs.id,
+          classId,
+          subjectId,
+          teacherId,
+          streamId: stream.id,
+        });
+      }
+    }
+  }
+  console.log(`✅ ${state.classSubjectIds.length} class-subject-stream assignments created`);
 
-// Helper function to create fee invoices
-async function createFeeInvoices(students: any[], feeStructures: any[]) {
-  const feeInvoices = await Promise.all([
-    // Student 1 - Primary School Invoice
-    prisma.feeInvoice.create({
-      data: {
-        id: uuidv4(),
-        invoiceNo: 'INV/2024/000001',
-        studentId: students[0].id,
-        feeStructureId: feeStructures[0].id,
-        academicYearId: feeStructures[0].academicYearId,
-        termId: feeStructures[0].termId,
-        schoolId: feeStructures[0].schoolId,
-        status: InvoiceStatus.UNPAID,
-        totalAmount: 10000.00,
-        discountAmount: 0,
-        paidAmount: 0,
-        balanceAmount: 10000.00,
-        dueDate: new Date('2024-04-05'),
-        issuedAt: new Date(),
-      },
-    }),
-    // Student 3 - Secondary School Invoice
-    prisma.feeInvoice.create({
-      data: {
-        id: uuidv4(),
-        invoiceNo: 'INV/2024/000002',
-        studentId: students[2].id,
-        feeStructureId: feeStructures[1].id,
-        academicYearId: feeStructures[1].academicYearId,
-        termId: feeStructures[1].termId,
-        schoolId: feeStructures[1].schoolId,
-        status: InvoiceStatus.UNPAID,
-        totalAmount: 28000.00,
-        discountAmount: 0,
-        paidAmount: 0,
-        balanceAmount: 28000.00,
-        dueDate: new Date('2024-04-05'),
-        issuedAt: new Date(),
-      },
-    }),
-  ]);
-  return feeInvoices;
-}
+  // Step 12: Enroll students in subjects (core subjects auto-enrolled, electives for senior forms)
+  for (const enrollment of state.enrollmentIds) {
+    const studentId = enrollment.studentId;
+    const classId = enrollment.classId;
+    const form = Object.entries(state.classIds).find(([_, cid]) => cid === classId)?.[0];
+    const isSenior = form === 'Form 3' || form === 'Form 4';
 
-// Helper function to create fee payments
-async function createFeePayments(feeInvoices: any[]) {
-  await Promise.all([
-    // Payment for Student 1
-    prisma.feePayment.create({
-      data: {
-        id: uuidv4(),
-        receiptNo: 'RCT/2024/000001',
-        invoiceId: feeInvoices[0].id,
-        studentId: feeInvoices[0].studentId,
-        schoolId: feeInvoices[0].schoolId,
-        amount: 5000.00,
-        method: PaymentMethod.CASH,
-        status: PaymentStatus.COMPLETED,
-        paidAt: new Date(),
-      },
-    }),
-  ]);
-}
+    // Find class-subject entries for this class
+    const classSubjects = state.classSubjectIds.filter(cs => cs.classId === classId);
 
-async function main() {
-  console.log('🌱 Starting database seeding...');
+    for (const cs of classSubjects) {
+      const subjectCode = Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0];
+      const isElective = electiveSubjects.includes(subjectCode || '');
 
-  // Create Super Admin
-  const superAdmin = await createUser('superadmin@edutrak.com', 'Admin123!', 'System', 'Administrator', Role.SUPER_ADMIN);
-  console.log('✅ Super Admin created:', superAdmin.email);
+      // Skip electives for junior forms
+      if (isElective && !isSenior) continue;
 
-  // Create sample schools
-  const schools = await Promise.all([
-    createSchool('Nairobi High School', 'REG001', SchoolType.SECONDARY, 'Nairobi', 'Westlands', 'Kitisuru', 'SCH001', 'KEM001', '+254700000001', 'info@nairobi-high.ac.ke', 'P.O. Box 12345, Nairobi', Ownership.PUBLIC, BoardingStatus.BOTH, SchoolGender.MIXED),
-    createSchool('Mombasa Primary School', 'REG002', SchoolType.PRIMARY, 'Mombasa', 'Mvita', 'Central', 'SCH002', 'NEM002', '+254700000002', 'info@mombasa-primary.ac.ke', 'P.O. Box 67890, Mombasa', Ownership.PUBLIC, BoardingStatus.DAY, SchoolGender.MIXED),
-    createSchool('Eldoret TVET Institute', 'REG003', SchoolType.TVET, 'Uasin Gishu', 'Eldoret', 'Huruma', 'SCH003', 'ELD003', '+254700000003', 'info@eldoret-tvet.ac.ke', 'P.O. Box 11223, Eldoret', Ownership.PRIVATE, BoardingStatus.BOTH, SchoolGender.MIXED),
-  ]);
-  console.log('✅ Sample schools created');
+      // For senior forms, randomly assign electives (each student gets 2-3 electives)
+      if (isElective && isSenior) {
+        if (Math.random() > 0.6) continue; // 40% chance to take each elective
+      }
 
-  // Create academic year and terms
-  const academicYear = await createAcademicYear(2024, new Date('2024-01-08'), new Date('2024-11-22'), true);
-  const terms = await createTerms(academicYear.id);
-  console.log('✅ Academic year and terms created');
-
-  // Create subjects
-  const subjects = await createSubjects();
-  console.log('✅ Sample subjects created');
-
-  // Create fee structures and items
-  const feeStructures = await createFeeStructures(schools[0].id, academicYear.id, terms[0].id);
-  console.log('✅ Fee structures and items created');
-
-  // Create classes for each school
-  const classes = await createClasses(schools[0].id, academicYear.id);
-  console.log('✅ Classes created');
-
-  // Create teachers for each school
-  const teachers = await createTeachers(schools[0].id);
-  console.log('✅ Teachers created');
-
-  // Create students for each school
-  const students = await createStudents(schools[0].id);
-  console.log('✅ Students created');
-
-  // Create guardians
-  const guardians = await createGuardians();
-  console.log('✅ Guardians created');
-
-  // Create student-guardian relationships
-  await createStudentGuardians(students, guardians);
-  console.log('✅ Student-guardian relationships created');
-
-  // Create class-subject assignments
-  const classSubjects = await createClassSubjects(classes, subjects, teachers, terms[0].id, academicYear.id, schools[0].id);
-  console.log('✅ Class-subject assignments created');
-
-  // Create student enrollments
-  const enrollments = await createStudentEnrollments(students, classes, academicYear.id, schools[0].id);
-  console.log('✅ Student enrollments created');
-
-  // Create student subject enrollments
-  await createStudentSubjectEnrollments(students, classSubjects, enrollments);
+      await prisma.studentClassSubject.create({
+        data: {
+          id: uuidv4(),
+          studentId,
+          classSubjectId: cs.id,
+          enrollmentId: enrollment.id,
+          schoolId: state.schoolId,
+          status: SubjectEnrollmentStatus.ACTIVE,
+        },
+      }).catch(() => { /* skip duplicates */ });
+    }
+  }
   console.log('✅ Student subject enrollments created');
 
-  // Create assessment definitions
-  const assessmentDefinitions = await createAssessmentDefinitions(classSubjects);
-  console.log('✅ Assessment definitions created');
+  // Step 13: Create Term 1 assessment definitions (CAT 1, CAT 2, End Term per subject-class-stream)
+  for (const cs of state.classSubjectIds) {
+    // CAT 1
+    const cat1 = await prisma.assessmentDefinition.create({
+      data: {
+        id: uuidv4(),
+        name: `${SUBJECT_DEFINITIONS.find(s => s.code === Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0])?.name || 'Subject'} CAT 1`,
+        type: AssessmentType.CAT,
+        maxMarks: 100,
+        classSubjectId: cs.id,
+        termId: state.term1Id!,
+        academicYearId: state.academicYearId,
+        schoolId: state.schoolId,
+      },
+    });
+    state.assessmentDefIds.push({ id: cat1.id, classSubjectId: cs.id, type: 'CAT_1' });
 
-  // Create assessment results
-  await createAssessmentResults(students, assessmentDefinitions);
-  console.log('✅ Assessment results created');
+    // CAT 2
+    const cat2 = await prisma.assessmentDefinition.create({
+      data: {
+        id: uuidv4(),
+        name: `${SUBJECT_DEFINITIONS.find(s => s.code === Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0])?.name || 'Subject'} CAT 2`,
+        type: AssessmentType.CAT,
+        maxMarks: 100,
+        classSubjectId: cs.id,
+        termId: state.term1Id!,
+        academicYearId: state.academicYearId,
+        schoolId: state.schoolId,
+      },
+    });
+    state.assessmentDefIds.push({ id: cat2.id, classSubjectId: cs.id, type: 'CAT_2' });
 
-  // Create fee invoices
-  const feeInvoices = await createFeeInvoices(students, feeStructures);
-  console.log('✅ Fee invoices created');
+    // End Term
+    const endTerm = await prisma.assessmentDefinition.create({
+      data: {
+        id: uuidv4(),
+        name: `${SUBJECT_DEFINITIONS.find(s => s.code === Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0])?.name || 'Subject'} End of Term`,
+        type: AssessmentType.END_OF_TERM,
+        maxMarks: 100,
+        classSubjectId: cs.id,
+        termId: state.term1Id!,
+        academicYearId: state.academicYearId,
+        schoolId: state.schoolId,
+      },
+    });
+    state.assessmentDefIds.push({ id: endTerm.id, classSubjectId: cs.id, type: 'END_TERM' });
+  }
+  console.log(`✅ ${state.assessmentDefIds.length} assessment definitions created`);
 
-  // Create fee payments
-  await createFeePayments(feeInvoices);
-  console.log('✅ Fee payments created');
+  // Step 14: Generate assessment results for all students in Term 1
+  let resultCount = 0;
+  for (const enrollment of state.enrollmentIds) {
+    const studentId = enrollment.studentId;
+    const classId = enrollment.classId;
 
-  console.log('🎉 Database seeding completed successfully!');
+    // Find class-subjects for this student's class
+    const studentClassSubjects = state.classSubjectIds.filter(cs => cs.classId === classId);
+
+    for (const cs of studentClassSubjects) {
+      // Find assessment defs for this class-subject
+      const defs = state.assessmentDefIds.filter(ad => ad.classSubjectId === cs.id);
+
+      for (const def of defs) {
+        let marks: number;
+        let grade: string;
+
+        if (def.type === 'END_TERM') {
+          // End term uses a weighted average of CATs + final exam
+          marks = generateMarks();
+        } else {
+          marks = generateMarks();
+        }
+        grade = markToGrade(marks);
+
+        const existing = await prisma.assessmentResult.findFirst({
+          where: {
+            studentId,
+            assessmentDefId: def.id,
+          },
+        });
+        if (!existing) {
+          await prisma.assessmentResult.create({
+            data: {
+              id: uuidv4(),
+              studentId,
+              assessmentDefId: def.id,
+              schoolId: state.schoolId,
+              numericValue: marks,
+              grade,
+              assessedById: cs.teacherId,
+            },
+          });
+          resultCount++;
+        }
+      }
+    }
+  }
+  console.log(`✅ ${resultCount} assessment results created`);
+
+  // Step 15: Create fee structures (one per form level)
+  const feeAmounts: Record<string, { tuition: number; boarding: number; activity: number }> = {
+    'Form 1': { tuition: 18000, boarding: 12000, activity: 3000 },
+    'Form 2': { tuition: 18000, boarding: 12000, activity: 3000 },
+    'Form 3': { tuition: 20000, boarding: 13000, activity: 3500 },
+    'Form 4': { tuition: 22000, boarding: 15000, activity: 4000 },
+  };
+
+  const feeStructureIds: Record<string, string> = {};
+  for (const form of FORM_LEVELS) {
+    const amounts = feeAmounts[form];
+    const fs = await prisma.feeStructure.create({
+      data: {
+        id: uuidv4(),
+        name: `${form} - Term 1 2025`,
+        description: `Fee structure for ${form} students, Term 1 2025`,
+        academicYearId: state.academicYearId,
+        termId: state.term1Id!,
+        classLevel: form,
+        schoolId: state.schoolId,
+        isActive: true,
+        currency: 'KES',
+      },
+    });
+    feeStructureIds[form] = fs.id;
+
+    // Create fee items
+    await prisma.feeItem.create({ data: { id: uuidv4(), feeStructureId: fs.id, name: 'Tuition Fee', category: 'TUITION' as any, amount: amounts.tuition } });
+    await prisma.feeItem.create({ data: { id: uuidv4(), feeStructureId: fs.id, name: 'Boarding Fee', category: 'BOARDING' as any, amount: amounts.boarding } });
+    await prisma.feeItem.create({ data: { id: uuidv4(), feeStructureId: fs.id, name: 'Activity Fee', category: 'ACTIVITY' as any, amount: amounts.activity } });
+  }
+  console.log('✅ Fee structures & items created');
+
+  // Step 16: Generate fee invoices for each student
+  let invoiceCounter = 1;
+  let paymentCounter = 1;
+  const studentsByClass: Record<string, { studentId: string; classId: string }[]> = {};
+  for (const enrollment of state.enrollmentIds) {
+    const classId = enrollment.classId;
+    if (!studentsByClass[classId]) studentsByClass[classId] = [];
+    studentsByClass[classId]!.push({ studentId: enrollment.studentId, classId });
+  }
+
+  for (const form of FORM_LEVELS) {
+    const classId = state.classIds[form];
+    const fsId = feeStructureIds[form];
+    const amounts = feeAmounts[form];
+    const totalAmount = amounts.tuition + amounts.boarding + amounts.activity;
+    const students = studentsByClass[classId] || [];
+
+    for (const { studentId } of students) {
+      // 60% paid, 25% partial, 15% unpaid
+      const paidRoll = Math.random();
+      let status: InvoiceStatus;
+      let paidAmount = 0;
+      if (paidRoll < 0.6) {
+        status = InvoiceStatus.PAID;
+        paidAmount = totalAmount;
+      } else if (paidRoll < 0.85) {
+        status = InvoiceStatus.PARTIAL;
+        paidAmount = Math.round(totalAmount * (0.3 + Math.random() * 0.4));
+      } else {
+        status = InvoiceStatus.UNPAID;
+      }
+
+      const invoice = await prisma.feeInvoice.create({
+        data: {
+          id: uuidv4(),
+          invoiceNo: `INV/2025/${String(invoiceCounter).padStart(5, '0')}`,
+          studentId,
+          feeStructureId: fsId,
+          academicYearId: state.academicYearId,
+          termId: state.term1Id!,
+          schoolId: state.schoolId,
+          status,
+          totalAmount,
+          discountAmount: 0,
+          paidAmount,
+          balanceAmount: totalAmount - paidAmount,
+          dueDate: new Date('2025-04-04'),
+        },
+      });
+      invoiceCounter++;
+
+      // Create payment records for paid/partial invoices
+      if (paidAmount > 0) {
+        const numPayments = status === InvoiceStatus.PAID ? randInt(1, 3) : 1;
+        let remaining = paidAmount;
+        for (let p = 0; p < numPayments; p++) {
+          const amt = p < numPayments - 1 ? Math.round(remaining / (numPayments - p)) : remaining;
+          remaining -= amt;
+          await prisma.feePayment.create({
+            data: {
+              id: uuidv4(),
+              receiptNo: `RCT/2025/${String(paymentCounter).padStart(5, '0')}`,
+              invoiceId: invoice.id,
+              studentId,
+              schoolId: state.schoolId,
+              amount: amt,
+              method: pick([PaymentMethod.CASH, PaymentMethod.MPESA, PaymentMethod.BANK_TRANSFER]),
+              status: PaymentStatus.COMPLETED,
+              paidAt: new Date(2025, 0, randInt(10, 30)),
+            },
+          });
+          paymentCounter++;
+        }
+      }
+    }
+  }
+  console.log(`✅ ${invoiceCounter - 1} fee invoices and ${paymentCounter - 1} payments created`);
+
+  // Step 17: Create Term 2 assessment definitions (lighter set — just one CAT + midterm for core subjects)
+  for (const cs of state.classSubjectIds) {
+    const subjectCode = Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0] || '';
+    const isCore = coreSubjects.includes(subjectCode);
+    if (!isCore) continue;
+
+    // Only create for core subjects in Term 2
+    await prisma.assessmentDefinition.create({
+      data: {
+        id: uuidv4(),
+        name: `${SUBJECT_DEFINITIONS.find(s => s.code === subjectCode)?.name || 'Subject'} CAT 1 (Term 2)`,
+        type: AssessmentType.CAT,
+        maxMarks: 100,
+        classSubjectId: cs.id,
+        termId: state.term2Id!,
+        academicYearId: state.academicYearId,
+        schoolId: state.schoolId,
+      },
+    }).catch(() => {});
+  }
+  console.log('✅ Term 2 assessment definitions created');
+
+  console.log('\n🎉 Seeding complete!');
+  console.log('───────────────────────────────────────');
+  console.log(`📧 admin@nps.ac.ke / Admin123!  — School Admin`);
+  console.log(`📧 superadmin@edutrak.com / Admin123!  — Super Admin`);
+  console.log(`📧 student1@nps.ac.ke / Student123!  — First student`);
+  console.log(`📧 teacher1@nps.ac.ke / Teacher123!  — First teacher`);
+  console.log(`📧 guardian1@nps.ac.ke / Guard123!    — First guardian`);
+  console.log('───────────────────────────────────────');
+  console.log(`🏫 ${DEMO_SCHOOL_NAME}`);
+  console.log(`📚 ${FORM_LEVELS.length} form levels × ${STREAMS.length} streams = ${FORM_LEVELS.length * STREAMS.length} classes`);
+  console.log(`👨‍🏫 ${state.teacherIds.length} teachers`);
+  console.log(`👨‍🎓 ${state.studentIds.length} students`);
+  console.log(`📝 ${resultCount} assessment results (Term 1)`);
+  console.log(`💰 ${invoiceCounter - 1} fee invoices`);
 }
 
 main()

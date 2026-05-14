@@ -31,8 +31,8 @@ export function StudentReportCard({
   };
 
   const handleDownload = () => {
-    // TODO: Implement PDF download
-    console.log('Download PDF');
+    // Use browser's "Save as PDF" — works in all modern browsers
+    window.print();
   };
 
   if (isLoading) {
@@ -99,7 +99,7 @@ export function StudentReportCard({
   };
 
   return (
-    <div className="bg-white text-gray-900 print:text-black">
+    <div className="bg-white text-gray-900 print:text-black report-card-print-area">
       <div className="p-4 md:p-8 max-w-4xl mx-auto border print:border-none rounded-lg print:shadow-none">
         {/* Professional Header */}
         <header className="pb-6 border-b-4 border-blue-900">

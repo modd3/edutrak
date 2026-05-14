@@ -278,7 +278,13 @@ export const sidebarConfig: NavItem[] = [
         href: '/academic-year',
         icon: CalendarFoldIcon,
         roles: ['SUPER_ADMIN', 'ADMIN'],
-      }
+      },
+      {
+        title: 'Year-End Wizard',
+        href: '/academic-year/year-end-wizard',
+        icon: Trophy,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
     ]
   },
   {

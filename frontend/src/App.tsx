@@ -14,6 +14,7 @@ import { RoleGuard } from '@/components/RoleGuard';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Unauthorized } from './pages/Unauthorized';
+import { YearEndWizard } from './pages/academic/YearEndWizard';
 import ClassesList from '@/pages/classes/ClassesList';
 import StudentsList from '@/pages/students/StudentsList';
 import SchoolsList from './pages/schools/SchoolsList';
@@ -238,6 +239,18 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <AcademicYearsPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Year-End Transition Wizard */}
+          <Route
+            path="/academic-year/year-end-wizard"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <YearEndWizard />
                 </DashboardLayout>
               </RoleGuard>
             }

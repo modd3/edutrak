@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,7 +19,7 @@ import {
    } from '@/hooks/use-academic';
 import { useTeachers } from '@/hooks/use-teachers';
 import { useSchoolContext } from '@/hooks/use-school-context';
-import { GraduationCap } from 'lucide-react';
+import { GraduationCap, GraduationCap as FinalIcon } from 'lucide-react';
 
 const classSchema = z.object({
   name: z.string().min(1, 'Class name is required'),
@@ -27,6 +28,7 @@ const classSchema = z.object({
   pathway: z.enum(['STEM', 'ARTS_SPORTS', 'SOCIAL_SCIENCES']).optional(),
   academicYearId: z.string().min(1, 'Academic year is required'),
   classTeacherId: z.string().optional(),
+  isFinal: z.boolean().optional(),
 });
 
 type ClassFormData = z.infer<typeof classSchema>;
@@ -84,6 +86,7 @@ export function ClassFormModal({ open, onOpenChange, mode, classData }: ClassFor
       pathway: undefined,
       academicYearId: activeAcademicYear?.data?.id || '',
       classTeacherId: '',
+      isFinal: false,
     },
   });
 
@@ -98,6 +101,7 @@ export function ClassFormModal({ open, onOpenChange, mode, classData }: ClassFor
         pathway: undefined,
         academicYearId: activeAcademicYear?.data?.id || '',
         classTeacherId: '',
+        isFinal: false,
       });
     }
   }, [open, mode, activeAcademicYear, form]);
@@ -111,6 +115,7 @@ export function ClassFormModal({ open, onOpenChange, mode, classData }: ClassFor
         pathway: classData.pathway || undefined,
         academicYearId: classData.academicYearId,
         classTeacherId: classData.classTeacherId || '',
+        isFinal: classData.isFinal ?? false,
       });
     }
   }, [mode, classData, open, form]);
@@ -119,8 +124,9 @@ export function ClassFormModal({ open, onOpenChange, mode, classData }: ClassFor
     const requestBody = {
       ...data,
       schoolId,
-      classTeacherId: data.classTeacherId || null,
-      pathway: data.pathway || null,
+      classTeacherId: data.classTeacherId || undefined,
+      pathway: data.pathway || undefined,
+      isFinal: data.isFinal ?? false,
     };
 
     if (mode === 'create') {
@@ -303,6 +309,31 @@ export function ClassFormModal({ open, onOpenChange, mode, classData }: ClassFor
                     </Select>
                   )}
                 />
+              </div>
+
+              <div className="space-y-2 md:col-span-2">
+                <div className="flex items-center gap-3 p-4 border rounded-lg bg-amber-50">
+                  <FinalIcon className="h-5 w-5 text-amber-600" />
+                  <div className="flex-1">
+                    <Label htmlFor="isFinal" className="font-semibold text-amber-900 cursor-pointer">
+                      Final/Graduating Class
+                    </Label>
+                    <p className="text-xs text-amber-700 mt-0.5">
+                      Mark this class as a final/graduating level (e.g. Form 4, Grade 12). Students will be eligible for graduation in the year-end transition.
+                    </p>
+                  </div>
+                  <Controller
+                    name="isFinal"
+                    control={form.control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="isFinal"
+                        checked={field.value ?? false}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                </div>
               </div>
             </div>
           </form>
