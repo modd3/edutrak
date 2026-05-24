@@ -1,4 +1,4 @@
-import apiClient from '@/lib/api-client';
+import api from '@/api';
 import { Guardian, User, ApiResponse, PaginatedResponse } from '@/types';
 
 export type GuardianCreateInput = {
@@ -29,7 +29,7 @@ export const guardianService = {
     pageSize?: number;
     search?: string;
   }): Promise<PaginatedResponse<GuardianResponse>> => {
-    const response = await apiClient.get('/guardians', { params });
+    const response = await api.get('/guardians', { params });
     return response.data;
   },
 
@@ -37,7 +37,7 @@ export const guardianService = {
    * Get a single guardian by ID
    */
   getById: async (id: string): Promise<GuardianResponse> => {
-    const response = await apiClient.get<ApiResponse<GuardianResponse>>(`/guardians/${id}`);
+    const response = await api.get<ApiResponse<GuardianResponse>>(`/guardians/${id}`);
     return response.data.data!;
   },
 
@@ -45,7 +45,7 @@ export const guardianService = {
    * Create a new guardian with user account
    */
   create: async (data: GuardianCreateInput): Promise<GuardianResponse> => {
-    const response = await apiClient.post<ApiResponse<GuardianResponse>>('/guardians', data);
+    const response = await api.post<ApiResponse<GuardianResponse>>('/guardians', data);
     return response.data.data!;
   },
 
@@ -53,7 +53,7 @@ export const guardianService = {
    * Update an existing guardian
    */
   update: async (id: string, data: GuardianUpdateInput): Promise<GuardianResponse> => {
-    const response = await apiClient.put<ApiResponse<GuardianResponse>>(`/guardians/${id}`, data);
+    const response = await api.put<ApiResponse<GuardianResponse>>(`/guardians/${id}`, data);
     return response.data.data!;
   },
 
@@ -61,28 +61,28 @@ export const guardianService = {
    * Delete a guardian
    */
   delete: async (id: string): Promise<void> => {
-    await apiClient.delete(`/guardians/${id}`);
+    await api.delete(`/guardians/${id}`);
   },
 
   /**
    * Link a guardian to a student
    */
   linkToStudent: async (guardianId: string, studentId: string): Promise<void> => {
-    await apiClient.post(`/guardians/${guardianId}/link-student`, { studentId });
+    await api.post(`/guardians/${guardianId}/link-student`, { studentId });
   },
 
   /**
    * Unlink a guardian from a student
    */
   unlinkStudent: async (guardianId: string, studentId: string): Promise<void> => {
-    await apiClient.post(`/guardians/${guardianId}/unlink-student`, { studentId });
+    await api.post(`/guardians/${guardianId}/unlink-student`, { studentId });
   },
 
   /**
    * Get guardians for a specific student
    */
   getByStudent: async (studentId: string): Promise<GuardianResponse[]> => {
-    const response = await apiClient.get<ApiResponse<GuardianResponse[]>>(`/students/${studentId}/guardians`);
+    const response = await api.get<ApiResponse<GuardianResponse[]>>(`/students/${studentId}/guardians`);
     return response.data.data!;
   },
 };

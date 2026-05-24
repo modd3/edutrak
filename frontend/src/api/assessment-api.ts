@@ -41,9 +41,11 @@ export interface CreateGradeInput {
 
 export interface BulkGradeEntry {
   assessmentDefId: string;
-  entries: Array<{
+  results: Array<{
     studentId: string;
-    marks: number;
+    numericValue?: number;
+    grade?: string;
+    competencyLevel?: string;
     comment?: string;
   }>;
 }
@@ -93,7 +95,7 @@ export const assessmentApi = {
    * Bulk create assessments
    */
   bulkCreateAssessments: async (assessments: CreateAssessmentInput[]) => {
-    const response = await api.post('/assessments/bulk', { assessments });
+    const response = await api.post('/assessments/bulk', assessments);
     return response.data;
   },
 
@@ -160,7 +162,7 @@ export const assessmentApi = {
   // ========================================
 
   /**
-   * Create or update single grade
+   * Create or update single grade (creates AssessmentResult)
    */
   createGrade: async (data: CreateGradeInput) => {
     const response = await api.post('/assessments/results', data);
@@ -168,7 +170,7 @@ export const assessmentApi = {
   },
 
   /**
-   * Bulk grade entry
+   * Bulk grade entry (multiple students in one call)
    */
   bulkGradeEntry: async (data: BulkGradeEntry) => {
     const response = await api.post('/assessments/results/bulk', data);
@@ -176,17 +178,15 @@ export const assessmentApi = {
   },
 
   /**
-   * CSV upload
+   * CSV upload for bulk grade entry
    */
   csvUpload: async (assessmentId: string, data: CSVGradeEntry[]) => {
-    const response = await api.post(`/assessments/results/upload/${assessmentId}`, {
-      data,
-    });
+    const response = await api.post(`/assessments/results/upload/${assessmentId}`, data);
     return response.data;
   },
 
   /**
-   * Get results with filters
+   * Get results with filters (from query /assessments/results)
    */
   getResults: async (filters?: ResultFilters) => {
     const response = await api.get('/assessments/results', { params: filters });

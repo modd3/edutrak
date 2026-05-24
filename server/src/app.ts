@@ -43,7 +43,7 @@ app.use('/api', limiter);
 app.use(compression());
 
 // Logging
-app.use(morgan('combined'));
+//app.use(morgan('combined'));
 app.use(requestLogger);
 
 // Body parsing middleware

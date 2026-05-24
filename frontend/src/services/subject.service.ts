@@ -164,30 +164,30 @@ export const subjectService = {
 export const classSubjectStrandService = {
   /** Assign a single strand to a class subject */
   assign: async (payload: { classSubjectId: string; strandId: string; schoolId: string }) => {
-    const res = await api.post<ApiResponse<any>>('/class-subject-strand/assign', payload);
+    const res = await api.post<ApiResponse<any>>('/academic/class-subject-strand/assign', payload);
     return res.data.data!;
   },
 
   /** Bulk assign multiple strands to a class subject */
   bulkAssign: async (payload: { classSubjectId: string; strandIds: string[]; schoolId: string }) => {
-    const res = await api.post<ApiResponse<any[]>>('/class-subject-strand/bulk-assign', payload);
+    const res = await api.post<ApiResponse<any[]>>('/academic/class-subject-strand/bulk-assign', payload);
     return res.data.data!;
   },
 
   /** List strands assigned to a class subject */
   listForClassSubject: async (params: { classSubjectId: string; schoolId: string }) => {
-    const res = await api.get<ApiResponse<any[]>>('/class-subject-strand/class-subject', { params: { classSubjectId: params.classSubjectId, schoolId: params.schoolId } });
+    const res = await api.get<ApiResponse<any[]>>('/academic/class-subject-strand/class-subject', { params: { classSubjectId: params.classSubjectId, schoolId: params.schoolId } });
     return res.data.data!;
   },
 
   /** Remove a strand assignment from a class subject */
   remove: async (payload: { classSubjectId: string; strandId: string; schoolId: string }) => {
-    await api.delete('/class-subject-strand/remove', { data: payload });
+    await api.delete('/academic/class-subject-strand/remove', { data: payload });
   },
 
   /** Get strands with assessment counts for a class subject */
   strandsWithAssessments: async (params: { classSubjectId: string; schoolId: string }) => {
-    const res = await api.get<ApiResponse<any[]>>('/class-subject-strand/class-subject', { params: { classSubjectId: params.classSubjectId, schoolId: params.schoolId, includeAssessments: true } });
+    const res = await api.get<ApiResponse<any[]>>('/academic/class-subject-strand/class-subject', { params: { classSubjectId: params.classSubjectId, schoolId: params.schoolId, includeAssessments: true } });
     return res.data.data!;
   },
 };

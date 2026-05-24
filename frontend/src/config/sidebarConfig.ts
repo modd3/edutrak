@@ -242,6 +242,12 @@ export const sidebarConfig: NavItem[] = [
     roles: ['SUPER_ADMIN', 'ADMIN'],
   },
   {
+    title: 'Subscriptions',
+    href: '/subscriptions',
+    icon: DollarSign,
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+  {
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,

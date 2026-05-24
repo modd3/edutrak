@@ -19,6 +19,7 @@ import ClassesList from '@/pages/classes/ClassesList';
 import StudentsList from '@/pages/students/StudentsList';
 import SchoolsList from './pages/schools/SchoolsList';
 import UsersList from './pages/users/UsersList';
+import {GuardiansList} from './pages/guardians/GuardiansList';
 import { AcademicYearsPage } from './pages/academic/AcademicYearsPage';
 import TeachersList from './pages/teachers/TeachersList';
 import { SubjectsList } from './pages/subjects/SubjectsList';
@@ -34,6 +35,7 @@ import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPagePro';
 import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
 import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
 import BillingAdminPage from '@/pages/billing/BillingAdminPage';
+import SubscriptionsPage from '@/pages/subscriptions/SubscriptionsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -120,6 +122,17 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <BillingAdminPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          <Route
+            path="/subscriptions"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <SubscriptionsPage />
                 </DashboardLayout>
               </RoleGuard>
             }
@@ -327,9 +340,19 @@ function App() {
             }
           />
 
-          {/* ADMIN, SUPER_ADMIN: Fee Structures */}
+          {/* ADMIN, SUPER_ADMIN: Guardians */}
+          <Route
+            path="/guardians"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <GuardiansList />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
 
-            {/* ADMIN, SUPER_ADMIN, TEACHER: Fee Management Hub */}
+          {/* ADMIN, SUPER_ADMIN: Fee Management Hub */}
           <Route
             path="/fees"
             element={

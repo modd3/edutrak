@@ -275,5 +275,6 @@ export const usersApi = {
 };
 
 export { feesApi } from './fees-api';
+export { subscriptionsApi } from './subscriptions-api';
 
 export default api;
