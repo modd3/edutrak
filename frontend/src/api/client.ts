@@ -1,0 +1,80 @@
+import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
+import { useAuthStore } from '@/store/auth-store';
+
+
+
+const api: AxiosInstance = axios.create({
+  baseURL: import.meta.env.VITE_API_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  timeout: 60000, // 60 seconds (increased from 30s to account for email sending)
+});
+
+// Request interceptor - Add auth token to requests
+api.interceptors.request.use(
+  (config) => {
+    const token = useAuthStore.getState().token;
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor - Handle token refresh and errors
+api.interceptors.response.use(
+  (response) => {
+    return response;
+  },
+  async (error: AxiosError) => {
+    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
+
+    // If error is 401 and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+        originalRequest._retry = true;
+  
+        try {
+          const refreshToken = useAuthStore.getState().refreshToken;
+  
+          if (refreshToken) {
+            // Try to refresh token
+            const response = await axios.post(
+              `${import.meta.env.VITE_API_URL}/auth/refresh-token`,
+              { refreshToken }
+            );
+  
+            if (response.data.success) {
+              const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
+  
+              // Update tokens in store
+              const currentUser = useAuthStore.getState().user;
+              if (currentUser) {
+                useAuthStore.getState().setAuth(currentUser, newToken, newRefreshToken);
+              }
+  
+              // Retry original request with new token
+              if (originalRequest.headers) {
+                originalRequest.headers.Authorization = `Bearer ${newToken}`;
+              }
+              return api(originalRequest);
+            }
+          }
+        } catch (refreshError) {
+          // Refresh failed - logout user
+          useAuthStore.getState().logout();
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+export default api;

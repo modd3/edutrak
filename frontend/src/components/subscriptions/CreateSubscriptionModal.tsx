@@ -21,10 +21,12 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useCreateSubscription } from '@/hooks/use-subscriptions';
-import { useSchoolContext } from '@/hooks/use-school-context';
+import { useSchoolContext, } from '@/hooks/use-school-context';
+import { useSchools } from '@/hooks/use-schools';
 
 const createSubscriptionSchema = z.object({
   planId: z.string().min(1, 'Plan is required'),
+  schoolId: z.string().optional(),
   startsAt: z.string().min(1, 'Start date is required'),
   currentPeriodStart: z.string().min(1, 'Period start date is required'),
   currentPeriodEnd: z.string().min(1, 'Period end date is required'),
@@ -46,11 +48,21 @@ export function CreateSubscriptionModal({
   plans,
   isLoadingPlans,
 }: CreateSubscriptionModalProps) {
-  const { schoolId } = useSchoolContext();
+  const { schoolId, isSuperAdmin } = useSchoolContext();
+  const schoolsData = useSchools();
   const createMutation = useCreateSubscription();
   const [isTrialing, setIsTrialing] = useState(false);
-
-  const form = useForm<CreateSubscriptionInput>({
+    
+  const schools = schoolsData.data?.data.data
+  
+  const {
+    watch, 
+    handleSubmit, 
+    reset, 
+    setValue,
+    register, 
+    formState: { errors },
+  } = useForm<CreateSubscriptionInput>({
     resolver: zodResolver(createSubscriptionSchema),
     defaultValues: {
       planId: '',
@@ -63,11 +75,16 @@ export function CreateSubscriptionModal({
     },
   });
 
-  const handleSubmit = async (data: CreateSubscriptionInput) => {
-    if (!schoolId) return;
+  const selectedSchool = watch("schoolId");
+  const onSubmit = async (data: CreateSubscriptionInput) => {
+    // Prefer the selected school when super admin, otherwise use context school
+    const finalSchoolId = isSuperAdmin ? (selectedSchool ?? schoolId) : schoolId;
+    if (!finalSchoolId) {
+      return;
+    }
 
     await createMutation.mutateAsync({
-      schoolId,
+      schoolId: finalSchoolId,
       planId: data.planId,
       startsAt: data.startsAt,
       currentPeriodStart: data.currentPeriodStart,
@@ -76,7 +93,7 @@ export function CreateSubscriptionModal({
     });
 
     if (!createMutation.isPending) {
-      form.reset();
+      reset();
       onOpenChange(false);
     }
   };
@@ -91,13 +108,37 @@ export function CreateSubscriptionModal({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* School Selection (only applicable when user is SUPER_ADMIN) */}
+         {isSuperAdmin &&
+          <div>
+            <Label htmlFor="schoolId">Select School</Label>
+            <Select
+              value={selectedSchool}
+              onValueChange={(value) => setValue('schoolId', value)}
+              disabled={!isSuperAdmin || isLoadingPlans || createMutation.isPending}
+            >
+              <SelectTrigger id="schoolId">
+                <SelectValue placeholder="Select a School" />
+              </SelectTrigger>
+              <SelectContent>
+                {schools?.map((school) => (
+                  <SelectItem key={school.id} value={school.id}>
+                    {school.name} 
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.schoolId && (
+              <p className="text-red-600 text-sm mt-1">{errors.schoolId.message}</p>
+            )}
+          </div>}
           {/* Plan Selection */}
           <div>
             <Label htmlFor="planId">Billing Plan</Label>
             <Select
-              value={form.watch('planId')}
-              onValueChange={(value) => form.setValue('planId', value)}
+              value={watch('planId')}
+              onValueChange={(value) => setValue('planId', value)}
               disabled={isLoadingPlans || createMutation.isPending}
             >
               <SelectTrigger id="planId">
@@ -111,8 +152,8 @@ export function CreateSubscriptionModal({
                 ))}
               </SelectContent>
             </Select>
-            {form.formState.errors.planId && (
-              <p className="text-red-600 text-sm mt-1">{form.formState.errors.planId.message}</p>
+            {errors.planId && (
+              <p className="text-red-600 text-sm mt-1">{errors.planId.message}</p>
             )}
           </div>
 
@@ -122,11 +163,11 @@ export function CreateSubscriptionModal({
             <Input
               id="startsAt"
               type="date"
-              {...form.register('startsAt')}
+              {...register('startsAt')}
               disabled={createMutation.isPending}
             />
-            {form.formState.errors.startsAt && (
-              <p className="text-red-600 text-sm mt-1">{form.formState.errors.startsAt.message}</p>
+            {errors.startsAt && (
+              <p className="text-red-600 text-sm mt-1">{errors.startsAt.message}</p>
             )}
           </div>
 
@@ -137,11 +178,11 @@ export function CreateSubscriptionModal({
               <Input
                 id="currentPeriodStart"
                 type="date"
-                {...form.register('currentPeriodStart')}
+                {...register('currentPeriodStart')}
                 disabled={createMutation.isPending}
               />
-              {form.formState.errors.currentPeriodStart && (
-                <p className="text-red-600 text-sm mt-1">{form.formState.errors.currentPeriodStart.message}</p>
+              {errors.currentPeriodStart && (
+                <p className="text-red-600 text-sm mt-1">{errors.currentPeriodStart.message}</p>
               )}
             </div>
             <div>
@@ -149,11 +190,11 @@ export function CreateSubscriptionModal({
               <Input
                 id="currentPeriodEnd"
                 type="date"
-                {...form.register('currentPeriodEnd')}
+                {...register('currentPeriodEnd')}
                 disabled={createMutation.isPending}
               />
-              {form.formState.errors.currentPeriodEnd && (
-                <p className="text-red-600 text-sm mt-1">{form.formState.errors.currentPeriodEnd.message}</p>
+              {errors.currentPeriodEnd && (
+                <p className="text-red-600 text-sm mt-1">{errors.currentPeriodEnd.message}</p>
               )}
             </div>
           </div>
@@ -180,11 +221,11 @@ export function CreateSubscriptionModal({
               <Input
                 id="trialEndsAt"
                 type="date"
-                {...form.register('trialEndsAt')}
+                {...register('trialEndsAt')}
                 disabled={createMutation.isPending}
               />
-              {form.formState.errors.trialEndsAt && (
-                <p className="text-red-600 text-sm mt-1">{form.formState.errors.trialEndsAt.message}</p>
+              {errors.trialEndsAt && (
+                <p className="text-red-600 text-sm mt-1">{errors.trialEndsAt.message}</p>
               )}
             </div>
           )}

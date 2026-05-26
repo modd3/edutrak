@@ -1,3 +1,13 @@
+export enum SubscriptionStatus {
+  TRIALING ='TRIALING', 
+  ACTIVE = 'ACTIVE',
+  PAST_DUE = 'PAST_DUE',
+  GRACE = 'GRACE',
+  SUPENDED = 'SUSPENDED',
+  CANCELED = 'CANCELED',
+  EXPIRED = 'EXPIRED',
+}
+
 export enum SchoolType {
   PRE_PRIMARY = 'PRE_PRIMARY',
   PRIMARY = 'PRIMARY',
@@ -151,6 +161,56 @@ export interface School {
     teachers: number;
     classes: number;
   }
+}
+
+export interface Plan {
+  id: string;
+  key: string;
+  name: string;
+  description?: string;
+  priceMinor: number;
+  currency: string;
+  billingInterval: string;
+  isActive: boolean;
+  features?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface BillingAccount {
+  id: string;
+  schoolId: string;
+  legalName: string;
+  email?: string;
+  phone?: string;
+  taxId?: string;
+  country?: string;
+  city?: string;
+  addressLine1?: string;
+  addressLine2?: string;
+  prefferedCurrency?: string;
+  createdAt: string;
+  updatedAt: string;
+  school?: { id: string; name: string };
+}
+
+export interface Subscription {
+  id: string;
+  schoolId: string;
+  planId: string;
+  status: SubscriptionStatus
+  startsAt: string;
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEndsAt?: string;
+  graceEndsAt?: string;
+  cancelAt?: string;
+  canceledAt?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+  plan?: Plan;
+  school?: { id: string; name: string };
 }
 
 export interface Student {

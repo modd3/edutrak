@@ -22,7 +22,6 @@ export function useSubscriptions(params?: {
       });
       return response.data;
     },
-    enabled: !!schoolId,
   });
 }
 
@@ -78,7 +77,7 @@ export function useTransitionSubscriptionStatus() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
-      queryClient.invalidateQueries({ queryKey: ['subscriptions', data.id] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', data?.id] });
       toast.success('Subscription status updated successfully');
     },
     onError: (error: any) => {

@@ -16,6 +16,14 @@ import { toast } from 'sonner';
 const billingAccountSchema = z.object({
   schoolId: z.string().min(1, 'School ID is required'),
   legalName: z.string().min(2, 'Legal name is required'),
+  email: z.string().email("Please provide an Email!").optional(),
+  Phone: z.string().min(2, 'Enter phone number').optional(),
+  optional: z.string().min(2, 'Enter Tax ID').optional(),
+  country: z.string().min(2, 'Enter a country Name').optional().default("Kenya"),
+  city: z.string().min(2, 'Enter a city name').optional(),
+  AddressLine1: z.string().min(2, 'Please Enter an Address').optional(),
+  AddressLine2: z.string().min(2, 'Please Enter an Address').optional(),
+  prefferedCurrency: z.string().min(2, 'Enter a preffered currency').optional().default("KES"),
 });
 
 const invoiceSchema = z.object({

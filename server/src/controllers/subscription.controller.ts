@@ -18,7 +18,7 @@ export class SubscriptionController {
     try {
       const result = await subscriptionService.getSubscriptions({
         schoolId: req.query.schoolId as string | undefined,
-        status: req.query.status as string | undefined,
+        status: req.query.status === "All" ? undefined : req.query.status as string | undefined,
         page: req.query.page ? Number(req.query.page) : undefined,
         limit: req.query.limit ? Number(req.query.limit) : undefined,
       });

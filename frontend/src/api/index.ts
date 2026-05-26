@@ -1,81 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosError } from 'axios';
-import { useAuthStore } from '@/store/auth-store';
-
-// Create axios instance
-const api: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  timeout: 60000, // 60 seconds (increased from 30s to account for email sending)
-});
-
-// Request interceptor - Add auth token to requests
-api.interceptors.request.use(
-  (config) => {
-    const token = useAuthStore.getState().token;
-
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Response interceptor - Handle token refresh and errors
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  async (error: AxiosError) => {
-    const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
-
-    // If error is 401 and we haven't retried yet
-    if (error.response?.status === 401 && !originalRequest._retry) {
-        originalRequest._retry = true;
-  
-        try {
-          const refreshToken = useAuthStore.getState().refreshToken;
-  
-          if (refreshToken) {
-            // Try to refresh token
-            const response = await axios.post(
-              `${import.meta.env.VITE_API_URL}/auth/refresh-token`,
-              { refreshToken }
-            );
-  
-            if (response.data.success) {
-              const { token: newToken, refreshToken: newRefreshToken } = response.data.data;
-  
-              // Update tokens in store
-              const currentUser = useAuthStore.getState().user;
-              if (currentUser) {
-                useAuthStore.getState().setAuth(currentUser, newToken, newRefreshToken);
-              }
-  
-              // Retry original request with new token
-              if (originalRequest.headers) {
-                originalRequest.headers.Authorization = `Bearer ${newToken}`;
-              }
-              return api(originalRequest);
-            }
-          }
-        } catch (refreshError) {
-          // Refresh failed - logout user
-          useAuthStore.getState().logout();
-          window.location.href = '/login';
-          return Promise.reject(refreshError);
-      }
-    }
-
-    return Promise.reject(error);
-  }
-);
-
+import api from './client';
 // API Methods
 export const authApi = {
   login: (email: string, password: string) =>
@@ -168,7 +91,7 @@ export const classesApi = {
     api.delete(`/classes/${id}`),
 
   getStudents: (id: string) =>
-    api.get(`/classes/${id}/students`),
+    api.get(`/students/class/${id}`),
 };
 
 export const subjectsApi = {
@@ -203,13 +126,13 @@ export const classSubjectsApi = {
 export const assessmentsApi = {
   // Assessment Definitions
   createDefinition: (data: any) =>
-    api.post('/assessments/definitions', data),
+    api.post('/assessments', data),
 
   getDefinition: (id: string) =>
-    api.get(`/assessments/definitions/${id}`),
+    api.get(`/assessments/${id}`),
 
   getClassSubjectDefinitions: (classSubjectId: string) =>
-    api.get(`/assessments/definitions/class-subject/${classSubjectId}`),
+    api.get(`/assessments/class-subject/${classSubjectId}`),
 
   // Assessment Results
   createResult: (data: any) =>
@@ -225,7 +148,7 @@ export const assessmentsApi = {
     api.put(`/assessments/results/${id}`, data),
 
   getStudentResults: (studentId: string, params?: any) =>
-    api.get(`/assessments/results/student/${studentId}`, { params }),
+    api.get('/assessments/results', { params: { studentId, ...params } }),
 
   // Statistics
   getStudentTermAverage: (studentId: string, termId: string) =>
@@ -276,5 +199,7 @@ export const usersApi = {
 
 export { feesApi } from './fees-api';
 export { subscriptionsApi } from './subscriptions-api';
+export { plansApi } from './plans-api';
+export {billingAccountsApi} from './billing-accounts-api'
 
 export default api;

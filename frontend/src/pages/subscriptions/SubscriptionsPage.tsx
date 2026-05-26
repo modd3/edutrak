@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
+import { usePlans } from '@/hooks/use-plans';
+import { useSchoolContext } from '@/hooks/use-school-context';
 import { CreateSubscriptionModal } from '@/components/subscriptions/CreateSubscriptionModal';
 import { ManageSubscriptionStatusModal } from '@/components/subscriptions/ManageSubscriptionStatusModal';
-import { Subscription } from '@/api/subscriptions-api';
+import { Subscription } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -23,31 +25,6 @@ import {
 import { Plus, Settings2, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 
-// Mock plans data - in a real app, this would come from a database
-const MOCK_PLANS = [
-  {
-    id: 'plan-basic',
-    name: 'Basic',
-    priceMinor: 50000,
-    currency: 'KES',
-    billingInterval: 'monthly',
-  },
-  {
-    id: 'plan-pro',
-    name: 'Professional',
-    priceMinor: 100000,
-    currency: 'KES',
-    billingInterval: 'monthly',
-  },
-  {
-    id: 'plan-enterprise',
-    name: 'Enterprise',
-    priceMinor: 200000,
-    currency: 'KES',
-    billingInterval: 'monthly',
-  },
-];
-
 const STATUS_COLORS: Record<string, string> = {
   TRIALING: 'bg-blue-100 text-blue-800',
   ACTIVE: 'bg-green-100 text-green-800',
@@ -64,6 +41,11 @@ export function SubscriptionsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>();
   const [showStatusModal, setShowStatusModal] = useState(false);
+
+  const planQuery = usePlans({ isActive: true, limit: 50 });
+  const plans = planQuery.data?.data || [];
+  const isLoadingPlans = planQuery.isLoading;
+  const {isSuperAdmin} = useSchoolContext()
 
   const { data, isLoading, isError } = useSubscriptions({
     page,
@@ -112,7 +94,7 @@ export function SubscriptionsPage() {
                   <SelectValue placeholder="All statuses" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Statuses</SelectItem>
+                  <SelectItem value="All">All Statuses</SelectItem>
                   <SelectItem value="TRIALING">Trialing</SelectItem>
                   <SelectItem value="ACTIVE">Active</SelectItem>
                   <SelectItem value="PAST_DUE">Past Due</SelectItem>
@@ -147,7 +129,8 @@ export function SubscriptionsPage() {
                     Period
                   </TableHead>
                   <TableHead>Trial Ends</TableHead>
-                  <TableHead>Actions</TableHead>
+                  {isSuperAdmin && 
+                  <TableHead>Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -173,7 +156,7 @@ export function SubscriptionsPage() {
                         <div className="text-sm">
                           <p className="font-medium">{subscription.plan?.name}</p>
                           <p className="text-gray-500">
-                            ${(subscription.plan?.priceMinor || 0) / 100} {subscription.plan?.currency}
+                            {(subscription.plan?.priceMinor || 0) / 100} {subscription.plan?.currency}
                           </p>
                         </div>
                       </TableCell>
@@ -191,7 +174,7 @@ export function SubscriptionsPage() {
                           ? new Date(subscription.trialEndsAt).toLocaleDateString()
                           : '—'}
                       </TableCell>
-                      <TableCell>
+                     {isSuperAdmin && <TableCell>
                         <Button
                           variant="outline"
                           size="sm"
@@ -204,7 +187,7 @@ export function SubscriptionsPage() {
                           <Settings2 className="h-4 w-4" />
                           Manage
                         </Button>
-                      </TableCell>
+                      </TableCell>}
                     </TableRow>
                   ))
                 )}
@@ -245,7 +228,8 @@ export function SubscriptionsPage() {
       <CreateSubscriptionModal
         open={showCreateModal}
         onOpenChange={setShowCreateModal}
-        plans={MOCK_PLANS}
+        plans={plans}
+        isLoadingPlans={isLoadingPlans}
       />
       <ManageSubscriptionStatusModal
         open={showStatusModal}

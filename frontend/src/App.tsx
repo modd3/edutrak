@@ -36,6 +36,7 @@ import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
 import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
 import BillingAdminPage from '@/pages/billing/BillingAdminPage';
 import SubscriptionsPage from '@/pages/subscriptions/SubscriptionsPage';
+import { PlansPage } from './pages/subscriptions/PlansPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -137,6 +138,19 @@ function App() {
               </RoleGuard>
             }
           />
+
+           {/* ADMIN, SUPER_ADMIN: Year-End Transition Wizard */}
+          <Route
+            path="/subscriptions/plans"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <PlansPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
 
           {/* SUPER_ADMIN ONLY: Schools Management */}
           <Route

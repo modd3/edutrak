@@ -1,5 +1,6 @@
 import { randomUUID } from 'crypto';
 import prisma from '../database/client';
+import logger from '../utils/logger';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   TRIALING: ['ACTIVE', 'CANCELED', 'EXPIRED'],
@@ -20,6 +21,13 @@ export class SubscriptionService {
     currentPeriodEnd: string;
     trialEndsAt?: string;
   }) {
+    // Ensure the referenced plan exists to avoid FK constraint errors
+    const plan = await (prisma as any).plan.findUnique({ where: { id: data.planId } });
+    if (!plan) {
+      logger.error(`Plan not found for id ${data.planId}`);
+      throw new Error('Plan not found');
+    }
+
     return await (prisma as any).tenantSubscription.create({
       data: {
         id: randomUUID(),

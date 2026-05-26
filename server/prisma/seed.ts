@@ -32,23 +32,23 @@ const state = {
 };
 
 async function main() {
-  console.log('🌱 Seeding Nairobi Premier Secondary School demo data...\n');
+  console.log('🌱 Seeding Nakuru Premier Secondary School demo data...\n');
 
   // Step 1: Create the school
   const school = await prisma.school.create({
     data: {
       id: uuidv4(),
       name: DEMO_SCHOOL_NAME,
-      registrationNo: 'NPS/2024/001',
+      registrationNo: 'NkPS/2024/001',
       type: SchoolType.SECONDARY,
-      county: 'Nairobi',
-      subCounty: 'Westlands',
-      ward: 'Kitisuru',
-      knecCode: 'NPS001',
-      kemisCode: 'NPSKEM001',
+      county: 'Nakuru',
+      subCounty: 'Westlandside',
+      ward: 'Kitutu',
+      knecCode: 'NkPS001',
+      kemisCode: 'NkPSKEM001',
       phone: '+254700100200',
-      email: 'info@nps.ac.ke',
-      address: 'P.O. Box 100-00100, Nairobi',
+      email: 'info@nkps.ac.ke',
+      address: 'P.O. Box 100-00100, Nakuru',
       ownership: Ownership.PUBLIC,
       boardingStatus: BoardingStatus.BOTH,
       gender: SchoolGender.MIXED,
