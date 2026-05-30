@@ -1,5 +1,5 @@
 import api from '@/api';
-import { School } from '@/types';
+import { ApiResponse, Class, PaginatedResponse, School, Student, User } from '@/types';
 // Define the shape for creating/updating a school based on your schema
 export type CreateSchoolDto = Omit<School, 'id' | 'createdAt' | 'updatedAt'>;
 export type UpdateSchoolDto  = Partial<CreateSchoolDto>;
@@ -15,6 +15,14 @@ export interface SchoolFilters {
   search?: string;
   page?: number;
   limit?: number;
+}
+
+export interface StudentFilters {
+   classId?: string;
+    status?: string;
+    search?: string;
+    page?: number;
+    limit?: number;
 }
 
 export interface SchoolStats {
@@ -38,58 +46,31 @@ export const schoolService = {
    * Get all schools with optional filters
    */
   getAll: (params?: SchoolFilters) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: School[];
-      count: number;
-      pagination: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>('/schools', { params }),
+    api.get<PaginatedResponse<School[]>>('/schools', { params }),
 
   /**
    * Get a single school by ID
    */
   getById: (id: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: School;
-    }>(`/schools/${id}`),
+    api.get<ApiResponse<School>>(`/schools/${id}`),
 
   /**
    * Get school by registration number
    */
   getByRegistrationNo: (registrationNo: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: School;
-    }>(`/schools/registration/${registrationNo}`),
+    api.get<ApiResponse<School>>(`/schools/registration/${registrationNo}`),
 
   /**
    * Create a new school
    */
   create: (data: CreateSchoolDto) =>
-    api.post<{
-      success: boolean;
-      message: string;
-      data: School;
-    }>('/schools', data),
+    api.post<ApiResponse<School>>('/schools', data),
 
   /**
    * Update a school
    */
   update: (id: string, data: UpdateSchoolDto) =>
-    api.put<{
-      success: boolean;
-      message: string;
-      data: School;
-    }>(`/schools/${id}`, data),
+    api.put<ApiResponse<School>>(`/schools/${id}`, data),
 
   /**
    * Delete a school
@@ -104,11 +85,7 @@ export const schoolService = {
    * Get school statistics
    */
   getStatistics: (schoolId?: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: SchoolStats;
-    }>(`/schools/${schoolId}/statistics`, {
+    api.get<ApiResponse<SchoolStats>>(`/schools/${schoolId}/statistics`, {
      // params: { schoolId },
     }),
 
@@ -116,60 +93,28 @@ export const schoolService = {
    * Get schools by county
    */
   getByCounty: (county: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: School[];
-      count: number;
-    }>(`/schools/county/${county}`),
+    api.get<PaginatedResponse<School[]>>(`/schools/county/${county}`),
 
   /**
    * Get school users (students, teachers, staff)
    */
   getSchoolUsers: (schoolId: string, role?: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: any[];
-      count: number;
-    }>(`/schools/${schoolId}/users`, {
+    api.get<PaginatedResponse<User[]>>(`/schools/${schoolId}/users`, {
       params: { role },
     }),
     /**
    * Get school classes
    */
   getSchoolClasses: (schoolId: string, academicYearId?: string) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: any[];
-      count: number;
-    }>(`/schools/${schoolId}/classes`, {
+    api.get<ApiResponse<Class>>(`/schools/${schoolId}/classes`, {
       params: { academicYearId },
     }),
 
   /**
    * Get school students
    */
-  getSchoolStudents: (schoolId: string, filters?: {
-    classId?: string;
-    status?: string;
-    search?: string;
-    page?: number;
-    limit?: number;
-  }) =>
-    api.get<{
-      success: boolean;
-      message: string;
-      data: any[];
-      count: number;
-      pagination?: {
-        page: number;
-        limit: number;
-        total: number;
-        pages: number;
-      };
-    }>(`/schools/${schoolId}/students`, {
+  getSchoolStudents: (schoolId: string, filters?: StudentFilters) =>
+    api.get<PaginatedResponse<Student>>(`/schools/${schoolId}/students`, {
       params: filters,
     }),
 

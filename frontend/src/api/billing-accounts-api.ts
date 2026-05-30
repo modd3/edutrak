@@ -18,7 +18,7 @@ export const billingAccountsApi = {
    * Create a new subscription
    */
   create: (data: CreateBillingAccountInput) =>
-    api.post<ApiResponse<BillingAccount>>('/billing-accounts', data),
+    api.put<ApiResponse<BillingAccount>>('/billing-accounts', data),
 
   /**
    * Get list of billing accounts with filters

@@ -8,9 +8,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, CheckCircle2, Loader2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Loader2, Plus } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
+import { useSchools } from '@/hooks/use-schools';
+import { CreateBillingAccountModal } from '@/components/billing/createBillingAccountModal';
 
 // Validation schemas
 const billingAccountSchema = z.object({
@@ -18,7 +20,7 @@ const billingAccountSchema = z.object({
   legalName: z.string().min(2, 'Legal name is required'),
   email: z.string().email("Please provide an Email!").optional(),
   Phone: z.string().min(2, 'Enter phone number').optional(),
-  optional: z.string().min(2, 'Enter Tax ID').optional(),
+  TaxId: z.string().min(2, 'Enter Tax ID').optional(),
   country: z.string().min(2, 'Enter a country Name').optional().default("Kenya"),
   city: z.string().min(2, 'Enter a city name').optional(),
   AddressLine1: z.string().min(2, 'Please Enter an Address').optional(),
@@ -37,11 +39,15 @@ type InvoiceInput = z.infer<typeof invoiceSchema>;
 
 export default function BillingAdminPage() {
   const { schoolId: contextSchoolId } = useSchoolContext();
+  console.log("context ID: ", contextSchoolId)
   const token = useAuthStore((s) => s.token);
   const baseUrl = import.meta.env.VITE_API_URL;
+  const schools = useSchools();
+  console.log("schools: ", schools)
 
   const [activeTab, setActiveTab] = useState('accounts');
   const [isLoading, setIsLoading] = useState(false);
+  const [showCreateBillingAccountModal, setShowCreateBillingAccountModal] = useState(false);
   const [apiResult, setApiResult] = useState<{ success: boolean; message: string; data?: any } | null>(null);
 
   // Billing Account Form
@@ -132,10 +138,17 @@ export default function BillingAdminPage() {
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Billing Administration</h1>
-        <p className="text-gray-600">Manage billing accounts and invoices for your schools</p>
+     <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold">Billing Administration</h1>
+          <p className="text-gray-600">Manage billing accounts and invoices</p>
+        </div>
+        <Button onClick={() => setShowCreateBillingAccountModal(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
+          New Billing Account
+        </Button>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -273,6 +286,13 @@ export default function BillingAdminPage() {
           </div>
         </Alert>
       )}
+      {/* Modals */}
+            <CreateBillingAccountModal
+              open={showCreateBillingAccountModal}
+              onOpenChange={setShowCreateBillingAccountModal}
+              isLoading={isLoading}
+            />
     </div>
+    
   );
 }

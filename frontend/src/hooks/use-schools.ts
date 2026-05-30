@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { schoolService, SchoolFilters, CreateSchoolDto, UpdateSchoolDto } from '@/services/school.service';
+import { schoolService, SchoolFilters, CreateSchoolDto, UpdateSchoolDto, StudentFilters } from '@/services/school.service';
 
 // Query Keys
 export const schoolKeys = {
@@ -9,6 +9,7 @@ export const schoolKeys = {
   details: () => [...schoolKeys.all, 'detail'] as const,
   detail: (id: string) => [...schoolKeys.details(), id] as const,
   statistics: () => [...schoolKeys.all, 'statistics'] as const,
+  schoolStudents: (id: string, filters: StudentFilters) => [...schoolKeys.all, 'students', id, filters] as const,
 };
 
 // Get all schools
@@ -79,6 +80,15 @@ export function useDeleteSchool() {
     },
   });
 }
+
+export function useSchoolStudents(id: string, filters?: StudentFilters) {
+  return useQuery({
+    queryKey: schoolKeys.schoolStudents(id, filters || {}),
+    queryFn: () => schoolService.getSchoolStudents(id, filters),
+    enabled: !!id,
+  });
+}
+
 
 // Check if registration number exists
 export function useCheckRegistrationNo(registrationNo: string) {

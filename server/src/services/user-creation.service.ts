@@ -17,6 +17,21 @@ interface BaseUserData {
   schoolId?: string;
 }
 
+interface GuardianAccountData {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  phone?: string;
+  idNumber?: string;
+  relationship: string;
+  occupation?: string;
+  employer?: string;
+  workPhone?: string;
+  isPrimary?: boolean;
+}
+
 interface StudentProfileData {
   admissionNo?: string; // Optional - auto-generated if not provided
   upiNumber?: string;
@@ -31,6 +46,7 @@ interface StudentProfileData {
   specialNeedsType?: string;
   medicalCondition?: string;
   allergies?: string;
+  guardians?: GuardianAccountData[];
 }
 
 interface TeacherProfileData {
@@ -145,7 +161,19 @@ export class UserCreationService extends BaseService {
               name: true,
             },
           },
-          student: true,
+          student: {
+            include: {
+              guardians: {
+                include: {
+                  guardian: {
+                    include: {
+                      user: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
           teacher: true,
           guardian: true,
         },
@@ -179,6 +207,26 @@ export class UserCreationService extends BaseService {
     if (role === 'STUDENT') {
       if (!profileData || !('gender' in profileData)) {
         throw new Error('Student profile data with gender is required');
+      }
+
+      if ('guardians' in profileData && profileData.guardians) {
+        if (profileData.guardians.length > 5) {
+          throw new Error('A student can have up to 5 guardians');
+        }
+
+        const primaryCount = profileData.guardians.filter(
+          (guardian) => guardian.isPrimary
+        ).length;
+
+        if (primaryCount > 1) {
+          throw new Error('Only one primary guardian can be selected');
+        }
+
+        for (const guardian of profileData.guardians) {
+          if (!guardian.email || !guardian.password || !guardian.firstName || !guardian.lastName || !guardian.relationship) {
+            throw new Error('Guardian email, password, first name, last name and relationship are required');
+          }
+        }
       }
     }
 
@@ -236,7 +284,7 @@ export class UserCreationService extends BaseService {
       upiNumber = `KE-${schoolCode}-${year}-${admissionNo}`;
     }
 
-    return await tx.student.create({
+    const student = await tx.student.create({
       data: {
         id: uuidv4(),
         userId: user.id,
@@ -263,6 +311,70 @@ export class UserCreationService extends BaseService {
         allergies: profileData.allergies,
       },
     });
+
+    if (profileData.guardians && profileData.guardians.length > 0) {
+      await this.createGuardiansForStudent(tx, student, profileData.guardians);
+    }
+
+    return student;
+  }
+
+  private async createGuardiansForStudent(
+    tx: any,
+    student: any,
+    guardians: GuardianAccountData[]
+  ) {
+    if (!guardians || guardians.length === 0) {
+      return;
+    }
+
+    if (guardians.length > 5) {
+      throw new Error('A student can have up to 5 guardians');
+    }
+
+    const primaryCount = guardians.filter((guardian) => guardian.isPrimary).length;
+    if (primaryCount > 1) {
+      throw new Error('Only one primary guardian can be selected');
+    }
+
+    for (let index = 0; index < guardians.length; index++) {
+      const guardianData = guardians[index];
+
+      const guardianUser = await tx.user.create({
+        data: {
+          id: uuidv4(),
+          email: guardianData.email,
+          password: await hashPassword(guardianData.password),
+          firstName: guardianData.firstName,
+          lastName: guardianData.lastName,
+          middleName: guardianData.middleName,
+          phone: guardianData.phone,
+          idNumber: guardianData.idNumber,
+          role: 'PARENT',
+          schoolId: student.schoolId,
+        },
+      });
+
+      const guardian = await tx.guardian.create({
+        data: {
+          id: uuidv4(),
+          userId: guardianUser.id,
+          relationship: guardianData.relationship,
+          occupation: guardianData.occupation,
+          employer: guardianData.employer,
+          workPhone: guardianData.workPhone,
+        },
+      });
+
+      await tx.studentGuardian.create({
+        data: {
+          id: uuidv4(),
+          studentId: student.id,
+          guardianId: guardian.id,
+          isPrimary: guardianData.isPrimary || (primaryCount === 0 && index === 0),
+        },
+      });
+    }
   }
 
   /**
@@ -421,10 +533,12 @@ export class UserCreationService extends BaseService {
       if (profileData) {
         switch (currentUser.role) {
           case 'STUDENT':
+            const { guardians: _guardians, ...studentUpdateData } = profileData as Partial<StudentProfileData>;
+
             await tx.student.update({
               where: { userId },
               data: {
-                ...profileData as Partial<StudentProfileData>,
+                ...studentUpdateData,
                 // Sync name fields
                 ...(userData.firstName && { firstName: userData.firstName }),
                 ...(userData.lastName && { lastName: userData.lastName }),

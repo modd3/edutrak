@@ -1,5 +1,5 @@
 // src/components/students/StudentFormModal.tsx
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState, useEffect } from 'react';
@@ -15,7 +15,7 @@ import { Student } from '@/types';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useSchools } from '@/hooks/use-schools';
 import { usePreviewSequence } from '@/hooks/use-sequences';
-import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle, Building2, UserIcon, Calendar } from 'lucide-react';
+import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle, Building2, UserIcon, Calendar, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api';
 
@@ -45,6 +45,20 @@ const studentFormSchema = z.object({
   specialNeedsType: z.string().optional(),
   medicalCondition: z.string().optional(),
   allergies: z.string().optional(),
+  guardians: z.array(z.object({
+    email: z.string().email('Invalid email address'),
+    password: z.string().min(8, 'Password must be at least 8 characters'),
+    firstName: z.string().min(1, 'First name is required'),
+    lastName: z.string().min(1, 'Last name is required'),
+    middleName: z.string().optional(),
+    phone: z.string().optional(),
+    idNumber: z.string().optional().transform((value) => (value === '' ? undefined : value)),
+    relationship: z.string().min(1, 'Relationship is required'),
+    occupation: z.string().optional(),
+    employer: z.string().optional(),
+    workPhone: z.string().optional(),
+    isPrimary: z.boolean().optional().default(false),
+  })).max(5, 'You can add up to 5 guardians').default([]),
 });
 
 type StudentFormData = z.infer<typeof studentFormSchema>;
@@ -100,11 +114,23 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
       specialNeedsType: '',
       medicalCondition: '',
       allergies: '',
+      guardians: [],
     },
   });
 
   // Watch school ID to trigger preview updates
   const watchedSchoolId = form.watch('schoolId') || contextSchoolId;
+
+  const { fields: guardianFields, append, remove } = useFieldArray({
+    control: form.control,
+    name: 'guardians',
+  });
+
+  const setPrimaryGuardian = (selectedIndex: number) => {
+    guardianFields.forEach((_, index) => {
+      form.setValue(`guardians.${index}.isPrimary`, index === selectedIndex);
+    });
+  }; 
 
   // Auto-generate Admission Number Preview
   const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
@@ -203,6 +229,10 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
         medicalCondition: data.medicalCondition,
         allergies: data.allergies,
       };
+
+      if (data.guardians && data.guardians.length > 0) {
+        profileData.guardians = data.guardians;
+      }
 
       // 3. Construct Payload
       const payload = {
@@ -582,6 +612,155 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
               </div>
             </div>
 
+            {mode === 'create' && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-sm font-semibold">Guardians</h3>
+                      <p className="text-xs text-muted-foreground">Add up to 5 guardian user accounts for this student.</p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        append({
+                          email: '',
+                          password: '',
+                          firstName: '',
+                          lastName: '',
+                          middleName: '',
+                          phone: '',
+                          idNumber: '',
+                          relationship: '',
+                          occupation: '',
+                          employer: '',
+                          workPhone: '',
+                          isPrimary: guardianFields.length === 0,
+                        })
+                      }
+                      disabled={guardianFields.length >= 5}
+                    >
+                      <Plus className="h-4 w-4" />
+                      Add Guardian
+                    </Button>
+                  </div>
+
+                  {guardianFields.length === 0 ? (
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      No guardians added yet. Click Add Guardian to create a guardian account for this student.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {guardianFields.map((field, index) => (
+                        <div key={field.id} className="rounded-lg border p-4">
+                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+                            <div>
+                              <p className="text-sm font-semibold">Guardian {index + 1}</p>
+                              <p className="text-xs text-muted-foreground">Create guardian user and profile.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id={`guardianPrimary-${field.id}`}
+                                  checked={form.watch(`guardians.${index}.isPrimary`)}
+                                  onCheckedChange={() => setPrimaryGuardian(index)}
+                                />
+                                <Label htmlFor={`guardianPrimary-${field.id}`} className="cursor-pointer text-sm">
+                                  Primary guardian
+                                </Label>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => remove(index)}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                            <div className="space-y-2">
+                              <Label>Email *</Label>
+                              <Input {...form.register(`guardians.${index}.email` as const)} placeholder="guardian@example.com" />
+                              {form.formState.errors.guardians?.[index]?.email && (
+                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.email?.message}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Password *</Label>
+                              <Input {...form.register(`guardians.${index}.password` as const)} type="password" placeholder="Password" />
+                              {form.formState.errors.guardians?.[index]?.password && (
+                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.password?.message}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>First Name *</Label>
+                              <Input {...form.register(`guardians.${index}.firstName` as const)} placeholder="Jane" />
+                              {form.formState.errors.guardians?.[index]?.firstName && (
+                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.firstName?.message}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Last Name *</Label>
+                              <Input {...form.register(`guardians.${index}.lastName` as const)} placeholder="Doe" />
+                              {form.formState.errors.guardians?.[index]?.lastName && (
+                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.lastName?.message}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Relationship *</Label>
+                              <Input {...form.register(`guardians.${index}.relationship` as const)} placeholder="Father, Mother" />
+                              {form.formState.errors.guardians?.[index]?.relationship && (
+                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.relationship?.message}</p>
+                              )}
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Phone</Label>
+                              <Input {...form.register(`guardians.${index}.phone` as const)} placeholder="+2547..." />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Middle Name</Label>
+                              <Input {...form.register(`guardians.${index}.middleName` as const)} placeholder="Optional" />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>ID Number</Label>
+                              <Input {...form.register(`guardians.${index}.idNumber` as const)} placeholder="Optional" />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Occupation</Label>
+                              <Input {...form.register(`guardians.${index}.occupation` as const)} placeholder="e.g. Teacher" />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Employer</Label>
+                              <Input {...form.register(`guardians.${index}.employer` as const)} placeholder="Company" />
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label>Work Phone</Label>
+                              <Input {...form.register(`guardians.${index}.workPhone` as const)} placeholder="+2547..." />
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
           </form>
         </ScrollArea>
 

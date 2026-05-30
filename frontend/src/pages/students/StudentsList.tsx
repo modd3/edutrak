@@ -68,6 +68,8 @@ export default function StudentsList() {
   const [search, setSearch] = useState('');
   const [genderFilter, setGenderFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
+  const [page, setPage] = useState(1);
+  const pageSize = 20;
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -83,10 +85,10 @@ export default function StudentsList() {
   const { data: studentsData, isLoading, isError } = useStudents({
     schoolId,
     search: search,
-    page: 1,
-    pageSize: 20,
+    page,
+    pageSize,
   });
-
+console.log('Fetched students:', studentsData);
   // Delete mutation
   const { mutate: deleteStudent, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
@@ -106,7 +108,24 @@ export default function StudentsList() {
 
   // Extract students from paginated response
   const students = studentsData?.data || [];
-  
+  const totalStudents = studentsData?.total || 0;
+
+  // Reset pagination when filters change
+  const handleSearchChange = (value: string) => {
+    setSearch(value);
+    setPage(1);
+  };
+
+  const handleGenderChange = (value: string) => {
+    setGenderFilter(value);
+    setPage(1);
+  };
+
+  const handleStatusChange = (value: string) => {
+    setStatusFilter(value);
+    setPage(1);
+  };
+
   // Filter students by gender and status
   const filteredStudents = students.filter((student: Student) => {
     const matchesGender = !genderFilter || genderFilter === 'all' || student.gender === genderFilter;
@@ -356,11 +375,11 @@ export default function StudentsList() {
           <Input
             placeholder="Search by name or admission number..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => handleSearchChange(e.target.value)}
             className="max-w-md"
           />
         </div>
-        <Select value={genderFilter} onValueChange={setGenderFilter}>
+        <Select value={genderFilter} onValueChange={handleGenderChange}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Filter by gender" />
           </SelectTrigger>
@@ -373,7 +392,7 @@ export default function StudentsList() {
       </div>
 
       {/* Tabs for Status */}
-      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
+      <Tabs value={statusFilter} onValueChange={handleStatusChange}>
         <TabsList>
           <TabsTrigger value="all">All Students</TabsTrigger>
           <TabsTrigger value="active">Enrolled</TabsTrigger>
@@ -387,8 +406,31 @@ export default function StudentsList() {
 
       {/* Summary */}
       {studentsData && (
-        <div className="text-sm text-muted-foreground text-center">
-          Showing {filteredStudents.length} of {students.length} students
+        <div className="space-y-2">
+          <div className="text-sm text-muted-foreground text-center">
+            Showing {totalStudents === 0 ? 0 : (page - 1) * pageSize + 1} - {totalStudents === 0 ? 0 : Math.min(page * pageSize, totalStudents)} of {totalStudents} students
+          </div>
+          <div className="flex items-center justify-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((prev) => Math.max(prev - 1, 1))}
+              disabled={page <= 1}
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-muted-foreground">
+              Page {page} of {Math.max(Math.ceil(totalStudents / pageSize), 1)}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((prev) => prev + 1)}
+              disabled={page >= Math.max(Math.ceil(totalStudents / pageSize), 1)}
+            >
+              Next
+            </Button>
+          </div>
         </div>
       )}
 
