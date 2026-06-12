@@ -8,6 +8,7 @@ export function useStudents(params?: {
   schoolId?: string;
   search?: string;
   gender?: string;
+  status?: string;
   hasSpecialNeeds?: boolean;
   classId?: string;
   page?: number;

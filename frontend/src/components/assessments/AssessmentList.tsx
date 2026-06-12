@@ -1,8 +1,9 @@
 // src/components/assessments/AssessmentList.tsx
 
 import { useState } from 'react';
-import { MoreHorizontal, Plus, Pencil, Trash2, FileText } from 'lucide-react';
-import { useAssessments, useDeleteAssessment } from '@/hooks/use-assessments';
+import { MoreHorizontal, Plus, Pencil, Trash2, FileText, Send, Play, CheckCircle, Lock } from 'lucide-react';
+import { useAssessments, useDeleteAssessment, useUpdateAssessmentStatus } from '@/hooks/use-assessments';
+import { AssessmentStatus } from '@/types';
 import { AssessmentForm } from './AssessmentForm';
 import {
   Card,
@@ -56,6 +57,14 @@ const ASSESSMENT_TYPE_COLORS: Record<string, string> = {
   COMPETENCY_BASED: 'bg-indigo-100 text-indigo-800',
 };
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; nextAction?: { label: string; status: AssessmentStatus; icon: any } }> = {
+  DRAFT: { label: 'Draft', color: 'bg-gray-100 text-gray-800', nextAction: { label: 'Publish', status: AssessmentStatus.PUBLISHED, icon: Send } },
+  PUBLISHED: { label: 'Published', color: 'bg-blue-100 text-blue-800', nextAction: { label: 'Start Grading', status: AssessmentStatus.GRADING_IN_PROGRESS, icon: Play } },
+  GRADING_IN_PROGRESS: { label: 'Grading', color: 'bg-yellow-100 text-yellow-800', nextAction: { label: 'Publish Results', status: AssessmentStatus.RESULTS_PUBLISHED, icon: CheckCircle } },
+  RESULTS_PUBLISHED: { label: 'Results Published', color: 'bg-green-100 text-green-800', nextAction: { label: 'Close', status: AssessmentStatus.CLOSED, icon: Lock } },
+  CLOSED: { label: 'Closed', color: 'bg-red-100 text-red-800' },
+};
+
 export function AssessmentList({ termId, classSubjectId, onGradeEntry }: AssessmentListProps) {
   const [showForm, setShowForm] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<any>(null);
@@ -63,6 +72,7 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
 
   const { data, isLoading } = useAssessments({ termId, classSubjectId });
   const deleteMutation = useDeleteAssessment();
+  const statusMutation = useUpdateAssessmentStatus();
 
   const handleEdit = (assessment: any) => {
     setEditingAssessment(assessment);
@@ -74,6 +84,10 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
       await deleteMutation.mutateAsync(deletingId);
       setDeletingId(null);
     }
+  };
+
+  const handleStatusChange = async (assessmentId: string, newStatus: AssessmentStatus) => {
+    await statusMutation.mutateAsync({ id: assessmentId, status: newStatus });
   };
 
   const handleCloseForm = () => {
@@ -141,6 +155,7 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Subject</TableHead>
                   <TableHead>Max Marks</TableHead>
                   <TableHead>Results</TableHead>
@@ -159,6 +174,14 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
                         variant="secondary"
                       >
                         {assessment.type.replace('_', ' ')}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge
+                        className={STATUS_CONFIG[assessment.status]?.color || 'bg-gray-100 text-gray-800'}
+                        variant="secondary"
+                      >
+                        {STATUS_CONFIG[assessment.status]?.label || assessment.status}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -188,6 +211,20 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
                             >
                               <FileText className="mr-2 h-4 w-4" />
                               Enter Grades
+                            </DropdownMenuItem>
+                          )}
+                          {STATUS_CONFIG[assessment.status]?.nextAction && (
+                            <DropdownMenuItem
+                              onClick={() => handleStatusChange(
+                                assessment.id,
+                                STATUS_CONFIG[assessment.status].nextAction!.status
+                              )}
+                            >
+                              {(() => {
+                                const Icon = STATUS_CONFIG[assessment.status].nextAction!.icon;
+                                return <Icon className="mr-2 h-4 w-4" />;
+                              })()}
+                              {STATUS_CONFIG[assessment.status].nextAction!.label}
                             </DropdownMenuItem>
                           )}
                           <DropdownMenuItem onClick={() => handleEdit(assessment)}>

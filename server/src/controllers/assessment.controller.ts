@@ -204,6 +204,46 @@ export class AssessmentController {
   };
 
   /**
+   * Update assessment status (workflow transition)
+   * PATCH /api/assessments/:id/status
+   */
+  updateAssessmentStatus = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      const schoolId = req.user!.schoolId!;
+      const userId = req.user!.userId;
+      const role = req.user!.role;
+
+      if (!status) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'Status is required',
+        });
+        return;
+      }
+
+      const assessment = await this.assessmentService.updateAssessmentStatus(
+        id,
+        status,
+        schoolId,
+        userId,
+        role
+      );
+
+      res.json({
+        message: 'Assessment status updated successfully',
+        data: assessment,
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'STATUS_UPDATE_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to update assessment status',
+      });
+    }
+  };
+
+  /**
    * Delete assessment definition
    * DELETE /api/assessments/:id
    */
@@ -543,6 +583,156 @@ export class AssessmentController {
       res.status(400).json({
         error: 'DELETE_FAILED',
         message: error instanceof Error ? error.message : 'Failed to delete grade',
+      });
+    }
+  };
+
+  // ========================================
+  // Assessment Weight Endpoints
+  // ========================================
+
+  /**
+   * Get weights for a term and class subject
+   * GET /api/assessments/weights?termId=X&classSubjectId=Y
+   */
+  getWeights = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { termId, classSubjectId } = req.query;
+      const schoolId = req.user!.schoolId!;
+
+      if (!termId || !classSubjectId) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'termId and classSubjectId are required',
+        });
+        return;
+      }
+
+      const weights = await this.assessmentService.getAssessmentWeights(
+        termId as string,
+        classSubjectId as string,
+        schoolId
+      );
+
+      res.json({ data: weights });
+    } catch (error) {
+      res.status(500).json({
+        error: 'FETCH_FAILED',
+        message: 'Failed to fetch assessment weights',
+      });
+    }
+  };
+
+  /**
+   * Upsert a single weight
+   * POST /api/assessments/weights
+   */
+  upsertWeight = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { assessmentType, termId, classSubjectId, weight } = req.body;
+      const schoolId = req.user!.schoolId!;
+
+      if (!assessmentType || !termId || !classSubjectId || weight === undefined) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'assessmentType, termId, classSubjectId, and weight are required',
+        });
+        return;
+      }
+
+      const result = await this.assessmentService.upsertAssessmentWeight(
+        assessmentType, termId, classSubjectId, weight, schoolId
+      );
+
+      res.json({ message: 'Weight saved successfully', data: result });
+    } catch (error) {
+      res.status(400).json({
+        error: 'UPSERT_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to save weight',
+      });
+    }
+  };
+
+  /**
+   * Bulk upsert weights
+   * POST /api/assessments/weights/bulk
+   */
+  bulkUpsertWeights = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { weights } = req.body;
+      const schoolId = req.user!.schoolId!;
+
+      if (!weights || !Array.isArray(weights)) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'weights array is required',
+        });
+        return;
+      }
+
+      const results = await this.assessmentService.bulkUpsertWeights(weights, schoolId);
+
+      res.json({
+        message: `Successfully saved ${results.length} weights`,
+        data: results,
+      });
+    } catch (error) {
+      res.status(400).json({
+        error: 'BULK_UPSERT_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to save weights',
+      });
+    }
+  };
+
+  /**
+   * Delete a weight
+   * DELETE /api/assessments/weights/:id
+   */
+  deleteWeight = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { id } = req.params;
+      const schoolId = req.user!.schoolId!;
+
+      await this.assessmentService.deleteAssessmentWeight(id, schoolId);
+
+      res.json({ message: 'Weight deleted successfully' });
+    } catch (error) {
+      res.status(400).json({
+        error: 'DELETE_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to delete weight',
+      });
+    }
+  };
+
+  /**
+   * Calculate weighted score for a student
+   * GET /api/assessments/weights/calculate?studentId=X&classSubjectId=Y&termId=Z
+   */
+  calculateWeightedScore = async (req: Request, res: Response): Promise<void> => {
+    try {
+      const { studentId, classSubjectId, termId } = req.query;
+      const schoolId = req.user!.schoolId!;
+
+      if (!studentId || !classSubjectId || !termId) {
+        res.status(400).json({
+          error: 'VALIDATION_ERROR',
+          message: 'studentId, classSubjectId, and termId are required',
+        });
+        return;
+      }
+
+      const result = await this.assessmentService.calculateWeightedScore(
+        studentId as string,
+        classSubjectId as string,
+        termId as string,
+        schoolId
+      );
+
+      res.json({ data: result });
+    } catch (error) {
+      res.status(500).json({
+        error: 'CALCULATION_FAILED',
+        message: error instanceof Error ? error.message : 'Failed to calculate weighted score',
       });
     }
   };

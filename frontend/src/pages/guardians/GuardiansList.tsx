@@ -1,5 +1,5 @@
 // src/pages/guardians/GuardiansList.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, PlusCircle, Edit, Trash, Eye, Phone, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import { ErrorMessage } from '@/components/shared/ErrorMessage';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useGuardians, useDeleteGuardian } from '@/hooks/use-guardians';
+import { useDebounce } from '@/hooks/use-debounce';
 import { GuardianResponse } from '@/services/guardian.service';
 import { GuardianFormModal } from '@/components/guardians/GuardianFormModal';
 import { GuardianDetailsModal } from '@/components/guardians/GuardianDetailsModal';
@@ -45,8 +46,15 @@ const RELATIONSHIP_LABELS: Record<string, string> = {
 };
 
 export function GuardiansList() {
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [page, setPage] = useState(1);
+  
+  // Reset page when debounced search changes
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+  
   const [selectedGuardian, setSelectedGuardian] = useState<GuardianResponse | null>(null);
   const [formOpen, setFormOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -56,7 +64,7 @@ export function GuardiansList() {
   const { data, isLoading, error } = useGuardians({
     page,
     pageSize: 10,
-    search: search || undefined,
+    search: debouncedSearch || undefined,
   });
 
   const { mutate: deleteGuardian, isPending: isDeleting } = useDeleteGuardian();
@@ -191,12 +199,11 @@ export function GuardiansList() {
         <EmptyState
           title="No guardians found"
           description="Get started by creating your first guardian account."
-          action={
-            <Button onClick={handleCreateClick}>
-              <PlusCircle className="mr-2 h-4 w-4" />
-              Create Guardian
-            </Button>
-          }
+          icon={PlusCircle}
+          action={{
+            label: "Create Guardian",
+            onClick: handleCreateClick
+          }}
         />
         <GuardianFormModal
           open={formOpen}
@@ -223,25 +230,13 @@ export function GuardiansList() {
       <div className="mb-4">
         <Input
           placeholder="Search guardians by name or email..."
-          value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="max-w-sm"
         />
       </div>
 
-      <DataTable
-        columns={columns}
-        data={data.data}
-        pagination={{
-          pageIndex: page - 1,
-          pageSize: 10,
-          pageCount: data.pagination?.pages || 1,
-        }}
-        onPageChange={setPage}
-      />
+      <DataTable columns={columns} data={data.data} pageSize={10} />
 
       <GuardianFormModal
         open={formOpen}

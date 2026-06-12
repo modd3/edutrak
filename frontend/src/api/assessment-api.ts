@@ -60,6 +60,7 @@ export interface AssessmentFilters {
   termId?: string;
   classSubjectId?: string;
   type?: AssessmentType;
+  status?: string;
   academicYearId?: string;
   page?: number;
   limit?: number;
@@ -150,6 +151,14 @@ export const assessmentApi = {
   },
 
   /**
+   * Update assessment status (workflow transition)
+   */
+  updateAssessmentStatus: async (id: string, status: string) => {
+    const response = await api.patch(`/assessments/${id}/status`, { status });
+    return response.data;
+  },
+
+  /**
    * Delete assessment
    */
   deleteAssessment: async (id: string) => {
@@ -228,6 +237,68 @@ export const assessmentApi = {
     const response = await api.get(
       `/assessments/reports/student/${studentId}/term/${termId}`
     );
+    return response.data;
+  },
+
+  // ========================================
+  // Assessment Weights
+  // ========================================
+
+  /**
+   * Get weights for a term and class subject
+   */
+  getWeights: async (termId: string, classSubjectId: string) => {
+    const response = await api.get('/assessments/weights', {
+      params: { termId, classSubjectId },
+    });
+    return response.data;
+  },
+
+  /**
+   * Upsert a single weight
+   */
+  upsertWeight: async (data: {
+    assessmentType: string;
+    termId: string;
+    classSubjectId: string;
+    weight: number;
+  }) => {
+    const response = await api.post('/assessments/weights', data);
+    return response.data;
+  },
+
+  /**
+   * Bulk upsert weights
+   */
+  bulkUpsertWeights: async (weights: Array<{
+    assessmentType: string;
+    termId: string;
+    classSubjectId: string;
+    weight: number;
+  }>) => {
+    const response = await api.post('/assessments/weights/bulk', { weights });
+    return response.data;
+  },
+
+  /**
+   * Delete a weight
+   */
+  deleteWeight: async (id: string) => {
+    const response = await api.delete(`/assessments/weights/${id}`);
+    return response.data;
+  },
+
+  /**
+   * Calculate weighted score for a student
+   */
+  calculateWeightedScore: async (
+    studentId: string,
+    classSubjectId: string,
+    termId: string
+  ) => {
+    const response = await api.get('/assessments/weights/calculate', {
+      params: { studentId, classSubjectId, termId },
+    });
     return response.data;
   },
 

@@ -351,6 +351,76 @@ export class AssessmentService {
   }
 
   /**
+   * Update assessment status (workflow transition)
+   * Valid transitions:
+   *   DRAFT → PUBLISHED
+   *   PUBLISHED → GRADING_IN_PROGRESS
+   *   GRADING_IN_PROGRESS → RESULTS_PUBLISHED
+   *   RESULTS_PUBLISHED → CLOSED
+   *   Any → DRAFT (admin only, to reopen)
+   */
+  async updateAssessmentStatus(
+    id: string,
+    newStatus: string,
+    schoolId: string,
+    userId: string,
+    role: string
+  ): Promise<any> {
+    const assessment = await this.prisma.assessmentDefinition.findFirst({
+      where: { id, schoolId },
+    });
+
+    if (!assessment) {
+      throw new Error('Assessment not found');
+    }
+
+    const validTransitions: Record<string, string[]> = {
+      DRAFT: ['PUBLISHED'],
+      PUBLISHED: ['GRADING_IN_PROGRESS', 'DRAFT'],
+      GRADING_IN_PROGRESS: ['RESULTS_PUBLISHED'],
+      RESULTS_PUBLISHED: ['CLOSED'],
+      CLOSED: [],
+    };
+
+    const allowed = validTransitions[assessment.status] || [];
+    
+    // Admins can reopen to DRAFT from any state
+    if (role !== 'TEACHER' && newStatus === 'DRAFT' && assessment.status !== 'DRAFT') {
+      // Admin override allowed
+    } else if (!allowed.includes(newStatus)) {
+      throw new Error(
+        `Cannot transition from ${assessment.status} to ${newStatus}. Allowed: ${allowed.join(', ')}`
+      );
+    }
+
+    const updateData: any = { status: newStatus };
+
+    // Set timestamp fields based on status
+    if (newStatus === 'PUBLISHED') {
+      updateData.publishedAt = new Date();
+    } else if (newStatus === 'RESULTS_PUBLISHED') {
+      updateData.resultsPublishedAt = new Date();
+    }
+
+    return this.prisma.assessmentDefinition.update({
+      where: { id },
+      data: updateData,
+      include: {
+        classSubject: {
+          include: {
+            subject: true,
+            stream: true,
+          },
+        },
+        term: true,
+        _count: {
+          select: { results: true },
+        },
+      },
+    });
+  }
+
+  /**
    * Get assessments for a specific class
    */
   async getClassAssessments(
@@ -584,6 +654,156 @@ export class AssessmentService {
       strand: assignment.strand,
       classSubjectId,
       assessments: results,
+    };
+  }
+
+  // ========================================
+  // Assessment Weight Management
+  // ========================================
+
+  /**
+   * Get all weights for a term and class subject
+   */
+  async getAssessmentWeights(termId: string, classSubjectId: string, schoolId: string) {
+    return this.prisma.assessmentWeight.findMany({
+      where: { termId, classSubjectId, schoolId },
+      orderBy: { assessmentType: 'asc' },
+    });
+  }
+
+  /**
+   * Upsert assessment weight (create or update)
+   */
+  async upsertAssessmentWeight(
+    assessmentType: string,
+    termId: string,
+    classSubjectId: string,
+    weight: number,
+    schoolId: string
+  ) {
+    if (weight < 0 || weight > 100) {
+      throw new Error('Weight must be between 0 and 100');
+    }
+
+    return this.prisma.assessmentWeight.upsert({
+      where: {
+        assessmentType_termId_classSubjectId: {
+          assessmentType: assessmentType as any,
+          termId,
+          classSubjectId,
+        },
+      },
+      update: { weight },
+      create: {
+        assessmentType: assessmentType as any,
+        termId,
+        classSubjectId,
+        weight,
+        schoolId,
+      },
+    });
+  }
+
+  /**
+   * Bulk upsert assessment weights
+   */
+  async bulkUpsertWeights(
+    weights: Array<{ assessmentType: string; termId: string; classSubjectId: string; weight: number }>,
+    schoolId: string
+  ) {
+    const results = await this.prisma.$transaction(
+      weights.map((w) =>
+        this.prisma.assessmentWeight.upsert({
+          where: {
+            assessmentType_termId_classSubjectId: {
+              assessmentType: w.assessmentType as any,
+              termId: w.termId,
+              classSubjectId: w.classSubjectId,
+            },
+          },
+          update: { weight: w.weight },
+          create: {
+            assessmentType: w.assessmentType as any,
+            termId: w.termId,
+            classSubjectId: w.classSubjectId,
+            weight: w.weight,
+            schoolId,
+          },
+        })
+      )
+    );
+    return results;
+  }
+
+  /**
+   * Delete an assessment weight
+   */
+  async deleteAssessmentWeight(id: string, schoolId: string) {
+    const weight = await this.prisma.assessmentWeight.findFirst({
+      where: { id, schoolId },
+    });
+    if (!weight) throw new Error('Weight not found');
+    return this.prisma.assessmentWeight.delete({ where: { id } });
+  }
+
+  /**
+   * Calculate weighted term score for a student in a class subject
+   */
+  async calculateWeightedScore(studentId: string, classSubjectId: string, termId: string, schoolId: string) {
+    const weights = await this.prisma.assessmentWeight.findMany({
+      where: { termId, classSubjectId, schoolId },
+    });
+
+    if (weights.length === 0) {
+      return null; // No weights configured
+    }
+
+    const weightMap = new Map(weights.map((w) => [w.assessmentType, w.weight]));
+    const totalWeight = weights.reduce((sum, w) => sum + w.weight, 0);
+
+    // Get all results for this student in assessments of this class subject in this term
+    const results = await this.prisma.assessmentResult.findMany({
+      where: {
+        studentId,
+        assessmentDef: {
+          classSubjectId,
+          termId,
+          schoolId,
+        },
+      },
+      include: {
+        assessmentDef: {
+          select: { type: true, maxMarks: true },
+        },
+      },
+    });
+
+    if (results.length === 0) return null;
+
+    // Group results by assessment type and calculate average percentage per type
+    const typeAvgs = new Map<string, number>();
+    const typeCounts = new Map<string, number>();
+
+    for (const result of results) {
+      if (result.numericValue == null || !result.assessmentDef.maxMarks) continue;
+      const type = result.assessmentDef.type;
+      const pct = (result.numericValue / result.assessmentDef.maxMarks) * 100;
+      typeAvgs.set(type, (typeAvgs.get(type) || 0) + pct);
+      typeCounts.set(type, (typeCounts.get(type) || 0) + 1);
+    }
+
+    let weightedSum = 0;
+    for (const [type, totalPct] of typeAvgs) {
+      const avg = totalPct / (typeCounts.get(type) || 1);
+      const weight = weightMap.get(type as any) || 0;
+      weightedSum += (avg * weight) / 100;
+    }
+
+    return {
+      weightedScore: Math.round(weightedSum * 100) / 100,
+      totalWeight,
+      configuredWeights: weights.length,
+      resultsUsed: results.filter((r) => r.numericValue != null).length,
     };
   }
 

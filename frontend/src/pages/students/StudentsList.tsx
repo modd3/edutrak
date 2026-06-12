@@ -1,5 +1,5 @@
 // src/pages/students/StudentsList.tsx
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ColumnDef } from '@tanstack/react-table';
 import { MoreHorizontal, PlusCircle, Edit, Trash, Eye, UserPlus, Upload, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { useStudents } from '@/hooks/use-students';
+import { useDebounce } from '@/hooks/use-debounce';
 import { usePermission } from '@/hooks/use-permission';
 import { Student } from '@/types';
 import { StudentDetailsModal } from '@/components/students/StudentDetailsModal';
@@ -65,7 +66,8 @@ const ENROLLMENT_STATUS_COLORS = {
 export default function StudentsList() {
   const { schoolId } = useSchoolContext();
   const { can } = usePermission();
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [genderFilter, setGenderFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('active');
   const [page, setPage] = useState(1);
@@ -81,14 +83,21 @@ export default function StudentsList() {
 
   const queryClient = useQueryClient();
 
-  // Fetch students with filters
+  // Reset page when debounced search or filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, genderFilter, statusFilter]);
+
+  // Fetch students with server-side filters (search + gender + status)
   const { data: studentsData, isLoading, isError } = useStudents({
     schoolId,
-    search: search,
+    search: debouncedSearch,
+    gender: genderFilter || undefined,
+    status: statusFilter === 'active' ? 'ACTIVE' : undefined,
     page,
     pageSize,
   });
-console.log('Fetched students:', studentsData);
+
   // Delete mutation
   const { mutate: deleteStudent, isPending: isDeleting } = useMutation({
     mutationFn: async (id: string) => {
@@ -107,38 +116,19 @@ console.log('Fetched students:', studentsData);
   });
 
   // Extract students from paginated response
+  // API returns: { success, message, data: [...], pagination: { page, limit, total, pages } }
   const students = studentsData?.data || [];
-  const totalStudents = studentsData?.total || 0;
+  const totalStudents = studentsData?.pagination?.total || 0;
 
-  // Reset pagination when filters change
-  const handleSearchChange = (value: string) => {
-    setSearch(value);
-    setPage(1);
-  };
+  // Client-side status filter only for "inactive" tab (no active enrollment)
+  // "active" and "all" are handled server-side
+  const filteredStudents = statusFilter === 'inactive'
+    ? students.filter((student: Student) => {
+        const hasActiveEnrollment = student.enrollments?.some(e => e.status === 'ACTIVE');
+        return !hasActiveEnrollment;
+      })
+    : students;
 
-  const handleGenderChange = (value: string) => {
-    setGenderFilter(value);
-    setPage(1);
-  };
-
-  const handleStatusChange = (value: string) => {
-    setStatusFilter(value);
-    setPage(1);
-  };
-
-  // Filter students by gender and status
-  const filteredStudents = students.filter((student: Student) => {
-    const matchesGender = !genderFilter || genderFilter === 'all' || student.gender === genderFilter;
-    
-    // Check enrollment status
-    const hasActiveEnrollment = student.enrollments?.some(e => e.status === 'ACTIVE');
-    const matchesStatus = 
-      statusFilter === 'all' ||
-      (statusFilter === 'active' && hasActiveEnrollment) ||
-      (statusFilter === 'inactive' && !hasActiveEnrollment);
-    
-    return matchesGender && matchesStatus;
-  })
   const handleDeleteClick = (student: Student) => {
     setSelectedStudent(student);
     setShowDeleteDialog(true);
@@ -155,21 +145,20 @@ console.log('Fetched students:', studentsData);
   };
 
   const handleEnrollClick = (student: Student, mode: 'create' | 'edit' = 'create') => {
-  setSelectedStudent(student);
-  setEnrollmentMode(mode);
-  
-  if (mode === 'edit') {
-    // Find the active enrollment
-    const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
-    if (activeEnrollment) {
-      setSelectedEnrollment(activeEnrollment);
+    setSelectedStudent(student);
+    setEnrollmentMode(mode);
+    
+    if (mode === 'edit') {
+      const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
+      if (activeEnrollment) {
+        setSelectedEnrollment(activeEnrollment);
+      }
+    } else {
+      setSelectedEnrollment(null);
     }
-  } else {
-    setSelectedEnrollment(null);
-  }
-  
-  setShowEnrollModal(true);
-};
+    
+    setShowEnrollModal(true);
+  };
 
   const confirmDelete = () => {
     if (selectedStudent) {
@@ -263,66 +252,66 @@ console.log('Fetched students:', studentsData);
       },
     },
     {
-  id: 'actions',
-  header: 'Actions',
-  cell: ({ row }) => {
-    const student = row.original;
-    const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
-    const hasActiveEnrollment = !!activeEnrollment;
-    const canEditStudent = can('edit_student');
-    const canDeleteStudent = can('delete_student');
-    
-    return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button variant="ghost" className="h-8 w-8 p-0">
-            <span className="sr-only">Open menu</span>
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          <DropdownMenuLabel>Actions</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handleStudentClick(student)}>
-            <Eye className="mr-2 h-4 w-4" />
-            View Details
-          </DropdownMenuItem>
-          {canEditStudent && (
-            <>
-              <DropdownMenuItem onClick={() => handleEditClick(student)}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Student
-              </DropdownMenuItem>
-            </>
-          )}
-          {hasActiveEnrollment ? (
-            <DropdownMenuItem onClick={() => handleEnrollClick(student, 'edit')}>
-              <Pencil className="mr-2 h-4 w-4" />
-              Edit Enrollment
-            </DropdownMenuItem>
-          ) : (
-            <DropdownMenuItem onClick={() => handleEnrollClick(student, 'create')}>
-              <UserPlus className="mr-2 h-4 w-4" />
-              Enroll in Class
-            </DropdownMenuItem>
-          )}
-          {canDeleteStudent && (
-            <>
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const student = row.original;
+        const activeEnrollment = student.enrollments?.find(e => e.status === 'ACTIVE');
+        const hasActiveEnrollment = !!activeEnrollment;
+        const canEditStudent = can('edit_student');
+        const canDeleteStudent = can('delete_student');
+        
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem
-                className="text-destructive"
-                onClick={() => handleDeleteClick(student)}
-              >
-                <Trash className="mr-2 h-4 w-4" />
-                Delete Student
+              <DropdownMenuItem onClick={() => handleStudentClick(student)}>
+                <Eye className="mr-2 h-4 w-4" />
+                View Details
               </DropdownMenuItem>
-            </>
-          )}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    );
-  },
-}
+              {canEditStudent && (
+                <>
+                  <DropdownMenuItem onClick={() => handleEditClick(student)}>
+                    <Edit className="mr-2 h-4 w-4" />
+                    Edit Student
+                  </DropdownMenuItem>
+                </>
+              )}
+              {hasActiveEnrollment ? (
+                <DropdownMenuItem onClick={() => handleEnrollClick(student, 'edit')}>
+                  <Pencil className="mr-2 h-4 w-4" />
+                  Edit Enrollment
+                </DropdownMenuItem>
+              ) : (
+                <DropdownMenuItem onClick={() => handleEnrollClick(student, 'create')}>
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Enroll in Class
+                </DropdownMenuItem>
+              )}
+              {canDeleteStudent && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => handleDeleteClick(student)}
+                  >
+                    <Trash className="mr-2 h-4 w-4" />
+                    Delete Student
+                  </DropdownMenuItem>
+                </>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    }
   ];
 
   if (isLoading) {
@@ -345,6 +334,10 @@ console.log('Fetched students:', studentsData);
       </div>
     );
   }
+
+  const totalPages = Math.max(Math.ceil(totalStudents / pageSize), 1);
+  const startRecord = totalStudents === 0 ? 0 : (page - 1) * pageSize + 1;
+  const endRecord = totalStudents === 0 ? 0 : Math.min(page * pageSize, totalStudents);
 
   return (
     <div className="space-y-6">
@@ -374,12 +367,12 @@ console.log('Fetched students:', studentsData);
         <div className="flex-1">
           <Input
             placeholder="Search by name or admission number..."
-            value={search}
-            onChange={(e) => handleSearchChange(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             className="max-w-md"
           />
         </div>
-        <Select value={genderFilter} onValueChange={handleGenderChange}>
+        <Select value={genderFilter} onValueChange={setGenderFilter}>
           <SelectTrigger className="w-[150px]">
             <SelectValue placeholder="Filter by gender" />
           </SelectTrigger>
@@ -392,7 +385,7 @@ console.log('Fetched students:', studentsData);
       </div>
 
       {/* Tabs for Status */}
-      <Tabs value={statusFilter} onValueChange={handleStatusChange}>
+      <Tabs value={statusFilter} onValueChange={setStatusFilter}>
         <TabsList>
           <TabsTrigger value="all">All Students</TabsTrigger>
           <TabsTrigger value="active">Enrolled</TabsTrigger>
@@ -404,11 +397,11 @@ console.log('Fetched students:', studentsData);
         </TabsContent>
       </Tabs>
 
-      {/* Summary */}
+      {/* Pagination */}
       {studentsData && (
         <div className="space-y-2">
           <div className="text-sm text-muted-foreground text-center">
-            Showing {totalStudents === 0 ? 0 : (page - 1) * pageSize + 1} - {totalStudents === 0 ? 0 : Math.min(page * pageSize, totalStudents)} of {totalStudents} students
+            Showing {startRecord} - {endRecord} of {totalStudents} students
           </div>
           <div className="flex items-center justify-center gap-2">
             <Button
@@ -420,13 +413,13 @@ console.log('Fetched students:', studentsData);
               Previous
             </Button>
             <span className="text-sm text-muted-foreground">
-              Page {page} of {Math.max(Math.ceil(totalStudents / pageSize), 1)}
+              Page {page} of {totalPages}
             </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => setPage((prev) => prev + 1)}
-              disabled={page >= Math.max(Math.ceil(totalStudents / pageSize), 1)}
+              disabled={page >= totalPages}
             >
               Next
             </Button>
@@ -462,14 +455,14 @@ console.log('Fetched students:', studentsData);
 
       {/* Enroll Student Modal */}
       {selectedStudent && (
-  <StudentEnrollmentModal
-    open={showEnrollModal}
-    onOpenChange={setShowEnrollModal}
-    student={selectedStudent}
-    enrollment={enrollmentMode === 'edit' ? selectedEnrollment : undefined}
-    mode={enrollmentMode}
-  />
-)}
+        <StudentEnrollmentModal
+          open={showEnrollModal}
+          onOpenChange={setShowEnrollModal}
+          student={selectedStudent}
+          enrollment={enrollmentMode === 'edit' ? selectedEnrollment : undefined}
+          mode={enrollmentMode}
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>

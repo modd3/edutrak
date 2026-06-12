@@ -49,6 +49,14 @@ export enum SubjectEnrollmentStatus {
   COMPLETED = 'COMPLETED',
   FAILED = 'FAILED'
 }
+export enum AssessmentStatus {
+  DRAFT = 'DRAFT',
+  PUBLISHED = 'PUBLISHED',
+  GRADING_IN_PROGRESS = 'GRADING_IN_PROGRESS',
+  RESULTS_PUBLISHED = 'RESULTS_PUBLISHED',
+  CLOSED = 'CLOSED',
+}
+
 export enum AssessmentType  {
   CAT = 'CAT',
   MIDTERM = 'MIDTERM',
@@ -380,10 +388,22 @@ export interface ClassSubjectStrand {
   strand: Strand;
 }
 
+export interface AssessmentWeight {
+  id: string;
+  assessmentType: AssessmentType;
+  termId: string;
+  classSubjectId: string;
+  weight: number;
+  schoolId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface AssessmentDefinition {
   id: string;
   name: string;
   type: AssessmentType;
+  status: AssessmentStatus;
   maxMarks: number;
   termId: string;
   term?: Term;
@@ -391,9 +411,20 @@ export interface AssessmentDefinition {
   classSubject?: ClassSubject;
   strandId: string;
   strand: Strand;
+  createdById?: string;
+  publishedAt?: string;
+  resultsPublishedAt?: string;
   results: AssessmentResult;
+  _count?: { results: number };
   createdAt: string;
   updatedAt: string;
+}
+
+export interface WeightedScoreResult {
+  weightedScore: number;
+  totalWeight: number;
+  configuredWeights: number;
+  resultsUsed: number;
 }
 
 export interface AssessmentResult {
@@ -460,7 +491,10 @@ export interface ApiResponse<T> {
 }
 
 export interface PaginatedResponse<T> extends ApiResponse<T[]> {
-  total: number;
-  page: number;
-  pageSize: number;
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }

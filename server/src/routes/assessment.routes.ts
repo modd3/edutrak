@@ -87,12 +87,64 @@ router.put(
   controller.updateAssessment
 );
 
+// Update assessment status (workflow transition)
+router.patch(
+  '/:id/status',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.updateAssessmentStatus
+);
+
 // Delete assessment
 router.delete(
   '/:id',
   authenticate,
   authorize('ADMIN'),
   controller.deleteAssessment
+);
+
+/**
+ * Assessment Weight Routes
+ */
+
+// Get weights for a term and class subject
+router.get(
+  '/weights',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.getWeights
+);
+
+// Calculate weighted score
+router.get(
+  '/weights/calculate',
+  authenticate,
+  authorize('ADMIN', 'TEACHER'),
+  controller.calculateWeightedScore
+);
+
+// Upsert a single weight
+router.post(
+  '/weights',
+  authenticate,
+  authorize('ADMIN'),
+  controller.upsertWeight
+);
+
+// Bulk upsert weights
+router.post(
+  '/weights/bulk',
+  authenticate,
+  authorize('ADMIN'),
+  controller.bulkUpsertWeights
+);
+
+// Delete a weight
+router.delete(
+  '/weights/:id',
+  authenticate,
+  authorize('ADMIN'),
+  controller.deleteWeight
 );
 
 /**

@@ -26,7 +26,7 @@ export const guardianService = {
    */
   getAll: async (params?: {
     page?: number;
-    pageSize?: number;
+    limit?: number;
     search?: string;
   }): Promise<PaginatedResponse<GuardianResponse>> => {
     const response = await api.get('/guardians', { params });

@@ -15,6 +15,7 @@ export const studentService = {
     schoolId?: string;
     search?: string;
     gender?: string;
+    status?: string;
     hasSpecialNeeds?: boolean;
     classId?: string;
   }): Promise<PaginatedResponse<Student>> => {
@@ -25,6 +26,7 @@ export const studentService = {
       schoolId: params?.schoolId,
       search: params?.search,
       gender: params?.gender,
+      status: params?.status,
       hasSpecialNeeds: params?.hasSpecialNeeds,
       classId: params?.classId,
     };

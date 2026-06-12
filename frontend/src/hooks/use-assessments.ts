@@ -115,6 +115,104 @@ export function useUpdateAssessment() {
 }
 
 /**
+ * Update assessment status mutation
+ */
+export function useUpdateAssessmentStatus() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ id, status }: { id: string; status: string }) =>
+      assessmentApi.updateAssessmentStatus(id, status),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['assessments'] });
+      queryClient.invalidateQueries({ queryKey: ['assessments', variables.id] });
+      toast.success('Assessment status updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update assessment status');
+    },
+  });
+}
+
+/**
+ * Get assessment weights for a term and class subject
+ */
+export function useAssessmentWeights(termId?: string, classSubjectId?: string) {
+  return useQuery({
+    queryKey: ['assessment-weights', termId, classSubjectId],
+    queryFn: () => assessmentApi.getWeights(termId!, classSubjectId!),
+    enabled: !!termId && !!classSubjectId,
+  });
+}
+
+/**
+ * Upsert assessment weight mutation
+ */
+export function useUpsertAssessmentWeight() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: { assessmentType: string; termId: string; classSubjectId: string; weight: number }) =>
+      assessmentApi.upsertWeight(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessment-weights'] });
+      toast.success('Weight saved successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to save weight');
+    },
+  });
+}
+
+/**
+ * Bulk upsert assessment weights mutation
+ */
+export function useBulkUpsertWeights() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (weights: Array<{ assessmentType: string; termId: string; classSubjectId: string; weight: number }>) =>
+      assessmentApi.bulkUpsertWeights(weights),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessment-weights'] });
+      toast.success('Weights saved successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to save weights');
+    },
+  });
+}
+
+/**
+ * Delete assessment weight mutation
+ */
+export function useDeleteAssessmentWeight() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (id: string) => assessmentApi.deleteWeight(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['assessment-weights'] });
+      toast.success('Weight deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete weight');
+    },
+  });
+}
+
+/**
+ * Calculate weighted score for a student
+ */
+export function useWeightedScore(studentId?: string, classSubjectId?: string, termId?: string) {
+  return useQuery({
+    queryKey: ['weighted-score', studentId, classSubjectId, termId],
+    queryFn: () => assessmentApi.calculateWeightedScore(studentId!, classSubjectId!, termId!),
+    enabled: !!studentId && !!classSubjectId && !!termId,
+  });
+}
+
+/**
  * Delete assessment mutation
  */
 export function useDeleteAssessment() {

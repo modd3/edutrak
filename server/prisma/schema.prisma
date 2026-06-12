@@ -29,6 +29,7 @@ model School {
   academicYears         AcademicYear[]
   assessmentDefinitions AssessmentDefinition[]
   assessmentResults     AssessmentResult[]
+  assessmentWeights     AssessmentWeight[]
   classes               Class[]
   classSubjects         ClassSubject[]
   streams               Stream[]
@@ -395,6 +396,7 @@ model Term {
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
   AssessmentDefinitions AssessmentDefinition[]
+  assessmentWeights     AssessmentWeight[]
   classSubjects         ClassSubject[]         @relation("TermClassSubjects")
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
   school                School?                @relation(fields: [schoolId], references: [id])
@@ -495,6 +497,7 @@ model ClassSubject {
   subjectCategory SubjectCategory
   schoolId        String?
   assessments     AssessmentDefinition[]
+  assessmentWeights AssessmentWeight[]
   academicYear    AcademicYear           @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
   class           Class                  @relation(fields: [classId], references: [id])
   stream          Stream?                @relation(fields: [streamId], references: [id])
@@ -589,30 +592,54 @@ model StudentClassSubject {
 }
 
 
-model AssessmentDefinition {
-  id             String             @id @default(uuid())
-  name           String
-  type           AssessmentType
-  maxMarks       Float?
+model AssessmentWeight {
+  id             String         @id @default(uuid())
+  assessmentType AssessmentType
   termId         String
   classSubjectId String
+  weight         Float          // percentage (e.g., 20 for 20%)
   schoolId       String?
-  academicYearId String?
-  strandId       String?
-  createdAt      DateTime           @default(now())
-  updatedAt      DateTime           @updatedAt
-  academicYear   AcademicYear?      @relation(fields: [academicYearId], references: [id])
-  classSubject   ClassSubject       @relation(fields: [classSubjectId], references: [id])
-  school         School?            @relation(fields: [schoolId], references: [id])
-  strand         Strand?            @relation(fields: [strandId], references: [id])
-  term           Term               @relation(fields: [termId], references: [id])
-  results        AssessmentResult[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  classSubject   ClassSubject   @relation(fields: [classSubjectId], references: [id])
+  school         School?        @relation(fields: [schoolId], references: [id])
+  term           Term           @relation(fields: [termId], references: [id])
+
+  @@unique([assessmentType, termId, classSubjectId])
+  @@index([termId])
+  @@index([classSubjectId])
+  @@index([schoolId])
+}
+
+model AssessmentDefinition {
+  id                String             @id @default(uuid())
+  name              String
+  type              AssessmentType
+  status            AssessmentStatus   @default(DRAFT)
+  maxMarks          Float?
+  termId            String
+  classSubjectId    String
+  schoolId          String?
+  academicYearId    String?
+  strandId          String?
+  createdById       String?
+  publishedAt       DateTime?
+  resultsPublishedAt DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  academicYear      AcademicYear?      @relation(fields: [academicYearId], references: [id])
+  classSubject      ClassSubject       @relation(fields: [classSubjectId], references: [id])
+  school            School?            @relation(fields: [schoolId], references: [id])
+  strand            Strand?            @relation(fields: [strandId], references: [id])
+  term              Term               @relation(fields: [termId], references: [id])
+  results           AssessmentResult[]
 
   @@index([schoolId])
   @@index([academicYearId])
   @@index([termId])
   @@index([classSubjectId])
   @@index([strandId])
+  @@index([status])
 }
 
 model AssessmentResult {
@@ -749,6 +776,14 @@ enum SubjectEnrollmentStatus {
   DROPPED
   COMPLETED
   FAILED
+}
+
+enum AssessmentStatus {
+  DRAFT
+  PUBLISHED
+  GRADING_IN_PROGRESS
+  RESULTS_PUBLISHED
+  CLOSED
 }
 
 enum AssessmentType {

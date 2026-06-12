@@ -16,6 +16,7 @@ import { DataTable } from '@/components/shared/DataTable';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { useDebounce } from '@/hooks/use-debounce';
 import {
   Select,
   SelectContent,
@@ -51,7 +52,8 @@ import { toast } from 'sonner';
 import { teacherService } from '@/services/teacher.service';
 
 export default function TeachersList() {
-  const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [employmentType, setEmploymentType] = useState('all');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
@@ -71,17 +73,17 @@ export default function TeachersList() {
     error,
     refetch 
   } = useQuery({
-    queryKey: ['teachers', schoolId, search, employmentType],
+    queryKey: ['teachers', schoolId, debouncedSearch, employmentType],
     queryFn: () => teacherService.getAll({
       schoolId,
-      search: search || undefined,
+      search: debouncedSearch || undefined,
       employmentType: employmentType === 'all' ? undefined : employmentType
     }),
     enabled: !!schoolId,
   });
 
   const teachers = teachersData?.data || [];
-  const totalTeachers = teachersData?.total || 0;
+  const totalTeachers = teachersData?.pagination?.total || 0;
 
   useEffect(() => {
     if (error) {
@@ -192,7 +194,7 @@ export default function TeachersList() {
             case 'CONTRACT': return 'secondary';
             case 'TEMPORARY': return 'outline';
             case 'BOM': return 'destructive';
-            case 'PTA': return 'secondary'; // Changed to secondary as success isn't standard in shadcn badges
+            case 'PTA': return 'secondary';
             default: return 'secondary';
           }
         };
@@ -305,8 +307,8 @@ export default function TeachersList() {
           <Input
             placeholder="Search by name, TSC number, or email..."
             className="pl-10"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
         </div>
         <Select
@@ -325,11 +327,11 @@ export default function TeachersList() {
             <SelectItem value="PTA">PTA</SelectItem>
           </SelectContent>
         </Select>
-        { (search || employmentType !== 'all') && (
+        { (searchInput || employmentType !== 'all') && (
             <Button
               variant="ghost"
               onClick={() => {
-                setSearch('');
+                setSearchInput('');
                 setEmploymentType('all');
               }}
             >
@@ -366,7 +368,7 @@ export default function TeachersList() {
             </div>
             <h3 className="mt-4 text-lg font-semibold">No teachers found</h3>
             <p className="mb-4 mt-2 text-sm text-muted-foreground">
-              {search || employmentType !== 'all' 
+              {searchInput || employmentType !== 'all' 
                 ? 'No teachers match your search criteria.' 
                 : 'Get started by adding your first teacher to the system.'}
             </p>
@@ -385,11 +387,7 @@ export default function TeachersList() {
             <DataTable
               columns={columns}
               data={teachers}
-              pagination={{
-                pageSize: 10,
-                pageIndex: 0,
-                pageCount: Math.ceil(totalTeachers / 10),
-              }}
+              pageSize={10}
             />
           </div>
           <div className="text-sm text-muted-foreground text-center">
