@@ -614,10 +614,14 @@ export class GradeEntryService {
    * Get CBC competency level from percentage
    */
   private getCompetencyLevel(percentage: number): CompetencyLevel {
-    if (percentage >= 80) return CompetencyLevel.EXCEEDING_EXPECTATIONS;
-    if (percentage >= 60) return CompetencyLevel.MEETING_EXPECTATIONS;
-    if (percentage >= 40) return CompetencyLevel.APPROACHING_EXPECTATIONS;
-    return CompetencyLevel.BELOW_EXPECTATIONS;
+    if (percentage >= 90) return CompetencyLevel.EXCEEDING_EXPECTATIONS_2;
+    if (percentage >= 80) return CompetencyLevel.EXCEEDING_EXPECTATIONS_1;
+    if (percentage >= 75) return CompetencyLevel.MEETING_EXPECTATIONS_2;
+    if (percentage >= 60) return CompetencyLevel.MEETING_EXPECTATIONS_1;
+    if (percentage >= 55) return CompetencyLevel.APPROACHING_EXPECTATIONS_2;
+    if (percentage >= 40) return CompetencyLevel.APPROACHING_EXPECTATIONS_1;
+    if (percentage >= 20) return CompetencyLevel.BELOW_EXPECTATIONS_1;
+    return CompetencyLevel.BELOW_EXPECTATIONS_2;
   }
 
   /**

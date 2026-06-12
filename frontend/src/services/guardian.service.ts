@@ -65,17 +65,21 @@ export const guardianService = {
   },
 
   /**
-   * Link a guardian to a student
+   * @deprecated Use studentGuardianService.linkGuardianToStudent instead
+   * Link a guardian to a student via centralized API
    */
   linkToStudent: async (guardianId: string, studentId: string): Promise<void> => {
-    await api.post(`/guardians/${guardianId}/link-student`, { studentId });
+    const { studentGuardianService } = await import('@/services/student-guardian.service');
+    await studentGuardianService.linkGuardianToStudent({ guardianId, studentId });
   },
 
   /**
-   * Unlink a guardian from a student
+   * @deprecated Use studentGuardianService.unlinkGuardian instead
+   * Unlink a guardian from a student via centralized API
    */
   unlinkStudent: async (guardianId: string, studentId: string): Promise<void> => {
-    await api.post(`/guardians/${guardianId}/unlink-student`, { studentId });
+    const { studentGuardianService } = await import('@/services/student-guardian.service');
+    await studentGuardianService.unlinkGuardian(studentId, guardianId);
   },
 
   /**

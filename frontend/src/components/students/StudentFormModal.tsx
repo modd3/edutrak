@@ -15,7 +15,7 @@ import { Student } from '@/types';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useSchools } from '@/hooks/use-schools';
 import { usePreviewSequence } from '@/hooks/use-sequences';
-import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle, Building2, UserIcon, Calendar, Plus, Trash2 } from 'lucide-react';
+import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle, Building2, UserIcon, Calendar, Plus, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import api from '@/api';
 
@@ -758,6 +758,26 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
                       ))}
                     </div>
                   )}
+                </div>
+              </>
+            )}
+
+            {/* In edit mode, show a note about managing guardians */}
+            {mode === 'edit' && (
+              <>
+                <Separator />
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Users className="h-4 w-4" />
+                      <span className="font-semibold">Guardian Management</span>
+                    </div>
+                    <p>
+                      To add, remove, or update guardian relationships, close this form and 
+                      open the student's detail view. Click <strong>"Manage Guardians"</strong> 
+                      in the Enrollment tab to link existing guardians or create new ones.
+                    </p>
+                  </div>
                 </div>
               </>
             )}

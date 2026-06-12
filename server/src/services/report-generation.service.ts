@@ -393,10 +393,14 @@ export class ReportGenerationService {
         };
       } else if (classData.curriculum === Curriculum.CBC) {
         competencyDistribution = {
-          [CompetencyLevel.EXCEEDING_EXPECTATIONS]: scores.filter((s) => s >= 80).length,
-          [CompetencyLevel.MEETING_EXPECTATIONS]: scores.filter((s) => s >= 60 && s < 80).length,
-          [CompetencyLevel.APPROACHING_EXPECTATIONS]: scores.filter((s) => s >= 40 && s < 60).length,
-          [CompetencyLevel.BELOW_EXPECTATIONS]: scores.filter((s) => s < 40).length,
+          [CompetencyLevel.EXCEEDING_EXPECTATIONS_2]: scores.filter((s) => s >= 90).length,
+          [CompetencyLevel.EXCEEDING_EXPECTATIONS_1]: scores.filter((s) => s >= 80 && s < 90).length,
+          [CompetencyLevel.MEETING_EXPECTATIONS_2]: scores.filter((s) => s >= 75 && s < 80).length,
+          [CompetencyLevel.MEETING_EXPECTATIONS_1]: scores.filter((s) => s >= 60 && s < 75).length,
+          [CompetencyLevel.APPROACHING_EXPECTATIONS_2]: scores.filter((s) => s >= 55 && s < 60).length,
+          [CompetencyLevel.APPROACHING_EXPECTATIONS_1]: scores.filter((s) => s >= 40 && s < 55).length,
+          [CompetencyLevel.BELOW_EXPECTATIONS_1]: scores.filter((s) => s >= 20 && s < 40).length,
+          [CompetencyLevel.BELOW_EXPECTATIONS_2]: scores.filter((s) => s < 20).length,
         };
       }
 
@@ -575,10 +579,14 @@ export class ReportGenerationService {
    * Helper: Get competency level from percentage
    */
   private getCompetencyLevel(percentage: number): CompetencyLevel {
-    if (percentage >= 80) return CompetencyLevel.EXCEEDING_EXPECTATIONS;
-    if (percentage >= 60) return CompetencyLevel.MEETING_EXPECTATIONS;
-    if (percentage >= 40) return CompetencyLevel.APPROACHING_EXPECTATIONS;
-    return CompetencyLevel.BELOW_EXPECTATIONS;
+    if (percentage >= 90) return CompetencyLevel.EXCEEDING_EXPECTATIONS_2;
+    if (percentage >= 80) return CompetencyLevel.EXCEEDING_EXPECTATIONS_1;
+    if (percentage >= 75) return CompetencyLevel.MEETING_EXPECTATIONS_2;
+    if (percentage >= 60) return CompetencyLevel.MEETING_EXPECTATIONS_1;
+    if (percentage >= 55) return CompetencyLevel.APPROACHING_EXPECTATIONS_2;
+    if (percentage >= 40) return CompetencyLevel.APPROACHING_EXPECTATIONS_1;
+    if (percentage >= 20) return CompetencyLevel.BELOW_EXPECTATIONS_1;
+    return CompetencyLevel.BELOW_EXPECTATIONS_2;
   }
 
   /**

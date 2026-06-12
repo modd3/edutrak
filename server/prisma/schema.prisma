@@ -307,14 +307,22 @@ model Guardian {
 }
 
 model StudentGuardian {
-  id         String   @id @default(uuid())
-  studentId  String
-  guardianId String
-  isPrimary  Boolean  @default(false)
-  guardian   Guardian @relation(fields: [guardianId], references: [id], onDelete: Cascade)
-  student    Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id             String     @id @default(uuid())
+  studentId      String
+  guardianId     String
+  relationship   String?     // Override relationship specific to this student-guardian pair
+  isPrimary      Boolean    @default(false)
+  isVerified     Boolean    @default(false)
+  verifiedAt     DateTime?
+  verifiedById   String?    // User who verified the relationship
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @default(now()) @updatedAt
+  guardian       Guardian   @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student        Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, guardianId])
+  @@index([studentId])
+  @@index([guardianId])
 }
 
 model Teacher {
@@ -453,7 +461,6 @@ model Subject {
   learningArea LearningArea?
   subjectGroup SubjectGroup?
   curriculum   Curriculum[]
-  requiredForPathway? LearningPathway[]
   description  String?
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
@@ -768,17 +775,17 @@ enum CompetencyLevel {
   APPROACHING_EXPECTATIONS_1
   APPROACHING_EXPECTATIONS_2
   BELOW_EXPECTATIONS_1
-  BELOW_EXPECTATIONS_1
+  BELOW_EXPECTATIONS_2
 }
 
 enum CoreCompetency {
-  COMMUNICATION_COLLABORATION = 'COMMUNICATION_COLLABORATION',
-  SELF_EFFICACY = 'SELF_EFFICACY',
-  CRITICAL_THINKING = 'CRITICAL_THINKING',
-  CREATIVITY_IMAGINATION = 'CREATIVITY_IMAGINATION',
-  CITIZENSHIP = 'CITIZENSHIP',
-  DIGITAL_LITERACY = 'DIGITAL_LITERACY',
-  LEARNING_TO_LEARN = 'LEARNING_TO_LEARN'
+  COMMUNICATION_COLLABORATION
+  SELF_EFFICACY
+  CRITICAL_THINKING
+  CREATIVITY_IMAGINATION
+  CITIZENSHIP
+  DIGITAL_LITERACY
+  LEARNING_TO_LEARN
 }
 
 
@@ -1000,24 +1007,21 @@ enum BillingInvoiceStatus {
 
 enum BillingPaymentStatus {
   PENDING
-  SUCCEEDED
+  COMPLETED
   FAILED
   REFUNDED
+  PARTIALLY_REFUNDED
 }
 
 enum DocumentTemplateScope {
   REPORT_CARD
-  FEE_INVOICE
-  PAYMENT_RECEIPT
-  STUDENT_TRANSCRIPT
-  ADMISSION_FORM
+  TRANSFER_SLIP
   LEAVING_CERTIFICATE
-  ID_CARD
+  FEEDBACK_FORM
 }
 
 enum TemplateStatus {
   DRAFT
-  REVIEW
   PUBLISHED
   ARCHIVED
 }

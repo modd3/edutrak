@@ -203,10 +203,14 @@ export interface GradeDistribution {
 }
 
 export interface CompetencyDistribution {
-  [CompetencyLevel.EXCEEDING_EXPECTATIONS]: number;
-  [CompetencyLevel.MEETING_EXPECTATIONS]: number;
-  [CompetencyLevel.APPROACHING_EXPECTATIONS]: number;
-  [CompetencyLevel.BELOW_EXPECTATIONS]: number;
+  [CompetencyLevel.EXCEEDING_EXPECTATIONS_1]: number;
+  [CompetencyLevel.EXCEEDING_EXPECTATIONS_2]: number;
+  [CompetencyLevel.MEETING_EXPECTATIONS_1]: number;
+  [CompetencyLevel.MEETING_EXPECTATIONS_2]: number;
+  [CompetencyLevel.APPROACHING_EXPECTATIONS_1]: number;
+  [CompetencyLevel.APPROACHING_EXPECTATIONS_2]: number;
+  [CompetencyLevel.BELOW_EXPECTATIONS_1]: number;
+  [CompetencyLevel.BELOW_EXPECTATIONS_2]: number;
 }
 
 export interface TopPerformer {

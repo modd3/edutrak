@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config({ path: require('path').resolve(__dirname, '../.env') });
+
 import { PrismaClient, Role, SchoolType, Ownership, BoardingStatus, SchoolGender, Curriculum, Gender, EmploymentType, TermName, SubjectCategory, EnrollmentStatus, SubjectEnrollmentStatus, AssessmentType, InvoiceStatus, PaymentMethod, PaymentStatus } from '@prisma/client';
 import { hashPassword } from '../src/utils/hash';
 import { v4 as uuidv4 } from 'uuid';

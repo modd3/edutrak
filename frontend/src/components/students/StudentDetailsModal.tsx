@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { StudentFormModal } from './StudentFormModal';
+import { StudentGuardianManager } from '@/components/guardians/StudentGuardianManager';
 
 interface StudentDetailsModalProps {
   open: boolean;
@@ -65,6 +66,7 @@ const InfoItem = ({
 
 export function StudentDetailsModal({ open, onOpenChange, student }: StudentDetailsModalProps) {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showGuardianManager, setShowGuardianManager] = useState(false);
   const fullName = `${student.firstName} ${student.middleName || ''} ${student.lastName}`.trim();
 
   const basicInfo = [
@@ -240,7 +242,7 @@ export function StudentDetailsModal({ open, onOpenChange, student }: StudentDeta
                   </Card>
                 )}
 
-                {student.guardians && student.guardians.length > 0 && (
+                {(student.guardians && student.guardians.length > 0) ? (
                   <Card>
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
@@ -257,11 +259,13 @@ export function StudentDetailsModal({ open, onOpenChange, student }: StudentDeta
                               <p className="text-sm font-medium">
                                 {sg.guardian?.user?.firstName} {sg.guardian?.user?.lastName}
                               </p>
-                              {sg.isPrimary && (
-                                <Badge variant="default" className="text-xs">
-                                  Primary
-                                </Badge>
-                              )}
+                              <div className="flex items-center gap-1">
+                                {sg.isPrimary && (
+                                  <Badge variant="default" className="text-xs">
+                                    Primary
+                                  </Badge>
+                                )}
+                              </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
                               <div className="flex items-center gap-1">
@@ -283,7 +287,24 @@ export function StudentDetailsModal({ open, onOpenChange, student }: StudentDeta
                       </div>
                     </CardContent>
                   </Card>
+                ) : (
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground text-center">
+                        No guardians linked. Click "Manage Guardians" to add one.
+                      </p>
+                    </CardContent>
+                  </Card>
                 )}
+                {/* Add Manage Guardians button */}
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowGuardianManager(true)}
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Manage Guardians
+                </Button>
               </TabsContent>
 
               {/* System Information Tab */}
@@ -370,6 +391,15 @@ export function StudentDetailsModal({ open, onOpenChange, student }: StudentDeta
         onOpenChange={setShowEditModal}
         mode="edit"
         student={student}
+      />
+      
+      {/* Guardian Relationship Manager */}
+      <StudentGuardianManager
+        open={showGuardianManager}
+        onOpenChange={setShowGuardianManager}
+        studentId={student.id}
+        mode="student"
+        studentName={fullName}
       />
     </>
   );
