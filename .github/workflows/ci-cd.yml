@@ -56,7 +56,7 @@ jobs:
           HUSKY: 0
         run: npm ci
       - name: 🔍 Type check
-        run: cd server && npm run type-check
+        run: npm run type-check:server
 
         
       - name: 🎨 Check code formatting

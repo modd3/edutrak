@@ -2,17 +2,17 @@
   "name": "edutrak-monorepo",
   "private": true,
   "scripts": {
-    "type-check": "cd server && npm run type-check --workspace=server",
-    "format:check": "cd server && npm run format:check --workspace=server",
-    "lint": "cd server && npm run lint --workspace=server",
-    "db:generate": "cd server && npm run db:generate --workspace=server",
-    "db:validate": "cd server && npm run db:validate --workspace=server",
-    "db:migrate:deploy": "cd server && npm run db:migrate:deploy --workspace=server",
-    "db:seed": "cd server && npm run db:seed --workspace=server",
-    "test:unit": "cd server && npm run test:unit --workspace=server",
-    "test:integration": "cd server && npm run test:integration --workspace=server",
-    "build": "cd server && npm run build --workspace=server",
-    "security:audit": "cd server && npm run security:audit --workspace=server"
+    "type-check:server": "npm run type-check --workspace=server",
+    "format:check": "npm run format:check --workspace=server",
+    "lint": "npm run lint --workspace=server",
+    "db:generate": "npm run db:generate --workspace=server",
+    "db:validate": "npm run db:validate --workspace=server",
+    "db:migrate:deploy": "npm run db:migrate:deploy --workspace=server",
+    "db:seed": "npm run db:seed --workspace=server",
+    "test:unit": "npm run test:unit --workspace=server",
+    "test:integration": "npm run test:integration --workspace=server",
+    "build": "npm run build --workspace=server",
+    "security:audit": "npm run security:audit --workspace=server"
   },
   "workspaces": [
     "server",
