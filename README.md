@@ -11,6 +11,7 @@ Key features
 - Assessments, grading and reports
 - Bulk user import (CSV)
 - Sequential ID generation for admission numbers and other entities
+- School fees management: structure, invoice & receipt generation
 
 Tech stack
 - Backend: Node.js, TypeScript, Express, Prisma (PostgreSQL)
