@@ -27,9 +27,10 @@ Repository layout
 Quick start (development)
 1. Prerequisites: Node.js 18+, npm, PostgreSQL (or use docker-compose)
 2. Clone the repo:
+   ```bash
    git clone https://github.com/modd3/edutrak.git
-   cd edutrak
 
+   cd edutrak``` 
 Backend (server)
 3. Copy env example and configure:
    cp server/.env.example server/.env
