@@ -29,26 +29,32 @@ Quick start (development)
 2. Clone the repo:
    ```bash
    git clone https://github.com/modd3/edutrak.git
-
-   cd edutrak``` 
+   cd edutrak
+   ``` 
 Backend (server)
 3. Copy env example and configure:
-   cp server/.env.example server/.env
+   ```bash
+     cp server/.env.example server/.env
+   ```
    # edit server/.env with DATABASE_URL and JWT secrets
 4. Install and run:
+   ```bash
    cd server
    npm install
    npx prisma migrate dev --name init
    npm run dev
-
+   ```
 Frontend
 5. Configure frontend env:
+   ```bash
    cp frontend/.env.example frontend/.env
+   ```
 6. Install and run:
+   ```bash
    cd frontend
    npm install
    npm run dev
-
+   ```
 Docs and next steps
 - See docs/project-outline.md and docs/FRONTEND_BUILD_GUIDE.md for architecture and development guidance.
 - Recommended immediate actions: add CI (lint/test/build), complete API contract (OpenAPI/Swagger), add seed data and tests, secure env secrets and add deployment pipeline.
