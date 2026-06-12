@@ -143,3 +143,4 @@ pastebin/
 
 *.code-workspace
 *.ctb
+*.vscode*
