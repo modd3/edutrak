@@ -1,5 +1,5 @@
 {
-  "name": "EduTrak-school-management-api",
+  "name": "edutrak-school-management-api",
   "version": "2.0.0",
   "description": "School Management System API for Kenya - Supporting CBC/CBE and 8-4-4 curricula",
   "main": "dist/server.js",
@@ -7,8 +7,7 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "type-check": "tsc --noEmit",
-    
+        
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -39,7 +38,6 @@
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
     
-    "prepare": "husky install",
     "precommit": "lint-staged",
     "prepush": "npm run type-check && npm run test:unit"
   },
