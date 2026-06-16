@@ -21,7 +21,7 @@ const router = Router();
  * @desc    Login user
  * @access  Public
  */
-router.post('/login', rateLimit(5, 15 * 60 * 1000), login);
+router.post('/login', rateLimit(15, 15 * 60 * 1000), login);
 
 /**
  * @route   POST /api/auth/register
