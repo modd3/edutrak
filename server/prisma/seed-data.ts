@@ -68,7 +68,7 @@ export const SUBJECT_DEFINITIONS = [
 ];
 
 export const FORM_LEVELS = ['Form 1', 'Form 2', 'Form 3', 'Form 4'];
-export const STREAMS = ['East', 'West', 'Central', 'North'];
+export const STREAMS = ['East', 'West'];
 export const DEMO_SCHOOL_NAME = 'Nakuru Premier Secondary School';
 
 export const ASSESSMENT_TYPES = ['CAT_1', 'CAT_2', 'END_TERM_EXAM'];

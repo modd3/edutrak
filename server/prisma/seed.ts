@@ -161,7 +161,7 @@ async function main() {
   state.term2Id = term2.id;
   console.log('✅ Academic Year 2025 with Term 1 & Term 2 created');
 
-  // Step 7: Create 12 classes (4 forms × 3 streams)
+  // Step 7: Create 8 classes (4 forms × 2 streams)
   let classIndex = 0;
   for (const form of FORM_LEVELS) {
     // Create the class (Form 1, Form 2, etc.)
@@ -179,7 +179,7 @@ async function main() {
     });
     state.classIds[form] = cls.id;
 
-    // Create 3 streams per form
+    // Create streams per form
     for (const streamName of STREAMS) {
       const stream = await prisma.stream.create({
         data: {
@@ -196,7 +196,7 @@ async function main() {
   }
   console.log(`✅ ${FORM_LEVELS.length} classes with ${STREAMS.length} streams each created`);
 
-  // Step 8: Create 15 teachers with user accounts
+  // Step 8: Create 8 teachers with user accounts (one per core subject)
   const teacherSubjectAssignments = [
     { firstName: 'John', lastName: 'Kamau', subject: 'Mathematics', gender: 'MALE' },
     { firstName: 'Mary', lastName: 'Wanjiku', subject: 'English', gender: 'FEMALE' },
@@ -206,13 +206,6 @@ async function main() {
     { firstName: 'Sarah', lastName: 'Kosgey', subject: 'Physics', gender: 'FEMALE' },
     { firstName: 'James', lastName: 'Mwangi', subject: 'Geography', gender: 'MALE' },
     { firstName: 'Esther', lastName: 'Muthoni', subject: 'History', gender: 'FEMALE' },
-    { firstName: 'Samuel', lastName: 'Njoroge', subject: 'CRE', gender: 'MALE' },
-    { firstName: 'Rebecca', lastName: 'Adhiambo', subject: 'Business Studies', gender: 'FEMALE' },
-    { firstName: 'Daniel', lastName: 'Mutua', subject: 'Agriculture', gender: 'MALE' },
-    { firstName: 'Faith', lastName: 'Wambui', subject: 'Computer Studies', gender: 'FEMALE' },
-    { firstName: 'Patrick', lastName: 'Odhiambo', subject: 'Mathematics', gender: 'MALE' },
-    { firstName: 'Nancy', lastName: 'Akinyi', subject: 'English', gender: 'FEMALE' },
-    { firstName: 'Kevin', lastName: 'Kipkorir', subject: 'Biology', gender: 'MALE' },
   ];
 
   for (let i = 0; i < teacherSubjectAssignments.length; i++) {
@@ -254,9 +247,9 @@ async function main() {
   }
   console.log(`✅ ${state.teacherIds.length} teachers created`);
 
-  // Step 9: Create 80 students (20 per form level)
+  // Step 9: Create 20 students (5 per form level)
   let studentCounter = 1;
-  const studentsPerForm = 20;
+  const studentsPerForm = 5;
   
   for (let formIdx = 0; formIdx < FORM_LEVELS.length; formIdx++) {
     const form = FORM_LEVELS[formIdx];
@@ -309,8 +302,8 @@ async function main() {
       });
       state.studentIds.push(student.id);
 
-      // Assign to a stream (distribute evenly: 6-7 per stream)
-      const streamIndex = s % 3;
+      // Assign to a stream (distribute evenly: 2-3 per stream)
+      const streamIndex = s % 2;
       const streamEntry = state.streamIds.find(
         st => st.classId === classId && st.name === STREAMS[streamIndex]
       );
@@ -336,9 +329,9 @@ async function main() {
   console.log(`✅ ${state.studentIds.length} students created and enrolled`);
 
   // Step 10: Create guardians and link to students
-  // Create ~25 guardians, each linked to 2-4 students
+  // Create 8 guardians, each linked to 2-3 students
   const existingGuardianEmails = new Set<string>();
-  for (let g = 0; g < 25; g++) {
+  for (let g = 0; g < 8; g++) {
     const isMale = randInt(0, 1) === 0;
     const firstName = isMale ? pick(KENYAN_FIRST_NAMES_MALE) : pick(KENYAN_FIRST_NAMES_FEMALE);
     const lastName = pick(KENYAN_LAST_NAMES);
@@ -695,27 +688,8 @@ async function main() {
   }
   console.log(`✅ ${invoiceCounter - 1} fee invoices and ${paymentCounter - 1} payments created`);
 
-  // Step 17: Create Term 2 assessment definitions (lighter set — just one CAT + midterm for core subjects)
-  for (const cs of state.classSubjectIds) {
-    const subjectCode = Object.entries(state.subjectIds).find(([_, sid]) => sid === cs.subjectId)?.[0] || '';
-    const isCore = coreSubjects.includes(subjectCode);
-    if (!isCore) continue;
-
-    // Only create for core subjects in Term 2
-    await prisma.assessmentDefinition.create({
-      data: {
-        id: uuidv4(),
-        name: `${SUBJECT_DEFINITIONS.find(s => s.code === subjectCode)?.name || 'Subject'} CAT 1 (Term 2)`,
-        type: AssessmentType.CAT,
-        maxMarks: 100,
-        classSubjectId: cs.id,
-        termId: state.term2Id!,
-        academicYearId: state.academicYearId,
-        schoolId: state.schoolId,
-      },
-    }).catch(() => {});
-  }
-  console.log('✅ Term 2 assessment definitions created');
+  // Step 17: Skip Term 2 assessment definitions for demo (reduces DB volume significantly)
+  console.log('⏭️  Skipping Term 2 assessment definitions (demo mode)');
 
   console.log('\n🎉 Seeding complete!');
   console.log('───────────────────────────────────────');
