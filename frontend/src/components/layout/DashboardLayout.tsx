@@ -15,12 +15,23 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { isAuthenticated, user } = useAuthStore();
 
+  // Redirect to login only if auth state is definitively not authenticated
+  // (not just still hydrating)
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
+    if (!isAuthenticated && user === null) {
+      // Give a small delay for Zustand persist hydration to complete
+      const timeout = setTimeout(() => {
+        // Re-check after brief delay — if still not authed, redirect
+        const { isAuthenticated: stillAuthed } = useAuthStore.getState();
+        if (!stillAuthed) {
+          navigate('/login');
+        }
+      }, 100);
+      return () => clearTimeout(timeout);
     }
-  }, [isAuthenticated, navigate]);
+  }, [isAuthenticated, user, navigate]);
 
+  // Render nothing while not authenticated (RoleGuard handles the redirect)
   if (!isAuthenticated || !user) {
     return null;
   }

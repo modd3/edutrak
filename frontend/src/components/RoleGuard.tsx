@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/auth-store';
 import { UserRole } from '@/store/auth-store';
@@ -30,23 +30,37 @@ export function RoleGuard({
   const { user, isAuthenticated } = useAuthStore();
   const navigate = useNavigate();
 
-  // Not authenticated - redirect to login
+  // Not authenticated - redirect to login (via useEffect, NOT during render)
+  useEffect(() => {
+    if (!isAuthenticated || !user) {
+      navigate('/login', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  // Check if user has required role
+  const hasAccess = isAuthenticated && user && roles.includes(user.role);
+
+  // Redirect to fallback route if user doesn't have access (via useEffect)
+  useEffect(() => {
+    if (isAuthenticated && user && !hasAccess) {
+      if (!fallbackComponent) {
+        navigate(fallbackRoute, { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, hasAccess, fallbackRoute, fallbackComponent, navigate]);
+
+  // Not authenticated yet - render nothing while redirecting
   if (!isAuthenticated || !user) {
-    navigate('/login', { replace: true });
     return null;
   }
 
-  // Check if user has required role
-  const hasAccess = roles.includes(user.role);
+  // No access and fallback component provided
+  if (!hasAccess && fallbackComponent) {
+    return <>{fallbackComponent}</>;
+  }
 
+  // No access - will redirect via useEffect above
   if (!hasAccess) {
-    // If fallback component provided, show it
-    if (fallbackComponent) {
-      return <>{fallbackComponent}</>;
-    }
-
-    // Otherwise redirect to fallback route
-    navigate(fallbackRoute, { replace: true });
     return null;
   }
 
