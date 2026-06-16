@@ -15,6 +15,7 @@ import subscriptionRoutes from './subscription.routes';
 import planRoutes from './plan.routes';
 import billingAccountRoutes from './billing-account.routes';
 import billingInvoiceRoutes from './billing-invoice.routes';
+import auditRoutes from './audit.routes';
 import studentGuardianRoutes from './student-guardian.routes';
 
 const router = Router();
@@ -39,5 +40,8 @@ router.use('/billing', billingInvoiceRoutes);
 
 // Student-Guardian relationship management
 router.use('/student-guardians', studentGuardianRoutes);
+
+// Audit logs
+router.use('/audit-logs', auditRoutes);
 
 export default router;

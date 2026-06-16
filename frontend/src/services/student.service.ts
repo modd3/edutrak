@@ -57,10 +57,10 @@ export const studentService = {
   },
 
   /**
-   * Updates an existing student by their ID.
+   * Updates an existing student by their user ID.
    */
   update: async (id: string, data: Partial<Student>): Promise<Student> => {
-    const response = await api.put<ApiResponse<Student>>(`/students/${id}`, data);
+    const response = await api.put<ApiResponse<Student>>(`/users/${id}`, data);
     if (!response.data.data) {
       throw new Error('Failed to update student');
     }

@@ -50,6 +50,7 @@ import { TeacherDetailsModal } from '@/components/teachers/TeacherDetailsModal';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { toast } from 'sonner';
 import { teacherService } from '@/services/teacher.service';
+import { useTeachers } from '@/hooks/use-teachers';
 
 export default function TeachersList() {
   const [searchInput, setSearchInput] = useState('');
@@ -60,7 +61,14 @@ export default function TeachersList() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedTeacher, setSelectedTeacher] = useState<Teacher | undefined>();
   const { schoolId, schoolName } = useSchoolContext();
+  const [page, setPage] = useState(1);
+  const limit = 20;
   
+  // Reset page when debounced search or filters change
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch, employmentType]);
+
   // Check if user can manage teachers
   const { hasAccess: canManageTeachers } = useAuthGuard({
     requiredRoles: ['SUPER_ADMIN', 'ADMIN'],
@@ -72,15 +80,13 @@ export default function TeachersList() {
     isLoading, 
     error,
     refetch 
-  } = useQuery({
-    queryKey: ['teachers', schoolId, debouncedSearch, employmentType],
-    queryFn: () => teacherService.getAll({
+  } = useTeachers({
       schoolId,
       search: debouncedSearch || undefined,
-      employmentType: employmentType === 'all' ? undefined : employmentType
-    }),
-    enabled: !!schoolId,
-  });
+      employmentType: employmentType === 'all' ? undefined : employmentType,
+      page,
+      limit,
+    });
 
   const teachers = teachersData?.data || [];
   const totalTeachers = teachersData?.pagination?.total || 0;

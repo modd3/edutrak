@@ -1,24 +1,20 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useEffect, useState } from 'react';
 import * as z from 'zod';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { calculateCBCGrade } from '@/lib/grade-calculator';
 
 const competencySchema = z.object({
-  competencyLevel: z.enum([
-    'EXCEEDING_EXPECTATIONS',
-    'MEETING_EXPECTATIONS',
-    'APPROACHING_EXPECTATIONS',
-    'BELOW_EXPECTATIONS',
-  ]),
+  marksObtained: z.number()
+    .min(0, 'Marks cannot be negative')
+    .max(100, 'Marks cannot exceed maximum'),
+  maxMarks: z.number()
+    .min(1, 'Maximum marks must be at least 1'),
   remarks: z.string().min(1, 'Remarks are required for CBC assessment'),
 });
 
@@ -32,64 +28,94 @@ export function CompetencyBasedForm({ onSubmit, defaultValues, isLoading }: Comp
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(competencySchema),
     defaultValues: {
-      competencyLevel: defaultValues?.competencyLevel || '',
+      marksObtained: defaultValues?.marksObtained || 0,
+      maxMarks: defaultValues?.maxMarks || 100,
       remarks: defaultValues?.remarks || '',
     },
   });
 
+  const marksObtained = watch('marksObtained');
+  const maxMarks = watch('maxMarks');
+  const [cbcResult, setCbcResult] = useState<ReturnType<typeof calculateCBCGrade> | null>(null);
+
+  useEffect(() => {
+    if (marksObtained && maxMarks && maxMarks > 0) {
+      const result = calculateCBCGrade(marksObtained, maxMarks);
+      setCbcResult(result);
+    }
+  }, [marksObtained, maxMarks]);
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-4">
+      <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="competencyLevel">Competency Level</Label>
-          <Select
-            name="competencyLevel"
-            defaultValue={defaultValues?.competencyLevel}
-            onValueChange={(value) => register('competencyLevel').onChange({ target: { value } })}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select competency level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="EXCEEDING_EXPECTATIONS">
-                Exceeding Expectations
-              </SelectItem>
-              <SelectItem value="MEETING_EXPECTATIONS">
-                Meeting Expectations
-              </SelectItem>
-              <SelectItem value="APPROACHING_EXPECTATIONS">
-                Approaching Expectations
-              </SelectItem>
-              <SelectItem value="BELOW_EXPECTATIONS">
-                Below Expectations
-              </SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.competencyLevel && (
+          <Label htmlFor="marksObtained">Marks Obtained</Label>
+          <Input
+            id="marksObtained"
+            type="number"
+            min="0"
+            step="0.5"
+            {...register('marksObtained', { valueAsNumber: true })}
+          />
+          {errors.marksObtained && (
             <p className="text-sm text-destructive">
-              {errors.competencyLevel.message as string}
+              {errors.marksObtained.message as string}
             </p>
           )}
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="remarks">Detailed Remarks</Label>
-          <Textarea
-            id="remarks"
-            rows={4}
-            placeholder="Provide detailed observations and recommendations..."
-            {...register('remarks')}
+          <Label htmlFor="maxMarks">Maximum Marks</Label>
+          <Input
+            id="maxMarks"
+            type="number"
+            min="1"
+            step="0.5"
+            {...register('maxMarks', { valueAsNumber: true })}
           />
-          {errors.remarks && (
+          {errors.maxMarks && (
             <p className="text-sm text-destructive">
-              {errors.remarks.message as string}
+              {errors.maxMarks.message as string}
             </p>
           )}
         </div>
+      </div>
+
+      {/* Auto-calculated CBC result */}
+      {cbcResult && marksObtained > 0 && (
+        <div className="p-4 rounded-lg border bg-gray-50 space-y-2">
+          <div className="flex items-center gap-3">
+            <Badge className={cbcResult.color}>
+              Grade: {cbcResult.grade}
+            </Badge>
+            <Badge className={cbcResult.color}>
+              {cbcResult.shortLabel}
+            </Badge>
+          </div>
+          <p className="text-sm text-gray-600">{cbcResult.label}</p>
+          <p className="text-xs text-gray-500">{cbcResult.description}</p>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label htmlFor="remarks">Detailed Remarks</Label>
+        <Textarea
+          id="remarks"
+          rows={4}
+          placeholder="Provide detailed observations and recommendations..."
+          {...register('remarks')}
+        />
+        {errors.remarks && (
+          <p className="text-sm text-destructive">
+            {errors.remarks.message as string}
+          </p>
+        )}
       </div>
 
       <Button type="submit" disabled={isLoading}>

@@ -4,6 +4,7 @@ import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
 import { RequestWithUser } from '@/middleware/school-context';
+import { auditService } from '../services/audit.service';
 
 export class StudentController {
   private getService(req: RequestWithUser) {
@@ -108,6 +109,19 @@ export class StudentController {
 
       const studentService = this.getService(req);
       const enrollment = await studentService.enrollStudent(req.body);
+      
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'ENROLL',
+        entityType: 'Student',
+        entityId: studentId,
+        details: `Student ${studentId} enrolled in class ${classId}`,
+        ipAddress: req.ip,
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Student enrolled successfully', enrollment);
     } catch (error: any) {
       return ResponseUtil.error(res, error.message, 400);
@@ -174,6 +188,19 @@ export class StudentController {
 
       const studentService = this.getService(req);
       const promotion = await studentService.promoteStudent(req.body);
+      
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'PROMOTE',
+        entityType: 'Student',
+        entityId: studentId,
+        details: `Student ${studentId} promoted from ${currentClassId} to ${newClassId}`,
+        ipAddress: req.ip,
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Student promoted successfully', promotion);
     } catch (error: any) {
       return ResponseUtil.error(res, error.message, 400);
@@ -193,6 +220,20 @@ export class StudentController {
         ...req.body,
         transferDate: new Date(),
       });
+      
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'TRANSFER',
+        entityType: 'Student',
+        entityId: studentId,
+        details: `Student ${studentId} transferred to school ${newSchoolId}`,
+        metadata: { transferReason },
+        ipAddress: req.ip,
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Student transferred successfully', transfer);
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -245,6 +286,18 @@ export class StudentController {
         req.schoolId,
         req.isSuperAdmin || false
       );
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'DELETE',
+        entityType: 'Student',
+        entityId: id,
+        details: `Student ${id} deleted`,
+        ipAddress: req.ip,
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
       res.json({ message: 'Student deleted successfully' });
     } catch (error: any) {

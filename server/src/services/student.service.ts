@@ -6,6 +6,7 @@ import emailService from '../utils/email';
 import { BaseService } from './base.service';
 import { RequestWithUser } from '../middleware/school-context';
 import { StudentClassSubjectService } from './student-class-subject.service';
+import { level } from 'winston';
 
 export class StudentService extends BaseService {
   private req?: RequestWithUser;
@@ -36,7 +37,7 @@ export class StudentService extends BaseService {
     hasSpecialNeeds?: boolean;
     classId?: string;
     streamId?: string;
-    status?: EnrollmentStatus;
+    status?: string;
     page?: number;
     limit?: number;
     search?: string;
@@ -58,7 +59,13 @@ export class StudentService extends BaseService {
     if (filters?.gender) where.gender = filters.gender;
     if (filters?.hasSpecialNeeds !== undefined) where.hasSpecialNeeds = filters.hasSpecialNeeds;
 
-    if (filters?.classId || filters?.streamId || filters?.status) {
+    if (filters?.status === 'INACTIVE') {
+        where.enrollments = {
+          none: {}
+        }
+    }
+
+    else if (filters?.classId || filters?.streamId || filters?.status) {
       where.enrollments = {
         some: {
           schoolId: schoolId, // Add schoolId filter for multi-tenancy safety
@@ -99,9 +106,15 @@ export class StudentService extends BaseService {
               schoolId: schoolId, // Add schoolId filter
             },
             include: {
-              class: true,
-              stream: true,
-              academicYear: true,
+              class: {
+                select: { id: true, name: true, level: true, curriculum: true, pathway: true}
+              },
+              stream: {
+                select: { name: true }
+              },
+              academicYear: {
+                select: { year: true, isActive: true}
+              },
 
             },
           },

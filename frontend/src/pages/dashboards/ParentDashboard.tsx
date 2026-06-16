@@ -1,5 +1,7 @@
-import { Users, TrendingUp, Calendar, Bell } from 'lucide-react';
+import { Users, TrendingUp, Calendar, Bell, Trophy, School } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { RecentActivities } from '@/components/shared/RecentActivities';
+import type { ActivityItem } from '@/components/shared/RecentActivities';
 
 export function ParentDashboard() {
   const { user } = useAuthStore();
@@ -45,6 +47,33 @@ export function ParentDashboard() {
     },
   ];
 
+  const activities: ActivityItem[] = [
+    ...recentUpdates.map((u, i) => ({
+      id: `update-${i}`,
+      icon: Trophy,
+      color: 'bg-yellow-500',
+      title: `${u.child} — ${u.subject}`,
+      description: u.grade ? `${u.update}: ${u.grade}` : u.update,
+      time: u.time,
+    })),
+    ...upcomingEvents.map((e, i) => ({
+      id: `event-${i}`,
+      icon: Calendar,
+      color: e.type === 'assessment' ? 'bg-orange-500' : e.type === 'event' ? 'bg-blue-500' : 'bg-green-500',
+      title: `${e.child}: ${e.event}`,
+      description: e.type.replace('_', ' '),
+      time: e.date,
+    })),
+    ...children.map((c, i) => ({
+      id: `child-${i}`,
+      icon: School,
+      color: 'bg-purple-500',
+      title: c.name,
+      description: `${c.class} — Avg: ${c.averageGrade}, Attendance: ${c.attendance}`,
+      time: 'Active',
+    })),
+  ];
+
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
@@ -82,8 +111,7 @@ export function ParentDashboard() {
               </div>
             </div>
 
-            <button className="w-full mt-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium
- transition-colors">
+            <button className="w-full mt-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
               View Full Report Card
             </button>
           </div>
@@ -103,45 +131,25 @@ export function ParentDashboard() {
                   event.type === 'event' ? 'bg-blue-100' : 'bg-green-100'
                 }`}>
                   {event.type === 'assessment' ? (
-                    <Calendar className={`${event.type === 'assessment' ? 'text-orange-600' : ''}`} size={20
-                    } />
-                                      ) : event.type === 'event' ? (
-                                        <Users className="text-blue-600" size={20} />
-                                      ) : (
-                                        <Bell className="text-green-600" size={20} />
-                                      )}
-                                    </div>
-                                    <div className="flex-1">
-                                      <p className="text-sm text-gray-600">{event.child}</p>
-                                      <h3 className="font-medium text-gray-900">{event.event}</h3>
-                                      <p className="text-xs text-gray-500 mt-1">{event.date}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                    
-                            {/* Recent Updates */}
-                            <div className="bg-white rounded-lg shadow p-6">
-                              <h2 className="text-lg font-semibold mb-4">Recent Updates</h2>
-                              <div className="space-y-4">
-                                {recentUpdates.map((update, index) => (
-                                  <div key={index} className="p-4 border border-gray-200 rounded-lg">
-                                    <p className="text-sm font-medium text-gray-900">{update.child}</p>
-                                    <p className="text-sm text-gray-600">{update.subject}</p>
-                                    <div className="flex items-center justify-between mt-2">
-                                      <p className="text-xs text-gray-500">{update.update}</p>
-                                      {update.grade && (
-                                        <span className="px-2 py-1 text-xs font-medium bg-green-100 text-green-700 rounded">
-                                          {update.grade}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <p className="text-xs text-gray-400 mt-2">{update.time}</p>
-                                    </div>
+                    <Calendar className="text-orange-600" size={20} />
+                  ) : event.type === 'event' ? (
+                    <Users className="text-blue-600" size={20} />
+                  ) : (
+                    <Bell className="text-green-600" size={20} />
+                  )}
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm text-gray-600">{event.child}</p>
+                  <h3 className="font-medium text-gray-900">{event.event}</h3>
+                  <p className="text-xs text-gray-500 mt-1">{event.date}</p>
+                </div>
+              </div>
             ))}
           </div>
         </div>
+
+        {/* Recent Activities */}
+        <RecentActivities activities={activities} />
       </div>
 
       {/* Performance Comparison */}

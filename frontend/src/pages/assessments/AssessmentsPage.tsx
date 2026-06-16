@@ -1,20 +1,14 @@
 // src/pages/assessments/AssessmentsPage.tsx
+// Clean tab-based layout: Assessments | Weights | Reports
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Filter } from 'lucide-react';
+import { Plus, Scale, FileText, ClipboardList } from 'lucide-react';
 import { AssessmentList } from '@/components/assessments/AssessmentList';
 import { AssessmentForm } from '@/components/assessments/AssessmentForm';
-import { useAssessmentStats } from '@/hooks/use-assessments';
+import { WeightConfiguration } from '@/components/assessments/WeightConfiguration';
 import { useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { useClassSubjects } from '@/hooks/use-class-subjects';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -24,70 +18,49 @@ import {
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { usePermission } from '@/hooks/use-permission';
 
 export function AssessmentsPage() {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [selectedTerm, setSelectedTerm] = useState<string>('');
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedClassSubject, setSelectedClassSubject] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
   const [editingAssessment, setEditingAssessment] = useState<any>(null);
+  const [activeTab, setActiveTab] = useState('assessments');
 
-  // Fetch active academic year with terms
-  const { data: activeYearData, isLoading: isLoadingYear, error: yearError } = useActiveAcademicYear();
+  const { data: activeYearData, isLoading: isLoadingYear } = useActiveAcademicYear();
   const activeYear = activeYearData;
 
-  
-  // Fetch classes for the active academic year
-  const { data: classesData, isLoading: isLoadingClasses, error: classesError } = useClasses(activeYear?.id);
+  const { data: classesData } = useClasses(activeYear?.id);
   const classes = classesData?.data || [];
-   
-  // Fetch class subjects based on selected class and term
-  const { data: classSubjectsData, isLoading: isLoadingSubjects, error: subjectsError } = useClassSubjects(
+
+  const { data: classSubjectsData } = useClassSubjects(
     selectedClass,
     activeYear?.id || '',
     selectedTerm
   );
   const classSubjects = classSubjectsData?.data.data || [];
-   // Fetch assessment statistics
-  const { data: stats, isLoading: isLoadingStats, error: statsError } = useAssessmentStats(activeYear?.id);
-
-  // Get terms from active academic year
   const terms = activeYear?.terms || [];
 
+  // Auto-select first term
   useEffect(() => {
-    if (terms.length > 0) {
-      // Auto-select the first term if available
-      if (!selectedTerm && terms[0]) {
-        setSelectedTerm(terms[0].id);
-      }
+    if (terms.length > 0 && !selectedTerm) {
+      setSelectedTerm(terms[0].id);
     }
   }, [terms, selectedTerm]);
 
+  // Auto-select first subject when class+term selected
   useEffect(() => {
-    if (selectedClass && selectedTerm) {
-      // Auto-select the first subject if available
-      if (!selectedClassSubject && classSubjects.length > 0) {
-        setSelectedClassSubject(classSubjects[0].id);
-      }
+    if (selectedClass && selectedTerm && classSubjects.length > 0 && !selectedClassSubject) {
+      setSelectedClassSubject(classSubjects[0].id);
     }
-  }, [selectedClass, selectedTerm, classSubjects, isLoadingSubjects, subjectsError, selectedClassSubject]);
-
+  }, [selectedClass, selectedTerm, classSubjects, selectedClassSubject]);
 
   const handleGradeEntry = (assessmentId: string) => {
     navigate(`/assessments/${assessmentId}/grades`);
-  };
-
-  const handleEdit = (assessment: any) => {
-    setEditingAssessment(assessment);
-    setShowForm(true);
-  }
-
-  const handleCloseForm = () => {
-    setShowForm(false);
-    setEditingAssessment(null);
   };
 
   const handleCreateAssessment = () => {
@@ -95,262 +68,103 @@ export function AssessmentsPage() {
       toast.error('Please select a class and term first');
       return;
     }
-
     setShowForm(true);
   };
 
-  const handleClassChange = (classId: string) => {
-    setSelectedClass(classId);
-    // Reset subject selection when class changes
-    setSelectedClassSubject('');
-  };
-
-  const handleTermChange = (termId: string) => {
-    setSelectedTerm(termId);
-    // Reset subject selection when term changes
-    setSelectedClassSubject('');
+  const handleCloseForm = () => {
+    setShowForm(false);
+    setEditingAssessment(null);
   };
 
   return (
     <div className="space-y-6">
       {/* Page Header */}
-      <div className="flex justify-between items-start">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold">Assessments</h1>
-          <p className="text-gray-500 mt-1">
-            Manage assessments, enter grades, and generate reports
-          </p>
+          <h1 className="text-2xl font-bold">Assessments</h1>
           {activeYear && (
-            <p className="text-sm text-gray-600 mt-1">
-              Academic Year: {activeYear.year} {activeYear.isActive && '(Active)'}
+            <p className="text-sm text-muted-foreground mt-0.5">
+              Academic Year {activeYear.year}{activeYear.isActive ? ' (Active)' : ''}
             </p>
           )}
         </div>
-        <Button onClick={handleCreateAssessment} disabled={!selectedClass || !selectedTerm}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Assessment
-        </Button>
       </div>
 
-      {/* Statistics Cards */}
-      {stats?.data && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Total Assessments
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{stats.data.total || 0}</div>
-            </CardContent>
-          </Card>
+      {/* Main Tabs */}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <div className="flex items-center justify-between border-b pb-1">
+          <TabsList className="h-10">
+            <TabsTrigger value="assessments" className="flex items-center gap-1.5">
+              <ClipboardList className="h-4 w-4" />
+              Assessments
+            </TabsTrigger>
+            <TabsTrigger value="weights" className="flex items-center gap-1.5">
+              <Scale className="h-4 w-4" />
+              Weights
+            </TabsTrigger>
+            <TabsTrigger value="reports" className="flex items-center gap-1.5">
+              <FileText className="h-4 w-4" />
+              Reports
+            </TabsTrigger>
+          </TabsList>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                With Results
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {stats.data.withResults || 0}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                Pending
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {stats.data.withoutResults || 0}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-500">
-                By Type
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-1">
-                {Object.entries(stats.data.byType || {}).map(([type, count]) => (
-                  <div key={type} className="flex justify-between text-sm">
-                    <span className="text-gray-600">{type}</span>
-                    <span className="font-semibold">{count as number}</span>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {/* Create button only on assessments tab */}
+          {activeTab === 'assessments' && (
+            <Button size="sm" onClick={handleCreateAssessment} disabled={!selectedClass || !selectedTerm}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Assessment
+            </Button>
+          )}
         </div>
-      )}
 
-      {/* Loading States */}
-      {(isLoadingYear || isLoadingClasses || isLoadingStats) && (
-        <Card>
-          <CardContent className="py-12 text-center">
-            <p className="text-gray-500">Loading data...</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Error States */}
-      {yearError && (
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="py-12 text-center">
-            <p className="text-red-600">Error loading academic year: {yearError.message}</p>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Filter className="h-4 w-4" />
-            Filters
-            {selectedClass && selectedTerm && (
-              <span className="text-xs font-normal text-gray-500 ml-auto">
-                Class: {classes.find((c: { id: string; }) => c.id === selectedClass)?.name},
-                Term: {terms.find((t: { id: string; }) => t.id === selectedTerm)?.name?.replace('_', ' ') || 'Unknown'}
-              </span>
-            )}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Term Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Term</label>
-              <Select value={selectedTerm} onValueChange={handleTermChange} disabled={isLoadingYear}>
-                <SelectTrigger>
-                  <SelectValue placeholder={isLoadingYear ? "Loading..." : "Select term"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {terms.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No terms available
-                    </SelectItem>
-                  ) : (
-                    terms.map((term: any) => (
-                      <SelectItem key={term.id} value={term.id}>
-                        {term.name.replace('_', ' ')} (Term {term.termNumber})
+        {/* ─── ASSESSMENTS TAB ─── */}
+        <TabsContent value="assessments" className="mt-4 space-y-4">
+          {/* Compact Filter Bar */}
+          <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-3 border">
+            <div className="flex items-center gap-2 flex-1 flex-wrap">
+              <div className="w-40">
+                <Select value={selectedTerm} onValueChange={(v) => { setSelectedTerm(v); setSelectedClassSubject(''); }} disabled={isLoadingYear}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Term" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {terms.map((t: any) => (
+                      <SelectItem key={t.id} value={t.id}>{t.name.replace('_', ' ')}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-44">
+                <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedClassSubject(''); }}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Class" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {classes.map((c: any) => (
+                      <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="w-52">
+                <Select value={selectedClassSubject} onValueChange={setSelectedClassSubject} disabled={!selectedClass}>
+                  <SelectTrigger className="h-9 text-sm">
+                    <SelectValue placeholder="Subject" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Subjects</SelectItem>
+                    {classSubjects.map((cs: any) => (
+                      <SelectItem key={cs.id} value={cs.id}>
+                        {cs.subject?.name || 'Unknown'}
                       </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {selectedTerm && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {terms.find((t: { id: string; }) => t.id === selectedTerm)?.startDate ?
-                    `Starts: ${new Date(terms.find((t: { id: string; }) => t.id === selectedTerm)?.startDate).toLocaleDateString()}` : ''}
-                </p>
-              )}
-            </div>
-
-            {/* Class Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Class</label>
-              <Select value={selectedClass} onValueChange={handleClassChange} disabled={isLoadingClasses}>
-                <SelectTrigger>
-                  <SelectValue placeholder={isLoadingClasses ? "Loading..." : "Select class"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {classes.length === 0 ? (
-                    <SelectItem value="none" disabled>
-                      No classes available
-                    </SelectItem>
-                  ) : (
-                    classes.map((cls: any) => (
-                      <SelectItem key={cls.id} value={cls.id}>
-                        {cls.name} - {cls.level} ({cls.curriculum})
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
-              {selectedClass && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {classes.find((c: { id: string; }) => c.id === selectedClass)?._count?.students || 0} students
-                </p>
-              )}
-            </div>
-
-            {/* Class Subject Filter */}
-            <div>
-              <label className="text-sm font-medium mb-2 block">Subject</label>
-              <Select
-                value={selectedClassSubject}
-                onValueChange={setSelectedClassSubject}
-                disabled={!selectedClass || !selectedTerm || isLoadingSubjects}
-              >
-                <SelectTrigger>
-                  <SelectValue
-                    placeholder={
-                      !selectedClass || !selectedTerm ? "Select class and term first" :
-                        isLoadingSubjects ? "Loading..." :
-                          "Select subject"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {classSubjects.length === 0 ? (
-                    <SelectItem value="all" disabled>
-                      No subjects assigned
-                    </SelectItem>
-                  ) : (
-                    <>
-                      <SelectItem value="all">All Subjects</SelectItem>
-                      {classSubjects.map((cs: any) => (
-                        <SelectItem key={cs.id} value={cs.id}>
-                          {cs.subject?.name || 'Unknown Subject'} ({cs.subject?.code})
-                        </SelectItem>
-                      ))}
-                    </>
-                  )}
-                </SelectContent>
-              </Select>
-              {!selectedClass && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Select a class first
-                </p>
-              )}
-              {selectedClass && !selectedTerm && (
-                <p className="text-xs text-gray-500 mt-1">
-                  Select a term first
-                </p>
-              )}
-              {selectedClassSubject && selectedClassSubject !== 'all' && (
-                <p className="text-xs text-gray-500 mt-1">
-                  {classSubjects.find((cs: { id: string; }) => cs.id === selectedClassSubject)?.teacher ?
-                    `Teacher: ${classSubjects.find((cs: { id: string; }) => cs.id === selectedClassSubject)?.teacher?.user?.firstName} 
-                    ${classSubjects.find((cs: { id: string; }) => cs.id === selectedClassSubject)?.teacher?.user?.lastName}` :
-                    'No teacher assigned'}
-                </p>
-              )}
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Assessment List by Type */}
-      <Tabs defaultValue="all" className="w-full">
-        <TabsList>
-          <TabsTrigger value="all">All</TabsTrigger>
-          <TabsTrigger value="CAT">CATs</TabsTrigger>
-          <TabsTrigger value="MIDTERM">Mid-Term</TabsTrigger>
-          <TabsTrigger value="END_OF_TERM">End of Term</TabsTrigger>
-          <TabsTrigger value="MOCK">Mock</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="all" className="mt-6">
+          {/* Assessment List */}
           {selectedTerm ? (
             <AssessmentList
               termId={selectedTerm}
@@ -358,38 +172,108 @@ export function AssessmentsPage() {
               onGradeEntry={handleGradeEntry}
             />
           ) : (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <p className="text-gray-500">
-                  {isLoadingYear ? "Loading terms..." : "Please select a term to view assessments"}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+              {isLoadingYear ? 'Loading...' : 'Select a term to view assessments'}
+            </div>
           )}
         </TabsContent>
 
-        {['CAT', 'MIDTERM', 'END_OF_TERM', 'MOCK'].map((type) => (
-          <TabsContent key={type} value={type} className="mt-6">
-            {selectedTerm ? (
-              <AssessmentList
-                termId={selectedTerm}
-                classSubjectId={selectedClassSubject !== 'all' ? selectedClassSubject : undefined}
-                onGradeEntry={handleGradeEntry}
-              />
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <p className="text-gray-500">
-                    {isLoadingYear ? "Loading terms..." : "Please select a term to view assessments"}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
-          </TabsContent>
-        ))}
+        {/* ─── WEIGHTS TAB ─── */}
+        <TabsContent value="weights" className="mt-4 space-y-4">
+          <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-3 border">
+            <div className="w-40">
+              <Select value={selectedTerm} onValueChange={(v) => { setSelectedTerm(v); setSelectedClassSubject(''); }} disabled={isLoadingYear}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Term" />
+                </SelectTrigger>
+                <SelectContent>
+                  {terms.map((t: any) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-44">
+              <Select value={selectedClass} onValueChange={(v) => { setSelectedClass(v); setSelectedClassSubject(''); }}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-52">
+              <Select value={selectedClassSubject} onValueChange={setSelectedClassSubject} disabled={!selectedClass}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classSubjects.map((cs: any) => (
+                    <SelectItem key={cs.id} value={cs.id}>
+                      {cs.subject?.name || 'Unknown'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {selectedTerm && selectedClassSubject && selectedClassSubject !== 'all' ? (
+            <WeightConfiguration termId={selectedTerm} classSubjectId={selectedClassSubject} />
+          ) : (
+            <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+              Select a term, class, and subject to configure weights
+            </div>
+          )}
+        </TabsContent>
+
+        {/* ─── REPORTS TAB ─── */}
+        <TabsContent value="reports" className="mt-4 space-y-4">
+          <div className="flex items-center gap-3 bg-muted/30 rounded-lg p-3 border">
+            <div className="w-40">
+              <Select value={selectedTerm} onValueChange={setSelectedTerm} disabled={isLoadingYear}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Term" />
+                </SelectTrigger>
+                <SelectContent>
+                  {terms.map((t: any) => (
+                    <SelectItem key={t.id} value={t.id}>{t.name.replace('_', ' ')}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="w-44">
+              <Select value={selectedClass} onValueChange={setSelectedClass}>
+                <SelectTrigger className="h-9 text-sm">
+                  <SelectValue placeholder="Class" />
+                </SelectTrigger>
+                <SelectContent>
+                  {classes.map((c: any) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button size="sm" variant="outline" disabled>
+              <FileText className="h-4 w-4 mr-1.5" />
+              Generate Reports
+            </Button>
+          </div>
+
+          <div className="flex flex-col items-center justify-center h-60 text-sm text-muted-foreground gap-3 border rounded-lg">
+            <FileText className="h-12 w-12 text-muted-foreground/40" />
+            <p>Select a class and term to generate CBC report cards</p>
+            <Button variant="outline" size="sm" onClick={() => navigate('/assessments/reports')}>
+              Go to Reports Page
+            </Button>
+          </div>
+        </TabsContent>
       </Tabs>
 
-      {/* Assessment Form */}
+      {/* Assessment Form Modal */}
       <AssessmentForm
         open={showForm}
         onOpenChange={handleCloseForm}
@@ -398,7 +282,6 @@ export function AssessmentsPage() {
         termId={selectedTerm}
         classSubjectId={selectedClassSubject || ''}
       />
-
     </div>
   );
 }

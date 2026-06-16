@@ -1,4 +1,5 @@
 import { useAuthStore } from '@/store/auth-store';
+import { SuperAdminDashboard } from './dashboards/SuperAdminDashboard';
 import { AdminDashboard } from './dashboards/AdminDashboard';
 import { TeacherDashboard } from './dashboards/TeacherDashboard';
 import { StudentDashboard } from './dashboards/StudentDashboard';
@@ -12,6 +13,7 @@ export function Dashboard() {
   // Render dashboard based on role
   switch (user.role) {
     case 'SUPER_ADMIN':
+      return <SuperAdminDashboard />;
     case 'ADMIN':
       return <AdminDashboard />;
     case 'TEACHER':

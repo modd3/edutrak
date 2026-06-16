@@ -93,7 +93,7 @@ export default function StudentsList() {
     schoolId,
     search: debouncedSearch,
     gender: genderFilter || undefined,
-    status: statusFilter === 'active' ? 'ACTIVE' : undefined,
+    status: statusFilter === 'active' ? 'ACTIVE' : statusFilter === 'inactive' ? 'INACTIVE' : undefined,
     page,
     pageSize,
   });
@@ -124,7 +124,8 @@ export default function StudentsList() {
   // "active" and "all" are handled server-side
   const filteredStudents = statusFilter === 'inactive'
     ? students.filter((student: Student) => {
-        const hasActiveEnrollment = student.enrollments?.some(e => e.status === 'ACTIVE');
+        const hasActiveEnrollment = student.enrollments && student.enrollments.length > 0;
+        console.log("Not Enrolled: ", !hasActiveEnrollment)
         return !hasActiveEnrollment;
       })
     : students;

@@ -120,7 +120,7 @@ function App() {
           <Route
             path="/billing-admin"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <BillingAdminPage />
                 </DashboardLayout>
@@ -131,7 +131,7 @@ function App() {
           <Route
             path="/subscriptions"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <SubscriptionsPage />
                 </DashboardLayout>
@@ -139,11 +139,11 @@ function App() {
             }
           />
 
-           {/* ADMIN, SUPER_ADMIN: Year-End Transition Wizard */}
+           {/* SUPER_ADMIN ONLY: Subscription Plans */}
           <Route
             path="/subscriptions/plans"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <PlansPage />
                 </DashboardLayout>

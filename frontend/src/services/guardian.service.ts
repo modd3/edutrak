@@ -3,6 +3,7 @@ import { Guardian, User, ApiResponse, PaginatedResponse } from '@/types';
 
 export type GuardianCreateInput = {
   email: string;
+  password: string;
   firstName: string;
   lastName: string;
   middleName?: string;

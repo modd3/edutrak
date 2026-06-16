@@ -2,7 +2,7 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,16 +21,34 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 import { GuardianResponse } from '@/services/guardian.service';
 import { useCreateGuardian, useUpdateGuardian } from '@/hooks/use-guardians';
-import { toast } from 'sonner';
 
-const guardianSchema = z.object({
+export type InlineGuardianData = {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  phone?: string;
+  idNumber?: string;
+  relationship: string;
+  occupation?: string;
+  employer?: string;
+  workPhone?: string;
+  isPrimary: boolean;
+};
+
+// Schema for standalone guardian mode (relationship is enum)
+const standaloneGuardianSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
   email: z.string().email('Valid email is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   phone: z.string().optional(),
   idNumber: z.string().optional(),
   relationship: z.enum(['FATHER', 'MOTHER', 'GUARDIAN', 'UNCLE', 'AUNT', 'GRANDPARENT', 'OTHER']),
@@ -39,13 +57,34 @@ const guardianSchema = z.object({
   workPhone: z.string().optional(),
 });
 
-type GuardianFormData = z.infer<typeof guardianSchema>;
+// Schema for student-context mode (relationship is free-text, includes isPrimary)
+const studentContextGuardianSchema = z.object({
+  firstName: z.string().min(1, 'First name is required'),
+  lastName: z.string().min(1, 'Last name is required'),
+  middleName: z.string().optional(),
+  email: z.string().email('Valid email is required'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  phone: z.string().optional(),
+  idNumber: z.string().optional(),
+  relationship: z.string().min(1, 'Relationship is required'),
+  occupation: z.string().optional(),
+  employer: z.string().optional(),
+  workPhone: z.string().optional(),
+  isPrimary: z.boolean().optional().default(false),
+});
+
+type StandaloneGuardianFormData = z.infer<typeof standaloneGuardianSchema>;
+type StudentContextGuardianFormData = z.infer<typeof studentContextGuardianSchema>;
 
 interface GuardianFormModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   mode: 'create' | 'edit';
   guardian?: GuardianResponse;
+  /** When true, shows isPrimary checkbox and uses free-text relationship. Default false. */
+  studentContext?: boolean;
+  /** When provided, submits data via this callback instead of API mutations */
+  onInlineSave?: (data: InlineGuardianData) => void;
 }
 
 const RELATIONSHIPS = [
@@ -63,47 +102,106 @@ export function GuardianFormModal({
   onOpenChange,
   mode,
   guardian,
+  studentContext = false,
+  onInlineSave,
 }: GuardianFormModalProps) {
   const { mutate: createGuardian, isPending: isCreating } = useCreateGuardian();
   const { mutate: updateGuardian, isPending: isUpdating } = useUpdateGuardian();
   const isLoading = isCreating || isUpdating;
-
-  const form = useForm<GuardianFormData>({
-    resolver: zodResolver(guardianSchema),
-    defaultValues: {
-      firstName: '',
-      lastName: '',
-      middleName: '',
-      email: '',
-      phone: '',
-      idNumber: '',
-      relationship: 'GUARDIAN',
-      occupation: '',
-      employer: '',
-      workPhone: '',
-    },
+  const [showPassword, setShowPassword] = useState(false);
+  const form = useForm<StandaloneGuardianFormData | StudentContextGuardianFormData>({
+    resolver: zodResolver(studentContext ? studentContextGuardianSchema : standaloneGuardianSchema),
+    defaultValues: studentContext
+      ? {
+          firstName: '',
+          lastName: '',
+          middleName: '',
+          email: '',
+          password: '',
+          phone: '',
+          idNumber: '',
+          relationship: '',
+          occupation: '',
+          employer: '',
+          workPhone: '',
+          isPrimary: false,
+        }
+      : {
+          firstName: '',
+          lastName: '',
+          middleName: '',
+          email: '',
+          password: '',
+          phone: '',
+          idNumber: '',
+          relationship: 'GUARDIAN',
+          occupation: '',
+          employer: '',
+          workPhone: '',
+        },
   });
 
   useEffect(() => {
     if (guardian && mode === 'edit') {
-      form.reset({
+      const baseValues = {
         firstName: guardian.user.firstName,
         lastName: guardian.user.lastName,
         middleName: guardian.user.middleName || '',
         email: guardian.user.email,
+        password: '',
         phone: guardian.user.phone || '',
         idNumber: guardian.user.idNumber || '',
-        relationship: guardian.relationship as any,
+        relationship: guardian.relationship,
         occupation: guardian.occupation || '',
         employer: guardian.employer || '',
         workPhone: guardian.workPhone || '',
-      });
-    } else {
+      };
+
+      if (studentContext) {
+        form.reset({
+          ...baseValues,
+          isPrimary: false,
+        } as StudentContextGuardianFormData);
+      } else {
+        // For edit in standalone mode, ensure relationship is a valid enum value
+        const validRelationship = RELATIONSHIPS.some(r => r.value === guardian.relationship)
+          ? (guardian.relationship as any)
+          : 'OTHER';
+        form.reset({
+          ...baseValues,
+          relationship: validRelationship,
+        } as StandaloneGuardianFormData);
+      }
+    } else if (open) {
       form.reset();
     }
-  }, [guardian, mode, open, form]);
+  }, [guardian, mode, open, form, studentContext]);
 
-  const onSubmit = (data: GuardianFormData) => {
+  const onSubmit = (data: StandaloneGuardianFormData | StudentContextGuardianFormData) => {
+    // If inline save callback is provided, use it
+    if (onInlineSave) {
+      const inlineData: InlineGuardianData = {
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        relationship: data.relationship,
+        occupation: data.occupation,
+        employer: data.employer,
+        workPhone: data.workPhone,
+        isPrimary: studentContext ? (data as StudentContextGuardianFormData).isPrimary : false,
+      };
+      onInlineSave(inlineData);
+      toast.success('Guardian added to student');
+      form.reset();
+      onOpenChange(false);
+      return;
+    }
+
+    // Otherwise use API mutations
     if (mode === 'create') {
       createGuardian(data as any, {
         onSuccess: () => {
@@ -200,6 +298,37 @@ export function GuardianFormModal({
             </div>
 
             <div>
+              <Label htmlFor="password">
+                {mode === 'create' ? 'Password *' : 'Update Password (Optional)'}
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder={mode === 'create' ? 'Secure password' : 'Leave blank to keep current'}
+                  {...form.register('password')}
+                  disabled={isLoading}
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              {form.formState.errors.password && (
+                <p className="text-red-500 text-sm mt-1">
+                  {form.formState.errors.password.message}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
               <Label htmlFor="phone">Phone</Label>
               <Input
                 id="phone"
@@ -208,9 +337,7 @@ export function GuardianFormModal({
                 disabled={isLoading}
               />
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="idNumber">ID Number</Label>
               <Input
@@ -220,27 +347,64 @@ export function GuardianFormModal({
                 disabled={isLoading}
               />
             </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
             <div>
-              <Label htmlFor="relationship">Relationship *</Label>
-              <Select
-                value={form.watch('relationship')}
-                onValueChange={(value) =>
-                  form.setValue('relationship', value as any)
-                }
-              >
-                <SelectTrigger id="relationship">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {RELATIONSHIPS.map((rel) => (
-                    <SelectItem key={rel.value} value={rel.value}>
-                      {rel.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {studentContext ? (
+                <>
+                  <Label htmlFor="relationship">Relationship *</Label>
+                  <Input
+                    id="relationship"
+                    placeholder="e.g. Father, Mother, Guardian"
+                    {...form.register('relationship')}
+                    disabled={isLoading}
+                  />
+                  {form.formState.errors.relationship && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {form.formState.errors.relationship.message}
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <Label htmlFor="relationship">Relationship *</Label>
+                  <Select
+                    value={form.watch('relationship')}
+                    onValueChange={(value) =>
+                      form.setValue('relationship', value as any)
+                    }
+                  >
+                    <SelectTrigger id="relationship">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {RELATIONSHIPS.map((rel) => (
+                        <SelectItem key={rel.value} value={rel.value}>
+                          {rel.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
             </div>
+
+            {studentContext && (
+              <div className="flex items-end pb-2">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="isPrimary"
+                    checked={(form.watch() as StudentContextGuardianFormData).isPrimary}
+                    onCheckedChange={(checked) =>
+                      form.setValue('isPrimary', checked === true)}
+                  />
+                  <Label htmlFor="isPrimary" className="cursor-pointer text-sm font-normal">
+                    Primary guardian
+                  </Label>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="border-t pt-4">
@@ -291,6 +455,8 @@ export function GuardianFormModal({
             <Button type="submit" disabled={isLoading}>
               {isLoading
                 ? 'Saving...'
+                : onInlineSave
+                ? 'Add to Student'
                 : mode === 'create'
                 ? 'Create Guardian'
                 : 'Update Guardian'}

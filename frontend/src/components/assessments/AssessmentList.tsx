@@ -1,17 +1,10 @@
 // src/components/assessments/AssessmentList.tsx
 
 import { useState } from 'react';
-import { MoreHorizontal, Plus, Pencil, Trash2, FileText, Send, Play, CheckCircle, Lock } from 'lucide-react';
+import { MoreHorizontal, Pencil, Trash2, FileText, Send, Play, CheckCircle, Lock } from 'lucide-react';
 import { useAssessments, useDeleteAssessment, useUpdateAssessmentStatus } from '@/hooks/use-assessments';
 import { AssessmentStatus } from '@/types';
 import { AssessmentForm } from './AssessmentForm';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -55,6 +48,13 @@ const ASSESSMENT_TYPE_COLORS: Record<string, string> = {
   MOCK: 'bg-yellow-100 text-yellow-800',
   NATIONAL_EXAM: 'bg-red-100 text-red-800',
   COMPETENCY_BASED: 'bg-indigo-100 text-indigo-800',
+  FORMATIVE: 'bg-teal-100 text-teal-800',
+  SUMMATIVE: 'bg-orange-100 text-orange-800',
+  SBA: 'bg-cyan-100 text-cyan-800',
+  DIAGNOSTIC: 'bg-gray-100 text-gray-800',
+  KPSEA: 'bg-rose-100 text-rose-800',
+  KJSEA: 'bg-fuchsia-100 text-fuchsia-800',
+  GRADE_9_PLACEMENT: 'bg-violet-100 text-violet-800',
 };
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; nextAction?: { label: string; status: AssessmentStatus; icon: any } }> = {
@@ -97,19 +97,13 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
 
   if (isLoading) {
     return (
-      <Card>
-        <CardHeader>
-          <Skeleton className="h-8 w-48" />
-          <Skeleton className="h-4 w-96" />
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {[...Array(5)].map((_, i) => (
-              <Skeleton key={i} className="h-12 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="rounded-lg border p-4">
+        <div className="space-y-2">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      </div>
     );
   }
 
@@ -117,116 +111,93 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Assessments</CardTitle>
-              <CardDescription>
-                Manage assessments for this term
-              </CardDescription>
-            </div>
-            <Button onClick={() => setShowForm(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Assessment
-            </Button>
+      <div className="rounded-lg border overflow-hidden">
+        {assessments.length === 0 ? (
+          <div className="text-center py-16">
+            <FileText className="mx-auto h-10 w-10 text-muted-foreground/40" />
+            <h3 className="mt-3 text-sm font-semibold text-muted-foreground">
+              No assessments yet
+            </h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Select a subject and create your first assessment
+            </p>
           </div>
-        </CardHeader>
-        <CardContent>
-          {assessments.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-semibold text-gray-900">
-                No assessments
-              </h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating a new assessment.
-              </p>
-              <div className="mt-6">
-                <Button onClick={() => setShowForm(true)}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Assessment
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Subject</TableHead>
-                  <TableHead>Max Marks</TableHead>
-                  <TableHead>Results</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {assessments.map((assessment: any) => (
-                  <TableRow key={assessment.id}>
+        ) : (
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-muted/50">
+                <TableHead className="font-medium">Name</TableHead>
+                <TableHead className="font-medium">Type</TableHead>
+                <TableHead className="font-medium">Status</TableHead>
+                <TableHead className="font-medium">Subject</TableHead>
+                <TableHead className="font-medium text-right">Results</TableHead>
+                <TableHead className="font-medium text-right w-16">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {assessments.map((assessment: any) => {
+                const statusCfg = STATUS_CONFIG[assessment.status];
+                return (
+                  <TableRow key={assessment.id} className="group">
                     <TableCell className="font-medium">
                       {assessment.name}
                     </TableCell>
                     <TableCell>
                       <Badge
-                        className={ASSESSMENT_TYPE_COLORS[assessment.type]}
+                        className={ASSESSMENT_TYPE_COLORS[assessment.type] || 'bg-gray-100 text-gray-800'}
                         variant="secondary"
                       >
-                        {assessment.type.replace('_', ' ')}
+                        {assessment.type?.replace('_', ' ') || assessment.type}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <Badge
-                        className={STATUS_CONFIG[assessment.status]?.color || 'bg-gray-100 text-gray-800'}
+                        className={statusCfg?.color || 'bg-gray-100 text-gray-800'}
                         variant="secondary"
                       >
-                        {STATUS_CONFIG[assessment.status]?.label || assessment.status}
+                        {statusCfg?.label || assessment.status}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      {assessment.classSubject?.subject?.name}
+                    <TableCell className="text-muted-foreground text-sm">
+                      {assessment.classSubject?.subject?.name || '—'}
                     </TableCell>
-                    <TableCell>
-                      {assessment.maxMarks || 'N/A'}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-gray-500">
-                        {assessment._count?.results || 0} entered
-                      </span>
+                    <TableCell className="text-right text-sm text-muted-foreground">
+                      {assessment._count?.results || 0} entered
+                      {assessment.maxMarks && (
+                        <span className="ml-1 text-xs text-muted-foreground/60">
+                          / {assessment.maxMarks} max
+                        </span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <span className="sr-only">Actions</span>
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuContent align="end" className="w-44">
+                          <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                            {assessment.name}
+                          </DropdownMenuLabel>
                           <DropdownMenuSeparator />
                           {onGradeEntry && (
-                            <DropdownMenuItem
-                              onClick={() => onGradeEntry(assessment.id)}
-                            >
+                            <DropdownMenuItem onClick={() => onGradeEntry(assessment.id)}>
                               <FileText className="mr-2 h-4 w-4" />
                               Enter Grades
                             </DropdownMenuItem>
                           )}
-                          {STATUS_CONFIG[assessment.status]?.nextAction && (
-                            <DropdownMenuItem
-                              onClick={() => handleStatusChange(
-                                assessment.id,
-                                STATUS_CONFIG[assessment.status].nextAction!.status
-                              )}
-                            >
+                          {statusCfg?.nextAction && (
+                            <DropdownMenuItem onClick={() => handleStatusChange(assessment.id, statusCfg.nextAction!.status)}>
                               {(() => {
-                                const Icon = STATUS_CONFIG[assessment.status].nextAction!.icon;
+                                const Icon = statusCfg.nextAction!.icon;
                                 return <Icon className="mr-2 h-4 w-4" />;
                               })()}
-                              {STATUS_CONFIG[assessment.status].nextAction!.label}
+                              {statusCfg.nextAction!.label}
                             </DropdownMenuItem>
                           )}
+                          <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => handleEdit(assessment)}>
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
@@ -242,12 +213,12 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+                );
+              })}
+            </TableBody>
+          </Table>
+        )}
+      </div>
 
       {/* Assessment Form */}
       <AssessmentForm
@@ -263,10 +234,9 @@ export function AssessmentList({ termId, classSubjectId, onGradeEntry }: Assessm
       <AlertDialog open={!!deletingId} onOpenChange={() => setDeletingId(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Assessment</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the
-              assessment and all associated results.
+              This will permanently delete this assessment and all its results. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

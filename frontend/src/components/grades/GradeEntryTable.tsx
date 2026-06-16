@@ -1,11 +1,12 @@
 // src/components/grades/GradeEntryTable.tsx
 
 import { useState, useEffect } from 'react';
-import { Save, Upload, Download, AlertCircle, Loader2 } from 'lucide-react';
+import { Save, Download, AlertCircle, Loader2 } from 'lucide-react';
 import { useAssessmentResults } from '@/hooks/use-grades';
 import { useBulkGradeEntry } from '@/hooks/use-grades';
 import { useStudentsEnrolledInSubject } from '@/hooks/use-student-subject-enrollment';
 import { SubjectEnrollmentStatus } from '@/types';
+import { calculateCBCGrade } from '@/lib/grade-calculator';
 import {
   Card,
   CardContent,
@@ -103,21 +104,27 @@ export function GradeEntryTable({
   };
 
   const handleSave = async () => {
-    const entries = Object.values(grades)
+    const results = Object.values(grades)
       .filter((grade) => grade.marks !== '')
-      .map((grade) => ({
-        studentId: grade.studentId,
-        marks: parseFloat(grade.marks),
-        comment: grade.comment || undefined,
-      }));
+      .map((grade) => {
+        const marks = parseFloat(grade.marks);
+        const cbcResult = calculateCBCGrade(marks, maxMarks);
+        return {
+          studentId: grade.studentId,
+          numericValue: marks,
+          grade: cbcResult.grade,
+          competencyLevel: cbcResult.competency,
+          comment: grade.comment || undefined,
+        };
+      });
 
-    if (entries.length === 0) {
+    if (results.length === 0) {
       return;
     }
 
     await bulkEntryMutation.mutateAsync({
       assessmentDefId: assessmentId,
-      entries,
+      results,
     });
 
     setHasChanges(false);
@@ -144,21 +151,10 @@ export function GradeEntryTable({
     a.click();
   };
 
-  const getGradeColor = (marks: number) => {
-    const percentage = (marks / maxMarks) * 100;
-    if (percentage >= 80) return 'bg-green-100 text-green-800';
-    if (percentage >= 60) return 'bg-blue-100 text-blue-800';
-    if (percentage >= 50) return 'bg-yellow-100 text-yellow-800';
-    return 'bg-red-100 text-red-800';
-  };
-
-  const getLetterGrade = (marks: number) => {
-    const percentage = (marks / maxMarks) * 100;
-    if (percentage >= 80) return 'A';
-    if (percentage >= 70) return 'B';
-    if (percentage >= 60) return 'C';
-    if (percentage >= 50) return 'D';
-    return 'E';
+  // CBC auto-calculation: compute grade + competency from numeric marks
+  const computeCBCResult = (marks: number | null) => {
+    if (marks === null || marks === undefined || isNaN(marks)) return null;
+    return calculateCBCGrade(marks, maxMarks);
   };
 
   if (isLoadingRoster || isLoadingResults) {
@@ -273,14 +269,20 @@ export function GradeEntryTable({
                       />
                     </TableCell>
                     <TableCell>
-                      {marks !== null && (
-                        <Badge
-                          className={getGradeColor(marks)}
-                          variant="secondary"
-                        >
-                          {getLetterGrade(marks)}
-                        </Badge>
-                      )}
+                      {marks !== null && (() => {
+                        const result = computeCBCResult(marks);
+                        if (!result) return null;
+                        return (
+                          <div className="flex flex-col items-center gap-0.5">
+                            <Badge className={result.color} variant="secondary">
+                              {result.grade}
+                            </Badge>
+                            <span className="text-[10px] text-muted-foreground font-medium">
+                              {result.shortLabel}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>
                       <Input

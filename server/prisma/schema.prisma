@@ -26,6 +26,7 @@ model School {
   gender                SchoolGender
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  auditLogs             AuditLog[]
   academicYears         AcademicYear[]
   assessmentDefinitions AssessmentDefinition[]
   assessmentResults     AssessmentResult[]
@@ -253,6 +254,7 @@ model User {
   student    Student?
   teacher    Teacher?
   school     School?   @relation(fields: [schoolId], references: [id])
+  auditLogs  AuditLog[] @relation("ActorAuditLogs")
 
   @@index([role])
   @@index([schoolId])
@@ -315,7 +317,7 @@ model StudentGuardian {
   isPrimary      Boolean    @default(false)
   isVerified     Boolean    @default(false)
   verifiedAt     DateTime?
-  verifiedById   String?    // User who verified the relationship
+  verifiedById   String?    
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @default(now()) @updatedAt
   guardian       Guardian   @relation(fields: [guardianId], references: [id], onDelete: Cascade)
@@ -664,6 +666,42 @@ model AssessmentResult {
   @@index([studentId])
   @@index([assessmentDefId])
   @@index([assessedById])
+}
+
+// ─── AuditLog ─────────────────────────────────────────────────────────────────
+// Captures all significant actions for activity feeds and compliance tracking.
+// Every controller that modifies data should create an audit log entry.
+//
+// entityType examples: "Student", "Teacher", "User", "School", "Class",
+//   "AssessmentDefinition", "AssessmentResult", "FeeInvoice", "FeePayment",
+//   "FeeStructure", "TenantSubscription", "Timetable", "TimetableEntry", "Report"
+//
+// action examples: "CREATE", "UPDATE", "DELETE", "LOGIN", "ENROLL", "PROMOTE",
+//   "GRADE", "PUBLISH", "PAYMENT", "REVERSE", "TRANSITION", "ASSIGN"
+// ────────────────────────────────────────────────────────────────────────────────
+model AuditLog {
+  id              String   @id @default(uuid())
+  schoolId        String?
+  actorId         String?
+  actorRole       String?                    // Snapshot of actor's role
+  action          String                     // e.g. "CREATE", "UPDATE", "DELETE"
+  entityType      String                     // e.g. "Student", "User", "Teacher"
+  entityId        String?
+  entityName      String?                    // Human-readable name (e.g. "John Doe")
+  details         String?                    // Short human-readable summary
+  metadata        Json?                      // Extra context (old/new values, diff)
+  ipAddress       String?
+  userAgent       String?
+  createdAt       DateTime   @default(now())
+
+  school          School?    @relation(fields: [schoolId], references: [id])
+  actor           User?      @relation("ActorAuditLogs", fields: [actorId], references: [id])
+
+  @@index([schoolId, createdAt(sort: Desc)])
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt(sort: Desc)])
 }
 
 enum SchoolType {

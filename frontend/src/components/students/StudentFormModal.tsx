@@ -1,5 +1,5 @@
 // src/components/students/StudentFormModal.tsx
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useState, useEffect } from 'react';
@@ -17,7 +17,8 @@ import { useSchools } from '@/hooks/use-schools';
 import { usePreviewSequence } from '@/hooks/use-sequences';
 import { GraduationCap, Sparkles, RefreshCw, Eye, EyeOff, AlertCircle, Building2, UserIcon, Calendar, Plus, Trash2, Users } from 'lucide-react';
 import { toast } from 'sonner';
-import api from '@/api';
+import { GuardianFormModal, InlineGuardianData } from '@/components/guardians/GuardianFormModal';
+import { useCreateStudent, useUpdateStudent } from '@/hooks/use-students';
 
 // Combined Schema: Base User + Student Profile
 const studentFormSchema = z.object({
@@ -45,20 +46,6 @@ const studentFormSchema = z.object({
   specialNeedsType: z.string().optional(),
   medicalCondition: z.string().optional(),
   allergies: z.string().optional(),
-  guardians: z.array(z.object({
-    email: z.string().email('Invalid email address'),
-    password: z.string().min(8, 'Password must be at least 8 characters'),
-    firstName: z.string().min(1, 'First name is required'),
-    lastName: z.string().min(1, 'Last name is required'),
-    middleName: z.string().optional(),
-    phone: z.string().optional(),
-    idNumber: z.string().optional().transform((value) => (value === '' ? undefined : value)),
-    relationship: z.string().min(1, 'Relationship is required'),
-    occupation: z.string().optional(),
-    employer: z.string().optional(),
-    workPhone: z.string().optional(),
-    isPrimary: z.boolean().optional().default(false),
-  })).max(5, 'You can add up to 5 guardians').default([]),
 });
 
 type StudentFormData = z.infer<typeof studentFormSchema>;
@@ -83,7 +70,11 @@ const KENYAN_COUNTIES = [
 export function StudentFormModal({ open, onOpenChange, mode, student }: StudentFormModalProps) {
   const [autoGenerateAdmission, setAutoGenerateAdmission] = useState(mode === 'create');
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [guardians, setGuardians] = useState<InlineGuardianData[]>([]);
+  const { mutate: createStudent, isPending: isCreating } = useCreateStudent();
+  const { mutate: updateStudent, isPending: isUpdating } = useUpdateStudent();
+  const isLoading = isCreating || isUpdating;
+  const [guardianModalOpen, setGuardianModalOpen] = useState(false);
   
   // Context & Hooks
   const { schoolId: contextSchoolId, schoolName: contextSchoolName, isSuperAdmin } = useSchoolContext();
@@ -114,23 +105,11 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
       specialNeedsType: '',
       medicalCondition: '',
       allergies: '',
-      guardians: [],
     },
   });
 
   // Watch school ID to trigger preview updates
   const watchedSchoolId = form.watch('schoolId') || contextSchoolId;
-
-  const { fields: guardianFields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'guardians',
-  });
-
-  const setPrimaryGuardian = (selectedIndex: number) => {
-    guardianFields.forEach((_, index) => {
-      form.setValue(`guardians.${index}.isPrimary`, index === selectedIndex);
-    });
-  }; 
 
   // Auto-generate Admission Number Preview
   const { data: previewAdmission, refetch: refreshAdmissionPreview } = usePreviewSequence(
@@ -192,14 +171,20 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
       form.reset();
       setShowPassword(false);
       setAutoGenerateAdmission(mode === 'create');
+      setGuardians([]);
     }
   }, [open, mode, form]);
 
-  const onSubmit = async (data: StudentFormData) => {
-    try {
-      setIsLoading(true);
+  const handleInlineSaveGuardian = (data: InlineGuardianData) => {
+    setGuardians(prev => [...prev, data]);
+  };
 
-      // 1. Prepare User Data
+  const handleRemoveGuardian = (index: number) => {
+    setGuardians(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const onSubmit = async (data: StudentFormData) => {
+    // 1. Prepare User Data
       const userData: any = {
         firstName: data.firstName,
         lastName: data.lastName,
@@ -230,8 +215,21 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
         allergies: data.allergies,
       };
 
-      if (data.guardians && data.guardians.length > 0) {
-        profileData.guardians = data.guardians;
+      if (guardians.length > 0) {
+        profileData.guardians = guardians.map(g => ({
+          email: g.email,
+          password: g.password,
+          firstName: g.firstName,
+          lastName: g.lastName,
+          middleName: g.middleName,
+          phone: g.phone,
+          idNumber: g.idNumber,
+          relationship: g.relationship,
+          occupation: g.occupation,
+          employer: g.employer,
+          workPhone: g.workPhone,
+          isPrimary: g.isPrimary,
+        }));
       }
 
       // 3. Construct Payload
@@ -241,558 +239,478 @@ export function StudentFormModal({ open, onOpenChange, mode, student }: StudentF
       };
 
       if (mode === 'create') {
-        // Use the centralized user creation endpoint
-        await api.post('/users', payload);
-        toast.success('Student created successfully');
-        onOpenChange(false);
-        window.location.reload();
+        createStudent(payload, {
+          onSuccess: () => {
+            onOpenChange(false);
+            setTimeout(() => window.location.reload(), 1000);
+          },
+        });
       } else if (student && student.userId) {
-        // For update, we might need a different structure depending on your API
-        // Assuming the generic update endpoint works similarly:
-        await api.put(`/users/${student.userId}`, payload);
-        toast.success('Student updated successfully');
-        onOpenChange(false);
-        window.location.reload();
+        updateStudent(
+          { id: student.userId, data: payload },
+          {
+            onSuccess: () => {
+              onOpenChange(false);
+              setTimeout(() => window.location.reload(), 1000);
+            },
+          }
+        );
       }
-
-    } catch (error: any) {
-      console.error(error);
-      toast.error(error.response?.data?.message || 'Failed to save student');
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <GraduationCap className="h-6 w-6" />
-            {mode === 'create' ? 'Register New Student' : 'Edit Student'}
-          </DialogTitle>
-          <DialogDescription>
-            {mode === 'create'
-              ? 'Fill in the student details and personal information.'
-              : 'Update student information and profile.'}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-4xl max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <GraduationCap className="h-6 w-6" />
+              {mode === 'create' ? 'Register New Student' : 'Edit Student'}
+            </DialogTitle>
+            <DialogDescription>
+              {mode === 'create'
+                ? 'Fill in the student details and personal information.'
+                : 'Update student information and profile.'}
+            </DialogDescription>
+          </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            
-            {/* --- BASIC INFORMATION --- */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <UserIcon className="h-4 w-4" />
-                Basic Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>First Name *</Label>
-                  <Input {...form.register('firstName')} placeholder="John" />
-                  {form.formState.errors.firstName && (
-                    <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p>
+          <ScrollArea className="max-h-[60vh] pr-4">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              
+              {/* --- BASIC INFORMATION --- */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <UserIcon className="h-4 w-4" />
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>First Name *</Label>
+                    <Input {...form.register('firstName')} placeholder="John" />
+                    {form.formState.errors.firstName && (
+                      <p className="text-sm text-destructive">{form.formState.errors.firstName.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Last Name *</Label>
+                    <Input {...form.register('lastName')} placeholder="Doe" />
+                    {form.formState.errors.lastName && (
+                      <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Middle Name</Label>
+                    <Input {...form.register('middleName')} placeholder="Optional" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Email *</Label>
+                    <Input {...form.register('email')} type="email" placeholder="student@example.com" />
+                    {form.formState.errors.email && (
+                      <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Phone</Label>
+                    <Input {...form.register('phone')} placeholder="+2547..." />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>ID Number</Label>
+                    <Input {...form.register('idNumber')} placeholder="National ID (Optional)" />
+                  </div>
+
+                  {/* School Selection Logic */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Building2 className="h-4 w-4" />
+                      School {!isSuperAdmin && <span className="text-xs text-muted-foreground">(Auto-assigned)</span>}
+                    </Label>
+
+                    {isSuperAdmin ? (
+                      <Controller
+                        name="schoolId"
+                        control={form.control}
+                        render={({ field }) => (
+                          <Select 
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              // Refresh preview if creating
+                              if (mode === 'create' && autoGenerateAdmission) {
+                                setTimeout(() => refreshAdmissionPreview(), 100);
+                              }
+                            }} 
+                            value={field.value}
+                            disabled={mode === 'edit'} 
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select School" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <ScrollArea className="h-48">
+                                {schools.map((school: any) => (
+                                  <SelectItem key={school.id} value={school.id}>
+                                    {school.name}
+                                  </SelectItem>
+                                ))}
+                              </ScrollArea>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                    ) : (
+                      <div className="relative">
+                        <Input
+                          value={contextSchoolName || 'No School Assigned'}
+                          disabled
+                          className="bg-muted cursor-not-allowed"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Password Field */}
+                  {(mode === 'create' || mode === 'edit') && (
+                    <div className="space-y-2 md:col-span-2">
+                      <Label>{mode === 'create' ? 'Password *' : 'Update Password (Optional)'}</Label>
+                      <div className="relative">
+                        <Input
+                          {...form.register('password')}
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder={mode === 'create' ? "Enter secure password" : "Leave blank to keep current"}
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {form.formState.errors.password && (
+                        <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
+                      )}
+                    </div>
                   )}
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <Label>Last Name *</Label>
-                  <Input {...form.register('lastName')} placeholder="Doe" />
-                  {form.formState.errors.lastName && (
-                    <p className="text-sm text-destructive">{form.formState.errors.lastName.message}</p>
-                  )}
-                </div>
+              <Separator />
 
-                <div className="space-y-2">
-                  <Label>Middle Name</Label>
-                  <Input {...form.register('middleName')} placeholder="Optional" />
-                </div>
+              {/* --- ACADEMIC INFORMATION --- */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4" />
+                  Academic Information
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  
+                  {/* Admission Number with Auto-Gen */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <Label>Admission Number *</Label>
+                      {mode === 'create' && (
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            id="autoAdmission"
+                            checked={autoGenerateAdmission}
+                            onCheckedChange={(checked) => {
+                              setAutoGenerateAdmission(!!checked);
+                              // Clear value to allow preview to take over
+                              form.setValue('admissionNo', ''); 
+                            }}
+                          />
+                          <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
+                            Auto-generate
+                          </Label>
+                        </div>
+                      )}
+                    </div>
 
-                <div className="space-y-2">
-                  <Label>Email *</Label>
-                  <Input {...form.register('email')} type="email" placeholder="student@example.com" />
-                  {form.formState.errors.email && (
-                    <p className="text-sm text-destructive">{form.formState.errors.email.message}</p>
-                  )}
-                </div>
+                    {autoGenerateAdmission && mode === 'create' ? (
+                      <div className="relative">
+                        <Input
+                          value={previewAdmission?.preview || 'Generating...'}
+                          disabled
+                          className="bg-muted"
+                        />
+                        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                          <Sparkles className="h-4 w-4 text-primary" />
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => refreshAdmissionPreview()}
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <Input
+                        {...form.register('admissionNo')}
+                        placeholder="Enter admission number"
+                        disabled={mode === 'edit'}
+                      />
+                    )}
+                    
+                    {form.formState.errors.admissionNo && !autoGenerateAdmission && (
+                      <p className="text-sm text-destructive">{form.formState.errors.admissionNo.message}</p>
+                    )}
+                  </div>
 
-                <div className="space-y-2">
-                  <Label>Phone</Label>
-                  <Input {...form.register('phone')} placeholder="+2547..." />
-                </div>
-
-                <div className="space-y-2">
-                  <Label>ID Number</Label>
-                  <Input {...form.register('idNumber')} placeholder="National ID (Optional)" />
-                </div>
-
-                {/* School Selection Logic */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    School {!isSuperAdmin && <span className="text-xs text-muted-foreground">(Auto-assigned)</span>}
-                  </Label>
-
-                  {isSuperAdmin ? (
+                  <div className="space-y-2">
+                    <Label>Gender *</Label>
                     <Controller
-                      name="schoolId"
+                      name="gender"
                       control={form.control}
                       render={({ field }) => (
-                        <Select 
-                          onValueChange={(val) => {
-                            field.onChange(val);
-                            // Refresh preview if creating
-                            if (mode === 'create' && autoGenerateAdmission) {
-                              setTimeout(() => refreshAdmissionPreview(), 100);
-                            }
-                          }} 
-                          value={field.value}
-                          disabled={mode === 'edit'} 
-                        >
+                        <Select onValueChange={field.onChange} value={field.value}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select School" />
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="MALE">Male</SelectItem>
+                            <SelectItem value="FEMALE">Female</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      )}
+                    />
+                  </div>
+
+                  {/* Date of Birth Field */}
+                  <div className="space-y-2">
+                    <Label className="flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      Date of Birth
+                    </Label>
+                    <Input 
+                      {...form.register('dob')} 
+                      type="date" 
+                      max={new Date().toISOString().split('T')[0]} // Restrict to past dates
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* --- GOVERNMENT IDs --- */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold">Government Identification</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>UPI Number</Label>
+                    <Input {...form.register('upiNumber')} placeholder="NEMIS UPI" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>KEMIS UPI</Label>
+                    <Input {...form.register('kemisUpi')} placeholder="KEMIS ID" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Birth Certificate No</Label>
+                    <Input {...form.register('birthCertNo')} placeholder="Entry Number" />
+                  </div>
+                   <div className="space-y-2">
+                    <Label>Nationality</Label>
+                    <Input {...form.register('nationality')} />
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* --- LOCATION --- */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold">Location</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>County</Label>
+                    <Controller
+                      name="county"
+                      control={form.control}
+                      render={({ field }) => (
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select County" />
                           </SelectTrigger>
                           <SelectContent>
                             <ScrollArea className="h-48">
-                              {schools.map((school: any) => (
-                                <SelectItem key={school.id} value={school.id}>
-                                  {school.name}
-                                </SelectItem>
+                              {KENYAN_COUNTIES.map((c) => (
+                                <SelectItem key={c} value={c}>{c}</SelectItem>
                               ))}
                             </ScrollArea>
                           </SelectContent>
                         </Select>
                       )}
                     />
-                  ) : (
-                    <div className="relative">
-                      <Input
-                        value={contextSchoolName || 'No School Assigned'}
-                        disabled
-                        className="bg-muted cursor-not-allowed"
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {/* Password Field */}
-                {(mode === 'create' || mode === 'edit') && (
-                  <div className="space-y-2 md:col-span-2">
-                    <Label>{mode === 'create' ? 'Password *' : 'Update Password (Optional)'}</Label>
-                    <div className="relative">
-                      <Input
-                        {...form.register('password')}
-                        type={showPassword ? 'text' : 'password'}
-                        placeholder={mode === 'create' ? "Enter secure password" : "Leave blank to keep current"}
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                    {form.formState.errors.password && (
-                      <p className="text-sm text-destructive">{form.formState.errors.password.message}</p>
-                    )}
                   </div>
-                )}
+                  <div className="space-y-2">
+                    <Label>Sub County</Label>
+                    <Input {...form.register('subCounty')} />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <Separator />
+              <Separator />
 
-            {/* --- ACADEMIC INFORMATION --- */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold flex items-center gap-2">
-                <GraduationCap className="h-4 w-4" />
-                Academic Information
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* --- MEDICAL / SPECIAL NEEDS --- */}
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold">Medical & Special Needs</h3>
                 
-                {/* Admission Number with Auto-Gen */}
                 <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Admission Number *</Label>
-                    {mode === 'create' && (
+                  <Controller
+                    name="hasSpecialNeeds"
+                    control={form.control}
+                    render={({ field }) => (
                       <div className="flex items-center gap-2">
                         <Checkbox
-                          id="autoAdmission"
-                          checked={autoGenerateAdmission}
+                          id="hasSpecialNeeds"
+                          checked={field.value}
                           onCheckedChange={(checked) => {
-                            setAutoGenerateAdmission(!!checked);
-                            // Clear value to allow preview to take over
-                            form.setValue('admissionNo', ''); 
+                            field.onChange(checked);
+                            if (!checked) form.setValue('specialNeedsType', '');
                           }}
                         />
-                        <Label htmlFor="autoAdmission" className="text-xs font-normal cursor-pointer">
-                          Auto-generate
-                        </Label>
+                        <Label htmlFor="hasSpecialNeeds" className="cursor-pointer">Student has special needs?</Label>
                       </div>
                     )}
-                  </div>
+                  />
+                </div>
 
-                  {autoGenerateAdmission && mode === 'create' ? (
-                    <div className="relative">
-                      <Input
-                        value={previewAdmission?.preview || 'Generating...'}
-                        disabled
-                        className="bg-muted"
-                      />
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        <Sparkles className="h-4 w-4 text-primary" />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0"
-                          onClick={() => refreshAdmissionPreview()}
-                        >
-                          <RefreshCw className="h-3 w-3" />
-                        </Button>
+                {form.watch('hasSpecialNeeds') && (
+                  <div className="space-y-2 ml-6 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                    <div className="flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
+                      <div className="flex-1">
+                        <Label>Special Needs Type</Label>
+                        <Input {...form.register('specialNeedsType')} placeholder="e.g. Visual Impairment" className="mt-2" />
                       </div>
                     </div>
-                  ) : (
-                    <Input
-                      {...form.register('admissionNo')}
-                      placeholder="Enter admission number"
-                      disabled={mode === 'edit'}
-                    />
-                  )}
-                  
-                  {form.formState.errors.admissionNo && !autoGenerateAdmission && (
-                    <p className="text-sm text-destructive">{form.formState.errors.admissionNo.message}</p>
-                  )}
-                </div>
+                  </div>
+                )}
 
-                <div className="space-y-2">
-                  <Label>Gender *</Label>
-                  <Controller
-                    name="gender"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select gender" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="MALE">Male</SelectItem>
-                          <SelectItem value="FEMALE">Female</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-
-                {/* Date of Birth Field */}
-                <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Date of Birth
-                  </Label>
-                  <Input 
-                    {...form.register('dob')} 
-                    type="date" 
-                    max={new Date().toISOString().split('T')[0]} // Restrict to past dates
-                  />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* --- GOVERNMENT IDs --- */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Government Identification</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>UPI Number</Label>
-                  <Input {...form.register('upiNumber')} placeholder="NEMIS UPI" />
-                </div>
-                <div className="space-y-2">
-                  <Label>KEMIS UPI</Label>
-                  <Input {...form.register('kemisUpi')} placeholder="KEMIS ID" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Birth Certificate No</Label>
-                  <Input {...form.register('birthCertNo')} placeholder="Entry Number" />
-                </div>
-                 <div className="space-y-2">
-                  <Label>Nationality</Label>
-                  <Input {...form.register('nationality')} />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* --- LOCATION --- */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Location</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>County</Label>
-                  <Controller
-                    name="county"
-                    control={form.control}
-                    render={({ field }) => (
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select County" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <ScrollArea className="h-48">
-                            {KENYAN_COUNTIES.map((c) => (
-                              <SelectItem key={c} value={c}>{c}</SelectItem>
-                            ))}
-                          </ScrollArea>
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Sub County</Label>
-                  <Input {...form.register('subCounty')} />
-                </div>
-              </div>
-            </div>
-
-            <Separator />
-
-            {/* --- MEDICAL / SPECIAL NEEDS --- */}
-            <div className="space-y-4">
-              <h3 className="text-sm font-semibold">Medical & Special Needs</h3>
-              
-              <div className="space-y-2">
-                <Controller
-                  name="hasSpecialNeeds"
-                  control={form.control}
-                  render={({ field }) => (
-                    <div className="flex items-center gap-2">
-                      <Checkbox
-                        id="hasSpecialNeeds"
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                          field.onChange(checked);
-                          if (!checked) form.setValue('specialNeedsType', '');
-                        }}
-                      />
-                      <Label htmlFor="hasSpecialNeeds" className="cursor-pointer">Student has special needs?</Label>
-                    </div>
-                  )}
-                />
-              </div>
-
-              {form.watch('hasSpecialNeeds') && (
-                <div className="space-y-2 ml-6 p-3 bg-amber-50 rounded-lg border border-amber-200">
-                  <div className="flex items-start gap-2">
-                    <AlertCircle className="h-4 w-4 text-amber-600 mt-0.5" />
-                    <div className="flex-1">
-                      <Label>Special Needs Type</Label>
-                      <Input {...form.register('specialNeedsType')} placeholder="e.g. Visual Impairment" className="mt-2" />
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Medical Conditions</Label>
+                    <Input {...form.register('medicalCondition')} placeholder="e.g. Asthma" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Allergies</Label>
+                    <Input {...form.register('allergies')} placeholder="e.g. Peanuts" />
                   </div>
                 </div>
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Medical Conditions</Label>
-                  <Input {...form.register('medicalCondition')} placeholder="e.g. Asthma" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Allergies</Label>
-                  <Input {...form.register('allergies')} placeholder="e.g. Peanuts" />
-                </div>
               </div>
-            </div>
 
-            {mode === 'create' && (
-              <>
-                <Separator />
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between gap-4">
-                    <div>
-                      <h3 className="text-sm font-semibold">Guardians</h3>
-                      <p className="text-xs text-muted-foreground">Add up to 5 guardian user accounts for this student.</p>
+              {mode === 'create' && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <h3 className="text-sm font-semibold">Guardians</h3>
+                        <p className="text-xs text-muted-foreground">Add up to 5 guardian user accounts for this student.</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setGuardianModalOpen(true)}
+                        disabled={guardians.length >= 5}
+                      >
+                        <Plus className="h-4 w-4" />
+                        Add Guardian
+                      </Button>
                     </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() =>
-                        append({
-                          email: '',
-                          password: '',
-                          firstName: '',
-                          lastName: '',
-                          middleName: '',
-                          phone: '',
-                          idNumber: '',
-                          relationship: '',
-                          occupation: '',
-                          employer: '',
-                          workPhone: '',
-                          isPrimary: guardianFields.length === 0,
-                        })
-                      }
-                      disabled={guardianFields.length >= 5}
-                    >
-                      <Plus className="h-4 w-4" />
-                      Add Guardian
-                    </Button>
-                  </div>
 
-                  {guardianFields.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                      No guardians added yet. Click Add Guardian to create a guardian account for this student.
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {guardianFields.map((field, index) => (
-                        <div key={field.id} className="rounded-lg border p-4">
-                          <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
-                            <div>
-                              <p className="text-sm font-semibold">Guardian {index + 1}</p>
-                              <p className="text-xs text-muted-foreground">Create guardian user and profile.</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`guardianPrimary-${field.id}`}
-                                  checked={form.watch(`guardians.${index}.isPrimary`)}
-                                  onCheckedChange={() => setPrimaryGuardian(index)}
-                                />
-                                <Label htmlFor={`guardianPrimary-${field.id}`} className="cursor-pointer text-sm">
-                                  Primary guardian
-                                </Label>
+                    {guardians.length === 0 ? (
+                      <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                        No guardians added yet. Click Add Guardian to create a guardian account for this student.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {guardians.map((guardian, index) => (
+                          <div key={index} className="rounded-lg border p-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <span className="font-medium text-sm">
+                                    {guardian.firstName} {guardian.lastName}
+                                  </span>
+                                  {guardian.isPrimary && (
+                                    <span className="ml-2 inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium bg-primary/10 text-primary">
+                                      Primary
+                                    </span>
+                                  )}
+                                  <p className="text-xs text-muted-foreground">
+                                    {guardian.relationship} &middot; {guardian.email}
+                                  </p>
+                                </div>
                               </div>
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => remove(index)}
+                                onClick={() => handleRemoveGuardian(index)}
                               >
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
                           </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                            <div className="space-y-2">
-                              <Label>Email *</Label>
-                              <Input {...form.register(`guardians.${index}.email` as const)} placeholder="guardian@example.com" />
-                              {form.formState.errors.guardians?.[index]?.email && (
-                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.email?.message}</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Password *</Label>
-                              <Input {...form.register(`guardians.${index}.password` as const)} type="password" placeholder="Password" />
-                              {form.formState.errors.guardians?.[index]?.password && (
-                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.password?.message}</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>First Name *</Label>
-                              <Input {...form.register(`guardians.${index}.firstName` as const)} placeholder="Jane" />
-                              {form.formState.errors.guardians?.[index]?.firstName && (
-                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.firstName?.message}</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Last Name *</Label>
-                              <Input {...form.register(`guardians.${index}.lastName` as const)} placeholder="Doe" />
-                              {form.formState.errors.guardians?.[index]?.lastName && (
-                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.lastName?.message}</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Relationship *</Label>
-                              <Input {...form.register(`guardians.${index}.relationship` as const)} placeholder="Father, Mother" />
-                              {form.formState.errors.guardians?.[index]?.relationship && (
-                                <p className="text-sm text-destructive">{form.formState.errors.guardians?.[index]?.relationship?.message}</p>
-                              )}
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Phone</Label>
-                              <Input {...form.register(`guardians.${index}.phone` as const)} placeholder="+2547..." />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Middle Name</Label>
-                              <Input {...form.register(`guardians.${index}.middleName` as const)} placeholder="Optional" />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>ID Number</Label>
-                              <Input {...form.register(`guardians.${index}.idNumber` as const)} placeholder="Optional" />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Occupation</Label>
-                              <Input {...form.register(`guardians.${index}.occupation` as const)} placeholder="e.g. Teacher" />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Employer</Label>
-                              <Input {...form.register(`guardians.${index}.employer` as const)} placeholder="Company" />
-                            </div>
-
-                            <div className="space-y-2">
-                              <Label>Work Phone</Label>
-                              <Input {...form.register(`guardians.${index}.workPhone` as const)} placeholder="+2547..." />
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
-
-            {/* In edit mode, show a note about managing guardians */}
-            {mode === 'edit' && (
-              <>
-                <Separator />
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Users className="h-4 w-4" />
-                      <span className="font-semibold">Guardian Management</span>
-                    </div>
-                    <p>
-                      To add, remove, or update guardian relationships, close this form and 
-                      open the student's detail view. Click <strong>"Manage Guardians"</strong> 
-                      in the Enrollment tab to link existing guardians or create new ones.
-                    </p>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              </>
-            )}
-          </form>
-        </ScrollArea>
+                </>
+              )}
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
-            Cancel
-          </Button>
-          <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
-            {isLoading ? 'Saving...' : mode === 'create' ? 'Register Student' : 'Update Student'}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              {/* In edit mode, show a note about managing guardians */}
+              {mode === 'edit' && (
+                <>
+                  <Separator />
+                  <div className="space-y-4">
+                    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Users className="h-4 w-4" />
+                        <span className="font-semibold">Guardian Management</span>
+                      </div>
+                      <p>
+                        To add, remove, or update guardian relationships, close this form and 
+                        open the student's detail view. Click <strong>"Manage Guardians"</strong> 
+                        in the Enrollment tab to link existing guardians or create new ones.
+                      </p>
+                    </div>
+                  </div>
+                </>
+              )}
+            </form>
+          </ScrollArea>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
+              Cancel
+            </Button>
+            <Button onClick={form.handleSubmit(onSubmit)} disabled={isLoading}>
+              {isLoading ? 'Saving...' : mode === 'create' ? 'Register Student' : 'Update Student'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Guardian Form Modal for inline creation — completely outside parent Dialog to avoid nested dialog conflicts */}
+      <GuardianFormModal
+        open={guardianModalOpen}
+        onOpenChange={setGuardianModalOpen}
+        mode="create"
+        studentContext={true}
+        onInlineSave={handleInlineSaveGuardian}
+      />
+    </>
   );
 }

@@ -7,8 +7,8 @@
 # Configuration & Colors
 # -----------------------------------------------------------------------------
 API_URL="http://localhost:4000/api"
-DEFAULT_EMAIL="admin@msa.com"
-DEFAULT_PASSWORD="Admin1@msa"
+DEFAULT_EMAIL="admin@nps.ac.ke"
+DEFAULT_PASSWORD="Admin123!"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'

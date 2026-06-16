@@ -7,6 +7,8 @@ export function useTeachers(params?: {
   schoolId?: string;
   employmentType?: string;
   search?: string;
+  page?: number;
+  limit?: number;
 }) {
   return useQuery({
     queryKey: ['teachers', params],

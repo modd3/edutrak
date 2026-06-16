@@ -1,4 +1,4 @@
-import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, Users2, Calendar, DollarSign } from 'lucide-react';
+import { Users, GraduationCap, BookOpen, TrendingUp, UserPlus, Calendar, School } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useNavigate } from 'react-router-dom';
 import { useSchoolStatistics } from '@/hooks/use-schools';
@@ -6,7 +6,11 @@ import { useAcademicStatistics } from '@/hooks/use-academic';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
 import { useAuthGuard } from '@/hooks/use-auth-guard';
+import { StudentFormModal } from '@/components/students/StudentFormModal'
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { RecentActivities } from '@/components/shared/RecentActivities';
+import type { ActivityItem } from '@/components/shared/RecentActivities';
+import { useRecentAuditLogs, formatAuditToActivity } from '@/hooks/use-audit';
 
 export function AdminDashboard() {
   const { user } = useAuthStore();
@@ -31,7 +35,7 @@ export function AdminDashboard() {
   const school_stats: any = (statisticsData as any)?.data?.data || (statisticsData as any)?.data || statisticsData;
 
   // Get academic stats for performance data
-  const { data: academicStatsData } = useAcademicStatistics();
+  const { data: academicStatsData } = useAcademicStatistics(user?.schoolId);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const academicStats: any = (academicStatsData as any)?.data?.data || (academicStatsData as any)?.data || academicStatsData;
 
@@ -48,25 +52,29 @@ export function AdminDashboard() {
     ? Math.round(chartData.reduce((sum: number, d: any) => sum + d.avg, 0) / chartData.length)
     : null;
 
+  const totalStudents = school_stats?.totalStudents ?? school_stats?._count?.students ?? 0;
+  const totalTeachers = school_stats?.usersByRole?.TEACHER ?? school_stats?._count?.teachers ?? 0;
+  const totalClasses = school_stats?.totalClasses ?? school_stats?._count?.classes ?? 0;
+
   const stats = [
     {
       title: 'Total Students',
-      value: school_stats?.totalStudents ?? school_stats?._count?.students ?? '—',
-      change: school_stats?.totalStudents ? `Active` : '',
+      value: totalStudents || '—',
+      change: totalStudents ? `Active` : '',
       icon: GraduationCap,
       color: 'bg-blue-500',
     },
     {
       title: 'Teachers',
-      value: school_stats?.usersByRole?.TEACHER ?? school_stats?._count?.teachers ?? '—',
-      change: school_stats?.usersByRole?.TEACHER ? 'On staff' : '',
+      value: totalTeachers || '—',
+      change: totalTeachers ? 'On staff' : '',
       icon: Users,
       color: 'bg-green-500',
     },
     {
       title: 'Classes',
-      value: school_stats?.totalClasses ?? school_stats?._count?.classes ?? '—',
-      change: school_stats?.totalClasses ? 'This year' : '',
+      value: totalClasses || '—',
+      change: totalClasses ? 'This year' : '',
       icon: BookOpen,
       color: 'bg-purple-500',
     },
@@ -79,19 +87,60 @@ export function AdminDashboard() {
     },
   ];
 
-  const recentActivities = [];
+  // Fetch real audit logs from the API
+  const { data: auditLogs, isLoading: auditLoading } = useRecentAuditLogs(8);
+  
+  // Build fallback activities from school stats when no audit data exists
+  const fallbackActivities: ActivityItem[] = [
+    ...(totalStudents > 0
+      ? [{
+          id: 'student-count',
+          icon: GraduationCap,
+          color: 'bg-blue-500',
+          title: `${totalStudents} student${totalStudents !== 1 ? 's' : ''} enrolled`,
+          description: `In ${totalClasses} class${totalClasses !== 1 ? 'es' : ''}`,
+          time: 'Current',
+          link: '/students',
+        }]
+      : []),
+    ...(totalTeachers > 0
+      ? [{
+          id: 'teacher-count',
+          icon: UserPlus,
+          color: 'bg-green-500',
+          title: `${totalTeachers} teacher${totalTeachers !== 1 ? 's' : ''} on staff`,
+          description: 'Teaching across classes',
+          time: 'Current',
+          link: '/teachers',
+        }]
+      : []),
+    {
+      id: 'school-name',
+      icon: School,
+      color: 'bg-purple-500',
+      title: user?.school?.name || 'School Dashboard',
+      description: 'Manage academics, students, and staff',
+      time: 'Active',
+      link: '/classes',
+    },
+  ];
+
+  // Merge: audit logs first, then fallback items to fill gaps
+  const auditActivities = auditLogs ? formatAuditToActivity(auditLogs) : [];
+  const activities: ActivityItem[] = auditActivities.length > 0
+    ? auditActivities
+    : fallbackActivities;
+
+  const [showCreateModal, setShowCreateModal] = useState(false);
 
   return (
     <div className="space-y-6">
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg p-6 text-white">
-         {user?.role === 'ADMIN' ? <h1 className="text-3xl font-bold mb-2">
-          Welcome back, {user?.firstName}!</h1> : <h1 className="text-3xl font-bold mb-2">
-          Welcome back, Super Admin!</h1>}
-        
-         {user?.role === 'ADMIN' ? <p className="text-blue-100">Here's what's happening in {user?.school?.name || 'your school'} today </p>
-         : <p> Manage EduTrak systems here </p> } 
-        
+        <h1 className="text-3xl font-bold mb-2">
+          Welcome back, {user?.firstName}!
+        </h1>
+        <p className="text-blue-100">Here's what's happening in {user?.school?.name || 'your school'} today</p>
       </div>
 
       {/* Stats Grid */}
@@ -110,100 +159,73 @@ export function AdminDashboard() {
             </div>
           </div>
           ))}
-          </div>
-    
-          {/* Charts and Data */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Performance Chart */}
-            <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Class Performance (Mean %)</h2>
-              {chartData.length > 0 ? (
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                      <YAxis domain={[0, 100]} />
-                      <Tooltip />
-                      <Bar dataKey="avg" fill="#2563eb" radius={[4, 4, 0, 0]} name="Average %" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              ) : (
-                <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-                  <p className="text-gray-500">No performance data yet. Add assessment results to see charts.</p>
-                </div>
-              )}
+      </div>
+  
+      {/* Charts and Data */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Performance Chart */}
+        <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Class Performance (Mean %)</h2>
+          {chartData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip />
+                  <Bar dataKey="avg" fill="#2563eb" radius={[4, 4, 0, 0]} name="Average %" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-    
-            {/* Key Metrics */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h2 className="text-lg font-semibold mb-4">Key Metrics</h2>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Users className="h-4 w-4 text-blue-600" />
-                    <span className="text-sm font-medium">Total Students</span>
-                  </div>
-                  <span className="font-bold text-lg">{stats[0].value}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-green-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <UserPlus className="h-4 w-4 text-green-600" />
-                    <span className="text-sm font-medium">Teachers</span>
-                  </div>
-                  <span className="font-bold text-lg">{stats[1].value}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-purple-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <BookOpen className="h-4 w-4 text-purple-600" />
-                    <span className="text-sm font-medium">Classes</span>
-                  </div>
-                  <span className="font-bold text-lg">{stats[2].value}</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-orange-50 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-orange-600" />
-                    <span className="text-sm font-medium">Avg. Score</span>
-                  </div>
-                  <span className="font-bold text-lg">{stats[3].value}</span>
-                </div>
-              </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
+              <p className="text-gray-500">No performance data yet. Add assessment results to see charts.</p>
             </div>
-          </div>
-    
-          {/* Quick Actions */}
-          <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {canManageStudents && (
-                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/students')}>
-                  <GraduationCap className="text-blue-600" size={24} />
-                  <span className="text-sm font-medium">Add Student</span>
-                </Button>
-              )}
-              {canManageTeachers && (
-                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/teachers')}>
-                  <Users className="text-green-600" size={24} />
-                  <span className="text-sm font-medium">Add Teacher</span>
-                </Button>
-              )}
-              {canManageClasses && (
-                <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/classes')}>
-                  <BookOpen className="text-purple-600" size={24} />
-                  <span className="text-sm font-medium">Create Class</span>
-                </Button>
-              )}
-              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/reports')}>
-                <TrendingUp className="text-orange-600" size={24} />
-                <span className="text-sm font-medium">View Reports</span>
-              </Button>
-              <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/academic-year/year-end-wizard')}>
-                <Calendar className="text-amber-600" size={24} />
-                <span className="text-sm font-medium">Year-End Wizard</span>
-              </Button>
-            </div>
-          </div>
+          )}
+        </div>
+
+        {/* Recent Activities */}
+        <RecentActivities activities={activities} />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {canManageStudents && (
+            <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => setShowCreateModal(true)}>
+              <GraduationCap className="text-blue-600" size={24} />
+              <span className="text-sm font-medium">Add Student</span>
+            </Button>
+          )}
+          {canManageTeachers && (
+            <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/teachers')}>
+              <Users className="text-green-600" size={24} />
+              <span className="text-sm font-medium">Add Teacher</span>
+            </Button>
+          )}
+          {canManageClasses && (
+            <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/classes')}>
+              <BookOpen className="text-purple-600" size={24} />
+              <span className="text-sm font-medium">Create Class</span>
+            </Button>
+             )}
+          <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/reports')}>
+            <TrendingUp className="text-orange-600" size={24} />
+            <span className="text-sm font-medium">View Reports</span>
+          </Button>
+          <Button variant="outline" className="h-auto flex-col py-4 gap-2" onClick={() => navigate('/academic-year/year-end-wizard')}>
+            <Calendar className="text-amber-600" size={24} />
+            <span className="text-sm font-medium">Year-End Wizard</span>
+          </Button>
+        </div>
+      </div>
+      <StudentFormModal 
+              open={showCreateModal} 
+              onOpenChange={setShowCreateModal} 
+              mode="create" 
+            />
     </div>
   );
 }

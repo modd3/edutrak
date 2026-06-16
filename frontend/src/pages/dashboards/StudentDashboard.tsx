@@ -1,5 +1,7 @@
-import { BookOpen, Calendar, Trophy, TrendingUp } from 'lucide-react';
+import { BookOpen, Calendar, Trophy, TrendingUp, ClipboardCheck } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
+import { RecentActivities } from '@/components/shared/RecentActivities';
+import type { ActivityItem } from '@/components/shared/RecentActivities';
 
 export function StudentDashboard() {
   const { user } = useAuthStore();
@@ -19,6 +21,33 @@ export function StudentDashboard() {
   const upcomingAssessments = [
     { subject: 'Mathematics', type: 'CAT 2', date: 'Tomorrow', time: '10:00 AM' },
     { subject: 'Kiswahili', type: 'Assignment', date: 'In 3 days', time: 'End of day' },
+  ];
+
+  const activities: ActivityItem[] = [
+    ...recentGrades.slice(0, 3).map((grade, i) => ({
+      id: `grade-${i}`,
+      icon: Trophy,
+      color: 'bg-yellow-500',
+      title: `${grade.subject}: ${grade.assessment}`,
+      description: `Scored ${grade.score} — Grade ${grade.grade}`,
+      time: grade.date,
+    })),
+    ...upcomingAssessments.map((a, i) => ({
+      id: `upcoming-${i}`,
+      icon: ClipboardCheck,
+      color: 'bg-orange-500',
+      title: `Upcoming: ${a.subject} ${a.type}`,
+      description: `${a.date} at ${a.time}`,
+      time: a.date,
+    })),
+    ...upcomingClasses.slice(0, 2).map((cls, i) => ({
+      id: `class-${i}`,
+      icon: BookOpen,
+      color: 'bg-blue-500',
+      title: cls.subject,
+      description: `${cls.teacher} — ${cls.room}`,
+      time: cls.time,
+    })),
   ];
 
   return (
@@ -98,22 +127,8 @@ export function StudentDashboard() {
           </div>
         </div>
 
-        {/* Upcoming Assessments */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold mb-4">Upcoming Tests</h2>
-          <div className="space-y-4">
-          {upcomingAssessments.map((assessment, index) => (
-              <div key={index} className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
-                <h3 className="font-medium text-gray-900">{assessment.subject}</h3>
-                <p className="text-sm text-gray-600">{assessment.type}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <p className="text-xs text-orange-600">{assessment.date}</p>
-                  <p className="text-xs text-gray-500">{assessment.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+        {/* Recent Activities */}
+        <RecentActivities activities={activities} />
       </div>
 
       {/* Recent Grades */}

@@ -354,18 +354,34 @@ export class AssessmentController {
       const data = createAssessmentResultSchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
       const userId = req.user!.userId;
+      const role = req.user!.role;
+      const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
 
-      // Fetch teacher record to get teacher ID (required for foreign key)
-      const teacher = await prisma.teacher.findUnique({
+      // Fetch teacher record - admins bypass assignment check
+      let teacher = await prisma.teacher.findUnique({
         where: { userId },
       });
 
-      if (!teacher) {
+      if (!teacher && !isAdmin) {
         res.status(403).json({
           error: 'TEACHER_NOT_FOUND',
           message: 'User is not a teacher. Only teachers can grade assessments.',
         });
         return;
+      }
+
+      // For admins without a teacher profile, use the first available teacher in the school
+      if (!teacher && isAdmin) {
+        teacher = await prisma.teacher.findFirst({
+          where: { user: { schoolId: schoolId || undefined } },
+        });
+        if (!teacher) {
+          res.status(400).json({
+            error: 'NO_TEACHERS_FOUND',
+            message: 'No teachers exist in this school to assign grades.',
+          });
+          return;
+        }
       }
 
       const result = await this.gradeEntryService.createOrUpdateResult(
@@ -403,18 +419,34 @@ export class AssessmentController {
       const data = gradeEntrySchema.parse(req.body);
       const schoolId = req.user!.schoolId!;
       const userId = req.user!.userId;
+      const role = req.user!.role;
+      const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
 
-      // Fetch teacher record to get teacher ID (required for foreign key)
-      const teacher = await prisma.teacher.findUnique({
+      // Fetch teacher record - admins bypass assignment check
+      let teacher = await prisma.teacher.findUnique({
         where: { userId },
       });
 
-      if (!teacher) {
+      if (!teacher && !isAdmin) {
         res.status(403).json({
           error: 'TEACHER_NOT_FOUND',
           message: 'User is not a teacher. Only teachers can grade assessments.',
         });
         return;
+      }
+
+      // For admins without a teacher profile, use the first available teacher in the school
+      if (!teacher && isAdmin) {
+        teacher = await prisma.teacher.findFirst({
+          where: { user: { schoolId: schoolId || undefined } },
+        });
+        if (!teacher) {
+          res.status(400).json({
+            error: 'NO_TEACHERS_FOUND',
+            message: 'No teachers exist in this school to assign grades.',
+          });
+          return;
+        }
       }
 
       const result = await this.gradeEntryService.bulkGradeEntry(
@@ -453,18 +485,34 @@ export class AssessmentController {
       const csvData = req.body.data; // Array of CSV rows
       const schoolId = req.user!.schoolId!;
       const userId = req.user!.userId;
+      const role = req.user!.role;
+      const isAdmin = role === 'ADMIN' || role === 'SUPER_ADMIN';
 
-      // Fetch teacher record to get teacher ID (required for foreign key)
-      const teacher = await prisma.teacher.findUnique({
+      // Fetch teacher record - admins bypass assignment check
+      let teacher = await prisma.teacher.findUnique({
         where: { userId },
       });
 
-      if (!teacher) {
+      if (!teacher && !isAdmin) {
         res.status(403).json({
           error: 'TEACHER_NOT_FOUND',
           message: 'User is not a teacher. Only teachers can grade assessments.',
         });
         return;
+      }
+
+      // For admins without a teacher profile, use the first available teacher in the school
+      if (!teacher && isAdmin) {
+        teacher = await prisma.teacher.findFirst({
+          where: { user: { schoolId: schoolId || undefined } },
+        });
+        if (!teacher) {
+          res.status(400).json({
+            error: 'NO_TEACHERS_FOUND',
+            message: 'No teachers exist in this school to assign grades.',
+          });
+          return;
+        }
       }
 
       // Validate CSV data

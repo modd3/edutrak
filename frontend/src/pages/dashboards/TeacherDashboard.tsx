@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { AssignTeacherToSubjectDialog } from '@/components/teachers/AssignTeacherToSubjectDialog';
 import { useNavigate } from 'react-router-dom';
+import { RecentActivities } from '@/components/shared/RecentActivities';
+import type { ActivityItem } from '@/components/shared/RecentActivities';
 
 export function TeacherDashboard() {
   const { user } = useAuthStore();
@@ -24,6 +26,36 @@ export function TeacherDashboard() {
   const pendingGrading = [
     { class: 'Form 4 South', assessment: 'Mock Exam', submissions: '32/35', urgent: true },
     { class: 'Form 3 North', assessment: 'CAT 1', submissions: '40/42', urgent: false },
+  ];
+
+  const activities: ActivityItem[] = [
+    ...pendingGrading.map((item, i) => ({
+      id: `grading-${i}`,
+      icon: ClipboardCheck,
+      color: item.urgent ? 'bg-red-500' : 'bg-orange-500',
+      title: `${item.class}: ${item.assessment}`,
+      description: `${item.submissions} submitted — ${item.urgent ? 'Urgent' : 'Pending'}`,
+      time: 'Now',
+      link: '/assessments',
+    })),
+    ...upcomingAssessments.map((a, i) => ({
+      id: `upcoming-${i}`,
+      icon: Calendar,
+      color: 'bg-blue-500',
+      title: `${a.class} — ${a.type}`,
+      description: `${a.subject} — ${a.date}`,
+      time: a.date,
+      link: '/assessments',
+    })),
+    ...myClasses.slice(0, 2).map((cls, i) => ({
+      id: `class-${i}`,
+      icon: BookOpen,
+      color: 'bg-green-500',
+      title: `${cls.name} — ${cls.subject}`,
+      description: `${cls.students} students — ${cls.period}`,
+      time: 'Today',
+      link: '/classes',
+    })),
   ];
 
   return (
@@ -80,7 +112,7 @@ export function TeacherDashboard() {
       </div>
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Today's Classes */}
         <div className="bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">Today's Schedule</h2>
@@ -94,9 +126,6 @@ export function TeacherDashboard() {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-medium text-blue-600">{cls.students} students</p>
-                  <button className="text-xs text-blue-600 hover:underline mt-1">
-                    View Class
-                  </button>
                 </div>
               </div>
             ))}
@@ -130,6 +159,9 @@ export function TeacherDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Recent Activities */}
+        <RecentActivities activities={activities} />
       </div>
 
       {/* Upcoming Assessments */}

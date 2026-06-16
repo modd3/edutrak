@@ -381,9 +381,6 @@ export const getUsersBySchool = async (req: RequestWithUser, res: Response) => {
     const { schoolId } = req.params;
     const { role } = req.query;
     const isSuperAdmin = req.isSuperAdmin || false;
-    console.log("Params", req.params)
-    console.log("Requesting school id: ", req.schoolId)
-
     // Validate school access
     if (!isSuperAdmin && req.schoolId !== schoolId) {
       return ResponseUtil.forbidden(res, 'Cannot access users from another school');
