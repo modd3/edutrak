@@ -19,8 +19,15 @@ const app = express();
 app.use(helmet());
 
 // CORS configuration
+const defaultOrigins = [
+  'http://localhost:3000',
+  'http://192.168.42.129:3000',
+  'https://edutrak-ke.vercel.app',
+  'https://edutrak-frontend.onrender.com',
+];
+
 app.use(cors({
-  origin: process.env.ALLOWED_ORIGINS?.split(',') || ['http://localhost:3000', 'http://192.168.42.129:3000'],
+  origin: process.env.ALLOWED_ORIGINS?.split(',') || defaultOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
