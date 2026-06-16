@@ -13,7 +13,6 @@ import { useSchoolContext } from '@/hooks/use-school-context';
 import {
   useAcademicYears,
   useClasses,
-  useCreateAcademicYear,
   useSetActiveAcademicYear,
   useCloneYearStructure,
   useBulkPromoteClass,
@@ -26,10 +25,12 @@ import {
   ChevronRight,
   GraduationCap,
   Loader2,
+  Plus,
   School,
   Users,
   AlertCircle,
 } from 'lucide-react';
+import { AcademicYearFormModal } from '@/components/academic/AcademicYearFormModal';
 
 type WizardStep = 'clone' | 'promote' | 'graduate' | 'summary';
 
@@ -55,10 +56,10 @@ export function YearEndWizard() {
   const [currentStep, setCurrentStep] = useState<WizardStep>('clone');
   const [fromYearId, setFromYearId] = useState('');
   const [newYearId, setNewYearId] = useState('');
-  const [newYearActive, setNewYearActive] = useState(false);
   const [cloneResult, setCloneResult] = useState<any>(null);
   const [graduateResult, setGraduateResult] = useState<{ classId: string; name: string; graduated: number }[]>([]);
   const [promoteResults, setPromoteResults] = useState<{ from: string; to: string; result: any }[]>([]);
+  const [showCreateYearModal, setShowCreateYearModal] = useState(false);
 
   // Queries
   const { data: yearsData } = useAcademicYears();
@@ -67,10 +68,9 @@ export function YearEndWizard() {
   const fromYearClasses = useClasses(fromYearId);
   const newYearClasses = useClasses(newYearId);
 
-  const allClasses = fromYearClasses.data || [];
+  const allClasses = Array.isArray(fromYearClasses.data) ? fromYearClasses.data : [];
 
   // Mutations
-  const { mutateAsync: createAcademicYear, isPending: isCreatingYear } = useCreateAcademicYear();
   const { mutateAsync: setActiveYear } = useSetActiveAcademicYear();
   const { mutateAsync: cloneStructure, isPending: isCloning } = useCloneYearStructure();
   const { mutateAsync: bulkPromote, isPending: isPromoting } = useBulkPromoteClass();
@@ -79,6 +79,11 @@ export function YearEndWizard() {
   const promoteForm = useForm<PromoteFormData>({
     resolver: zodResolver(promoteSchema),
   });
+
+  // Derived: selected source year and whether target year exists
+  const selectedYear = academicYears.find((y: any) => y.id === fromYearId);
+  const targetYearValue = selectedYear ? selectedYear.year + 1 : null;
+  const targetYearExists = targetYearValue !== null && academicYears.some((y: any) => y.year === targetYearValue);
 
   // Get classes marked as final
   const finalClasses = allClasses.filter((c: any) => c.isFinal);
@@ -95,32 +100,17 @@ export function YearEndWizard() {
   };
 
   // ── Step 1: Clone Structure ──────────────────────────────────────────
-  const handleCreateAndClone = async () => {
-    const selectedYear = academicYears.find((y: any) => y.id === fromYearId);
-    if (!selectedYear) return;
+  const handleClone = async () => {
+    if (!selectedYear || !targetYearValue) return;
 
-    const newYear = selectedYear.year + 1;
-    const startDate = new Date(`${newYear}-01-06`);
-    const endDate = new Date(`${newYear}-11-28`);
+    const existingYear = academicYears.find((y: any) => y.year === targetYearValue);
+    if (!existingYear) return;
 
-    const created = await createAcademicYear({
-      year: newYear,
-      startDate,
-      endDate,
-      isActive: false,
-      terms: [
-        { name: 'TERM_1', termNumber: 1, startDate: new Date(`${newYear}-01-06`), endDate: new Date(`${newYear}-04-04`) },
-        { name: 'TERM_2', termNumber: 2, startDate: new Date(`${newYear}-05-05`), endDate: new Date(`${newYear}-08-08`) },
-        { name: 'TERM_3', termNumber: 3, startDate: new Date(`${newYear}-08-25`), endDate: new Date(`${newYear}-11-28`) },
-      ],
-    });
-
-    const newYearCreated = created.data;
-    setNewYearId(newYearCreated.id);
+    setNewYearId(existingYear.id);
 
     const result = await cloneStructure({
       fromAcademicYearId: fromYearId,
-      toAcademicYearId: newYearCreated.id,
+      toAcademicYearId: existingYear.id,
     });
 
     setCloneResult(result.data || result);
@@ -163,7 +153,7 @@ export function YearEndWizard() {
             <div>
               <h3 className="text-lg font-semibold mb-2">Step 1: Select Source Year & Clone</h3>
               <p className="text-sm text-muted-foreground mb-4">
-                Choose the current academic year to clone. A new year will be created with the same class structure, streams, and subject assignments.
+                Choose the current academic year to clone. The target year must exist before cloning — create it here if needed.
               </p>
             </div>
 
@@ -183,24 +173,44 @@ export function YearEndWizard() {
               </Select>
             </div>
 
-            {fromYearId && (
-              <Alert>
-                <School className="h-4 w-4" />
-                <AlertTitle>What will be cloned</AlertTitle>
-                <AlertDescription>
-                  A new academic year (one year ahead) will be created with:
-                  <ul className="list-disc ml-6 mt-2 text-sm space-y-1">
-                    <li>All classes from the source year</li>
-                    <li>Stream assignments for each class</li>
-                    <li>Subject-to-class assignments</li>
-                  </ul>
-                </AlertDescription>
-              </Alert>
+            {fromYearId && targetYearValue && (
+              <>
+                {targetYearExists ? (
+                  <Alert className="bg-green-50 border-green-200">
+                    <School className="h-4 w-4 text-green-600" />
+                    <AlertTitle className="text-green-800">Target Year Ready</AlertTitle>
+                    <AlertDescription className="text-green-700">
+                      {targetYearValue} academic year exists. Click "Clone Structure" to copy all classes, streams, and subject assignments from {selectedYear?.year}.
+                    </AlertDescription>
+                  </Alert>
+                ) : (
+                  <Alert>
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Target Year Not Found</AlertTitle>
+                    <AlertDescription>
+                      <p className="mb-3">
+                        The {targetYearValue} academic year does not exist yet. Create it with the correct government-provided dates before cloning.
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowCreateYearModal(true)}
+                      >
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create {targetYearValue} Academic Year
+                      </Button>
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </>
             )}
 
             <div className="flex justify-end">
-              <Button onClick={handleCreateAndClone} disabled={!fromYearId || isCreatingYear || isCloning}>
-                {(isCreatingYear || isCloning) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              <Button
+                onClick={handleClone}
+                disabled={!fromYearId || !targetYearExists || isCloning}
+              >
+                {isCloning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Clone Structure & Continue
               </Button>
             </div>
@@ -261,7 +271,7 @@ export function YearEndWizard() {
                             <SelectValue placeholder="Select target class" />
                           </SelectTrigger>
                           <SelectContent>
-                            {(newYearClasses.data || []).map((cls: any) => (
+                            {(Array.isArray(newYearClasses.data) ? newYearClasses.data : []).map((cls: any) => (
                               <SelectItem key={cls.id} value={cls.id}>
                                 {cls.name}
                               </SelectItem>
@@ -474,6 +484,12 @@ export function YearEndWizard() {
           {renderStep()}
         </CardContent>
       </Card>
+
+      {/* Create Academic Year Modal */}
+      <AcademicYearFormModal
+        open={showCreateYearModal}
+        onOpenChange={setShowCreateYearModal}
+      />
     </div>
   );
 }
