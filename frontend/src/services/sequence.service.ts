@@ -1,4 +1,4 @@
-import apiClient from '@/lib/api-client';
+import api from '@/api/client';
 import { ApiResponse } from '@/types';
 
 export type SequenceType = 'ADMISSION_NUMBER' | 'EMPLOYEE_NUMBER' | 'RECEIPT_NUMBER' | 'INVOICE_NUMBER' | 'ASSESSMENT_NUMBER' | 'CLASS_CODE';
@@ -14,7 +14,7 @@ export const sequenceService = {
    * Preview the next sequence number without generating it
    */
   preview: async (type: SequenceType, schoolId?: string): Promise<SequenceResponse> => {
-    const response = await apiClient.get<ApiResponse<SequenceResponse>>('/sequences/preview', {
+    const response = await api.get<ApiResponse<SequenceResponse>>('/sequences/preview', {
       params: { type, schoolId },
     });
     return response.data.data!;
@@ -24,7 +24,7 @@ export const sequenceService = {
    * Generate the next sequence number
    */
   generate: async (type: SequenceType, schoolId?: string): Promise<SequenceResponse> => {
-    const response = await apiClient.post<ApiResponse<SequenceResponse>>('/sequences/generate', {
+    const response = await api.post<ApiResponse<SequenceResponse>>('/sequences/generate', {
       type,
       schoolId,
     });
@@ -38,7 +38,7 @@ export const sequenceService = {
     page?: number;
     pageSize?: number;
   }): Promise<any> => {
-    const response = await apiClient.get(`/sequences/history`, {
+    const response = await api.get(`/sequences/history`, {
       params: { type, schoolId, ...params },
     });
     return response.data;
@@ -48,6 +48,6 @@ export const sequenceService = {
    * Reset sequence (admin only)
    */
   reset: async (type: SequenceType, schoolId?: string): Promise<void> => {
-    await apiClient.post(`/sequences/reset`, { type, schoolId });
+    await api.post(`/sequences/reset`, { type, schoolId });
   },
 };

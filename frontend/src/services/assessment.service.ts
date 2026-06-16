@@ -1,5 +1,8 @@
-import apiClient from '@/lib/api-client';
-import { Assessment, ApiResponse, PaginatedResponse } from '@/types';
+import apiClient from '@/api/client';
+import { AssessmentDefinition, AssessmentType, ApiResponse, PaginatedResponse } from '@/types';
+
+// Alias for backwards compatibility - this file uses "Assessment" to mean assessment definitions
+type Assessment = AssessmentDefinition;
 
 export type AssessmentCreateInput = {
   name: string;
