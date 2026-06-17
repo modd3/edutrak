@@ -13,7 +13,7 @@ interface UsersFilters {
 }
 
 interface UsersResponse {
-  users: User[];
+  data: User[];
   pagination: {
     page: number;
     limit: number;

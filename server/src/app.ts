@@ -6,6 +6,7 @@ import compression from 'compression';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
 import routes from './routes';
+import webhookRoutes from './routes/webhook.routes';
 import { errorHandler } from './middleware/errorHandler';
 import { requestLogger } from './middleware/requestLogger';
 import logger from './utils/logger';
@@ -30,7 +31,7 @@ app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',') || defaultOrigins,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Idempotency-Key', 'X-Signature', 'X-Event-Name', 'X-Timestamp'],
 }));
 
 // Rate limiting
@@ -53,11 +54,16 @@ app.use(compression());
 //app.use(morgan('combined'));
 app.use(requestLogger);
 
-// Body parsing middleware
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Body parsing middleware for API routes
+app.use('/api', express.json({ limit: '10mb' }));
+app.use('/api', express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Routes
+// Webhook routes — use JSON parser (M-Pesa sends JSON callbacks)
+// Raw body parser can be added per-provider for signature verification
+app.use('/webhooks', express.json({ limit: '10mb' }));
+app.use('/webhooks', webhookRoutes);
+
+// Routes (authenticated)
 app.use('/api', routes);
 
 // Health check endpoint

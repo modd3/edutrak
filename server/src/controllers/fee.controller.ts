@@ -18,8 +18,18 @@ import {
   getInvoicesQuerySchema,
   getPaymentsQuerySchema,
   feeReportQuerySchema,
+  initiateOnlinePaymentSchema,
+  configurePaymentProviderSchema,
+  updatePaymentProviderSchema,
+  upsertLateFeesConfigSchema,
+  createPaymentPlanSchema,
+  sendReminderSchema,
 } from '../validation/fee.validation';
 import logger from '../utils/logger';
+import { LateFeesService } from '../services/fee/late-fees.service';
+import { PaymentPlanService } from '../services/fee/payment-plan.service';
+import { ReminderService } from '../services/fee/reminder.service';
+import { ReconciliationService } from '../services/fee/reconciliation.service';
 
 export class FeeController {
   // ── Fee Structures ─────────────────────────────────────────────────────────
@@ -288,6 +298,313 @@ export class FeeController {
       const cloned = await service.cloneFeeStructure({ sourceFeeStructureId, toAcademicYearId, toTermId, newName });
       return ResponseUtil.created(res, 'Fee structure cloned successfully', cloned);
     } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ONLINE PAYMENTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initiate an online payment (M-Pesa STK Push) for an invoice.
+   * POST /api/fees/invoices/:id/pay-online
+   */
+  async initiateOnlinePayment(req: RequestWithUser, res: Response) {
+    try {
+      const data = initiateOnlinePaymentSchema.parse(req.body);
+      const service = FeeService.withRequest(req);
+      const result = await service.initiateOnlinePayment(data);
+      return ResponseUtil.success(res, 'Payment initiated', result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      logger.error('Error initiating online payment', { error: error.message });
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAYMENT PROVIDER CONFIGURATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Configure a payment provider for the school.
+   * POST /api/fees/providers/configure
+   */
+  async configurePaymentProvider(req: RequestWithUser, res: Response) {
+    try {
+      const data = configurePaymentProviderSchema.parse(req.body);
+      const service = FeeService.withRequest(req);
+      const config = await service.configurePaymentProvider(data);
+      return ResponseUtil.created(res, 'Payment provider configured', config);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      logger.error('Error configuring payment provider', { error: error.message });
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  /**
+   * Update a payment provider configuration.
+   * PATCH /api/fees/providers/:providerId
+   */
+  async updatePaymentProvider(req: RequestWithUser, res: Response) {
+    try {
+      const { providerId } = req.params;
+      const data = updatePaymentProviderSchema.parse(req.body);
+      const service = FeeService.withRequest(req);
+      const config = await service.updatePaymentProvider(providerId, data);
+      return ResponseUtil.success(res, 'Payment provider updated', config);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      logger.error('Error updating payment provider', { error: error.message });
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  /**
+   * Get all configured payment providers for the school.
+   * GET /api/fees/providers
+   */
+  async getPaymentProviders(req: RequestWithUser, res: Response) {
+    try {
+      const service = FeeService.withRequest(req);
+      const providers = await service.getPaymentProviders();
+      return ResponseUtil.success(res, 'Payment providers retrieved', providers);
+    } catch (error: any) {
+      logger.error('Error getting payment providers', { error: error.message });
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  /**
+   * Remove a payment provider configuration.
+   * DELETE /api/fees/providers/:providerId
+   */
+  async deletePaymentProvider(req: RequestWithUser, res: Response) {
+    try {
+      const { providerId } = req.params;
+      const service = FeeService.withRequest(req);
+      await service.deletePaymentProvider(providerId);
+      return ResponseUtil.success(res, 'Payment provider removed');
+    } catch (error: any) {
+      logger.error('Error removing payment provider', { error: error.message });
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LATE FEES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async getLateFeesConfig(req: RequestWithUser, res: Response) {
+    try {
+      const service = LateFeesService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const config = await service.getConfig(schoolId);
+      return ResponseUtil.success(res, 'Late fee config retrieved', config);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async upsertLateFeesConfig(req: RequestWithUser, res: Response) {
+    try {
+      const data = upsertLateFeesConfigSchema.parse(req.body);
+      const service = LateFeesService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const config = await service.upsertConfig(schoolId, data);
+      return ResponseUtil.success(res, 'Late fee config updated', config);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async applyLateFees(req: RequestWithUser, res: Response) {
+    try {
+      const service = LateFeesService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const results = await service.applyLateFees(schoolId);
+      return ResponseUtil.success(res, `Late fees applied to ${results.length} invoices`, results);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAYMENT PLANS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async createPaymentPlan(req: RequestWithUser, res: Response) {
+    try {
+      const data = createPaymentPlanSchema.parse(req.body);
+      const service = PaymentPlanService.withRequest(req);
+      const plan = await service.createPlan(data);
+      return ResponseUtil.created(res, 'Payment plan created', plan);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async getPaymentPlan(req: RequestWithUser, res: Response) {
+    try {
+      const { invoiceId } = req.params;
+      const service = PaymentPlanService.withRequest(req);
+      const plan = await service.getPlan(invoiceId);
+      if (!plan) return ResponseUtil.notFound(res, 'Payment plan');
+      return ResponseUtil.success(res, 'Payment plan retrieved', plan);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getSchoolPaymentPlans(req: RequestWithUser, res: Response) {
+    try {
+      const service = PaymentPlanService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const plans = await service.getSchoolPlans(schoolId);
+      return ResponseUtil.success(res, 'Payment plans retrieved', plans);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async cancelPaymentPlan(req: RequestWithUser, res: Response) {
+    try {
+      const { invoiceId } = req.params;
+      const service = PaymentPlanService.withRequest(req);
+      await service.cancelPlan(invoiceId);
+      return ResponseUtil.success(res, 'Payment plan cancelled');
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // REMINDERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async sendReminder(req: RequestWithUser, res: Response) {
+    try {
+      const data = sendReminderSchema.parse(req.body);
+      const service = ReminderService.withRequest(req);
+      const result = await service.sendReminder(data.invoiceId, data.reminderType, data.method);
+      return ResponseUtil.success(res, 'Reminder processed', result);
+    } catch (error: any) {
+      if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
+
+  async processReminders(req: RequestWithUser, res: Response) {
+    try {
+      const service = ReminderService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const results = await service.processPendingReminders(schoolId);
+      return ResponseUtil.success(res, `Processed ${results.length} reminders`, results);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getReminderHistory(req: RequestWithUser, res: Response) {
+    try {
+      const { invoiceId } = req.params;
+      const service = ReminderService.withRequest(req);
+      const history = await service.getReminderHistory(invoiceId);
+      return ResponseUtil.success(res, 'Reminder history retrieved', history);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getReminderStats(req: RequestWithUser, res: Response) {
+    try {
+      const service = ReminderService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const stats = await service.getSchoolReminderStats(schoolId);
+      return ResponseUtil.success(res, 'Reminder stats retrieved', stats);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RECONCILIATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Upload a bank statement CSV for reconciliation.
+   * POST /api/fees/reconciliation/upload
+   */
+  async uploadStatement(req: RequestWithUser, res: Response) {
+    try {
+      const service = ReconciliationService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      // Get CSV content from body or file upload
+      const csvContent = req.body.csvContent || (req.file ? req.file.buffer.toString('utf-8') : null);
+      const bankName = req.body.bankName;
+
+      if (!csvContent) {
+        return ResponseUtil.validationError(res, 'CSV content is required (send as csvContent or file upload)');
+      }
+
+      const result = await service.uploadStatement(csvContent, schoolId, bankName);
+      return ResponseUtil.success(res, 'Bank statement processed', result);
+    } catch (error: any) {
+      logger.error('Error processing bank statement', { error: error.message });
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  /**
+   * Confirm reconciliation matches and create payments.
+   * POST /api/fees/reconciliation/confirm
+   */
+  async confirmReconciliation(req: RequestWithUser, res: Response) {
+    try {
+      const { matchIds } = req.body;
+      if (!matchIds || !Array.isArray(matchIds) || matchIds.length === 0) {
+        return ResponseUtil.validationError(res, 'matchIds array is required');
+      }
+      const service = ReconciliationService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+      const result = await service.confirmMatches(matchIds, schoolId);
+      return ResponseUtil.success(res, `Confirmed ${result.confirmed} payments`, result);
+    } catch (error: any) {
+      logger.error('Error confirming reconciliation', { error: error.message });
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  /**
+   * Generate a reconciliation report for a date range.
+   * GET /api/fees/reconciliation/report?from=2025-01-01&to=2025-12-31
+   */
+  async getReconciliationReport(req: RequestWithUser, res: Response) {
+    try {
+      const service = ReconciliationService.withRequest(req);
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const fromDate = req.query.from ? new Date(req.query.from as string) : new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const toDate = req.query.to ? new Date(req.query.to as string) : new Date();
+
+      const report = await service.generateReport(schoolId, fromDate, toDate);
+      return ResponseUtil.success(res, 'Reconciliation report generated', report);
+    } catch (error: any) {
+      logger.error('Error generating reconciliation report', { error: error.message });
       return ResponseUtil.serverError(res, error.message);
     }
   }

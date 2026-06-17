@@ -170,6 +170,78 @@ export const feeReportQuerySchema = z.object({
   classLevel: z.string().optional(),
 });
 
+// ── Late Fees ──────────────────────────────────────────────────────────────────
+
+export const upsertLateFeesConfigSchema = z.object({
+  penaltyType: z.enum(['FLAT', 'PERCENTAGE', 'COMPOUND']),
+  penaltyAmount: z.number().positive('Penalty amount must be positive'),
+  graceDays: z.number().int().min(0).max(365).default(7),
+  maxPenalty: z.number().positive().optional().nullable(),
+  applyRecurring: z.boolean().default(false),
+  recurrenceDays: z.number().int().min(1).optional().nullable(),
+  isActive: z.boolean().default(true),
+});
+
+export const applyLateFeeSchema = z.object({
+  invoiceId: z.uuid('Invalid invoice ID'),
+});
+
+// ── Payment Plans ──────────────────────────────────────────────────────────────
+
+export const createPaymentPlanSchema = z.object({
+  invoiceId: z.string().uuid('Invalid invoice ID'),
+  installments: z.number().int().min(2, 'At least 2 installments required').max(24),
+  frequency: z.enum(['MONTHLY', 'WEEKLY', 'BIWEEKLY', 'CUSTOM']),
+  firstDueDate: z.string().min(1, 'First due date is required'),
+  customDays: z.number().int().min(1).optional(),
+  notes: z.string().max(500).optional(),
+});
+
+export const payInstallmentSchema = z.object({
+  installmentId: z.string().uuid('Invalid installment ID'),
+  amount: z.number().positive('Amount must be positive'),
+  paymentId: z.string().uuid('Invalid payment ID'),
+});
+
+// ── Reminders ──────────────────────────────────────────────────────────────────
+
+export const sendReminderSchema = z.object({
+  invoiceId: z.string().uuid('Invalid invoice ID'),
+  reminderType: z.enum(['PAYMENT_DUE', 'OVERDUE_3DAYS', 'OVERDUE_7DAYS', 'FINAL_NOTICE']),
+  method: z.enum(['SMS', 'EMAIL', 'PUSH', 'SYSTEM']).default('SYSTEM'),
+});
+
+// ── Online Payment ─────────────────────────────────────────────────────────────
+
+export const initiateOnlinePaymentSchema = z.object({
+  invoiceId: z.string().uuid('Invalid invoice ID'),
+  phoneNumber: z.string().min(10, 'Phone number is required'),
+  provider: z.string().optional(), // defaults to primary active provider
+  callbackUrl: z.string().url().optional(),
+  idempotencyKey: z.string().min(8).optional(), // can also be passed as header
+});
+
+const recordSchema = z.object({}).passthrough() as z.ZodType<Record<string, string>>;
+
+export const configurePaymentProviderSchema = z.object({
+  provider: z.string().min(1, 'Provider name is required'), // "MPESA", "FLUTTERWAVE"
+  apiKey: z.string().min(1, 'API key is required'),
+  secretKey: z.string().min(1, 'Secret key is required'),
+  callbackUrl: z.string().url().optional(),
+  webhookSecret: z.string().optional(),
+  isActive: z.boolean().default(true),
+  extraConfig: recordSchema.optional(),
+});
+
+export const updatePaymentProviderSchema = z.object({
+  apiKey: z.string().optional(),
+  secretKey: z.string().optional(),
+  callbackUrl: z.string().url().optional(),
+  webhookSecret: z.string().optional(),
+  isActive: z.boolean().optional(),
+  extraConfig: recordSchema.optional(),
+});
+
 // ── Type Exports ──────────────────────────────────────────────────────────────
 
 export type CreateFeeStructureInput = z.infer<typeof createFeeStructureSchema>;
@@ -185,3 +257,11 @@ export type GetFeeStructuresQuery = z.infer<typeof getFeeStructuresQuerySchema>;
 export type GetInvoicesQuery = z.infer<typeof getInvoicesQuerySchema>;
 export type GetPaymentsQuery = z.infer<typeof getPaymentsQuerySchema>;
 export type FeeReportQuery = z.infer<typeof feeReportQuerySchema>;
+export type InitiateOnlinePaymentInput = z.infer<typeof initiateOnlinePaymentSchema>;
+export type ConfigurePaymentProviderInput = z.infer<typeof configurePaymentProviderSchema>;
+export type UpdatePaymentProviderInput = z.infer<typeof updatePaymentProviderSchema>;
+export type UpsertLateFeesConfigInput = z.infer<typeof upsertLateFeesConfigSchema>;
+export type ApplyLateFeeInput = z.infer<typeof applyLateFeeSchema>;
+export type CreatePaymentPlanInput = z.infer<typeof createPaymentPlanSchema>;
+export type PayInstallmentInput = z.infer<typeof payInstallmentSchema>;
+export type SendReminderInput = z.infer<typeof sendReminderSchema>;

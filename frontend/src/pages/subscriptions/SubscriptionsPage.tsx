@@ -53,6 +53,7 @@ export function SubscriptionsPage() {
     status: statusFilter || undefined,
   });
 
+
   const subscriptions = data?.data || [];
   const pagination = data?.pagination;
 

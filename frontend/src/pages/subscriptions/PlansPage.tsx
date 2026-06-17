@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { usePlans, useDeletePlan } from '@/hooks/use-plans';
 import { PlanFormModal } from '@/components/subscriptions/PlanFormModal';
-import { Plan } from '@/api/plans-api';
+import { Plan } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {

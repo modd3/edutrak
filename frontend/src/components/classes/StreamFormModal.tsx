@@ -94,9 +94,9 @@ export function StreamFormModal({
     const requestBody = {
       ...data,
       // Remove undefined values and handle "none" selection
-      capacity: data.capacity || null,
+      capacity: data.capacity || undefined,
       // Ensure streamTeacherId is null if empty string or "none"
-      streamTeacherId: data.streamTeacherId && data.streamTeacherId !== 'none' ? data.streamTeacherId : null,
+      streamTeacherId: data.streamTeacherId && data.streamTeacherId !== 'none' ? data.streamTeacherId : undefined,
     };
 
     if (mode === 'create') {

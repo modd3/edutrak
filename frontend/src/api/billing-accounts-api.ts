@@ -29,7 +29,7 @@ export const billingAccountsApi = {
     page?: number;
     limit?: number;
   }) =>
-    api.get<PaginatedResponse<BillingAccount[]>>('/billing-accounts', { params }),
+    api.get<PaginatedResponse<BillingAccount>>('/billing-accounts', { params }),
 
   /**
    * Get a single billing account by ID

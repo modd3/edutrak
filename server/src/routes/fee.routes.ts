@@ -1,9 +1,13 @@
 // src/routes/fee.routes.ts
 import { Router } from 'express';
+import multer from 'multer';
 import { feeController } from '../controllers/fee.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
 import { requireFeature } from '../middleware/entitlement.middleware';
+import { idempotencyMiddleware } from '../middleware/idempotency.middleware';
+
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
 const router = Router();
 
@@ -221,6 +225,213 @@ router.get(
   '/reports/defaulters',
   authorize('ADMIN', 'SUPER_ADMIN'),
   feeController.getDefaultersReport.bind(feeController)
+);
+
+// ── Online Payments ────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/fees/invoices/:id/pay-online
+ * Initiate an online payment (M-Pesa STK Push) for an invoice.
+ * Requires an idempotency key to prevent duplicate charges.
+ */
+router.post(
+  '/invoices/:id/pay-online',
+  authorize('ADMIN', 'SUPER_ADMIN', 'PARENT'),
+  idempotencyMiddleware(),
+  feeController.initiateOnlinePayment.bind(feeController)
+);
+
+// ── Payment Provider Configuration ─────────────────────────────────────────────
+
+/**
+ * POST /api/fees/providers/configure
+ * Configure a payment provider (Daraja, Flutterwave, etc.) for the school.
+ */
+router.post(
+  '/providers/configure',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.configurePaymentProvider.bind(feeController)
+);
+
+/**
+ * GET /api/fees/providers
+ * List all configured payment providers for the school.
+ */
+router.get(
+  '/providers',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getPaymentProviders.bind(feeController)
+);
+
+/**
+ * PATCH /api/fees/providers/:providerId
+ * Update a payment provider configuration.
+ */
+router.patch(
+  '/providers/:providerId',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.updatePaymentProvider.bind(feeController)
+);
+
+/**
+ * DELETE /api/fees/providers/:providerId
+ * Remove a payment provider configuration.
+ */
+router.delete(
+  '/providers/:providerId',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.deletePaymentProvider.bind(feeController)
+);
+
+// ── Late Fees ──────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/fees/late-fees/config
+ * Get the late fee configuration for the school.
+ */
+router.get(
+  '/late-fees/config',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getLateFeesConfig.bind(feeController)
+);
+
+/**
+ * PUT /api/fees/late-fees/config
+ * Create or update the late fee configuration.
+ */
+router.put(
+  '/late-fees/config',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.upsertLateFeesConfig.bind(feeController)
+);
+
+/**
+ * POST /api/fees/late-fees/apply
+ * Manually trigger late fee application for all overdue invoices.
+ */
+router.post(
+  '/late-fees/apply',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.applyLateFees.bind(feeController)
+);
+
+// ── Payment Plans ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/fees/plans
+ * Create a payment plan (installment schedule) for an invoice.
+ */
+router.post(
+  '/plans',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.createPaymentPlan.bind(feeController)
+);
+
+/**
+ * GET /api/fees/plans
+ * List all active payment plans for the school.
+ */
+router.get(
+  '/plans',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getSchoolPaymentPlans.bind(feeController)
+);
+
+/**
+ * GET /api/fees/plans/:invoiceId
+ * Get the payment plan for a specific invoice.
+ */
+router.get(
+  '/plans/:invoiceId',
+  authorize('ADMIN', 'SUPER_ADMIN', 'PARENT'),
+  feeController.getPaymentPlan.bind(feeController)
+);
+
+/**
+ * PATCH /api/fees/plans/:invoiceId/cancel
+ * Cancel a payment plan.
+ */
+router.patch(
+  '/plans/:invoiceId/cancel',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.cancelPaymentPlan.bind(feeController)
+);
+
+// ── Reminders ──────────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/fees/reminders/send
+ * Send a manual reminder for an invoice.
+ */
+router.post(
+  '/reminders/send',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.sendReminder.bind(feeController)
+);
+
+/**
+ * POST /api/fees/reminders/process
+ * Process all pending reminders for the school.
+ */
+router.post(
+  '/reminders/process',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.processReminders.bind(feeController)
+);
+
+/**
+ * GET /api/fees/reminders/:invoiceId
+ * Get reminder history for an invoice.
+ */
+router.get(
+  '/reminders/:invoiceId',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getReminderHistory.bind(feeController)
+);
+
+/**
+ * GET /api/fees/reminders/stats
+ * Get aggregated reminder statistics for the school.
+ */
+router.get(
+  '/reminders/stats',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getReminderStats.bind(feeController)
+);
+
+// ── Reconciliation ──────────────────────────────────────────────────────────────
+
+/**
+ * POST /api/fees/reconciliation/upload
+ * Upload a bank statement CSV for auto-matching.
+ * Accepts multipart file upload or raw CSV content in body.
+ */
+router.post(
+  '/reconciliation/upload',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  upload.single('statement'),
+  feeController.uploadStatement.bind(feeController)
+);
+
+/**
+ * POST /api/fees/reconciliation/confirm
+ * Confirm auto-matched transactions and create payments.
+ */
+router.post(
+  '/reconciliation/confirm',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.confirmReconciliation.bind(feeController)
+);
+
+/**
+ * GET /api/fees/reconciliation/report
+ * Generate reconciliation report for a date range.
+ * Query: ?from=2025-01-01&to=2025-12-31
+ */
+router.get(
+  '/reconciliation/report',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getReconciliationReport.bind(feeController)
 );
 
 export default router;

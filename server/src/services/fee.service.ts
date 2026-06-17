@@ -20,7 +20,13 @@ import {
   GetInvoicesQuery,
   GetPaymentsQuery,
   FeeReportQuery,
+  InitiateOnlinePaymentInput,
+  ConfigurePaymentProviderInput,
+  UpdatePaymentProviderInput,
 } from '../validation/fee.validation';
+import { PaymentProviderFactory } from './payment-provider/PaymentProviderFactory';
+import { IdempotencyService } from './payment-provider/idempotency.service';
+import { OnlinePaymentResponse } from '../types/payment-provider.types';
 
 /**
  * FeeService
@@ -1015,6 +1021,229 @@ export class FeeService extends BaseService {
     });
 
     return cloned;
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ONLINE PAYMENTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initiate an online payment (M-Pesa STK Push) for an invoice.
+   * Uses the payment provider abstraction and idempotency protection.
+   */
+  async initiateOnlinePayment(data: InitiateOnlinePaymentInput): Promise<OnlinePaymentResponse> {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const sid = this.assertSchool(isSuperAdmin ? undefined : schoolId);
+    const effectiveSchoolId = isSuperAdmin ? sid : schoolId!;
+
+    // Validate the invoice exists and belongs to the school
+    const invoice = await this.prisma.feeInvoice.findFirst({
+      where: {
+        id: data.invoiceId,
+        ...(isSuperAdmin ? {} : { schoolId: effectiveSchoolId }),
+      },
+    });
+    if (!invoice) throw new Error('Invoice not found or access denied');
+    if (invoice.status === 'CANCELLED') throw new Error('Cannot pay a cancelled invoice');
+    if (invoice.status === 'PAID') throw new Error('Invoice is already fully paid');
+
+    const outstandingBalance = Number(invoice.totalAmount) - Number(invoice.discountAmount) - Number(invoice.paidAmount);
+    if (outstandingBalance <= 0) throw new Error('Invoice has no outstanding balance');
+
+    // Get the payment provider
+    const provider = await PaymentProviderFactory.getProvider(effectiveSchoolId, data.provider);
+
+    // Generate a unique transaction reference
+    const receiptNo = await sequenceGenerator.generateNext(
+      SequenceType.RECEIPT_NUMBER,
+      effectiveSchoolId
+    );
+    const transactionRef = `EDT${receiptNo}`;
+
+    // Initiate the payment with the provider
+    const chargeDTO = {
+      amount: Math.round(outstandingBalance * 100), // Convert to minor units (e.g., KES 500.00 → 50000)
+      currency: 'KES',
+      transactionRef,
+      description: `Invoice ${invoice.invoiceNo}`,
+      phoneNumber: data.phoneNumber,
+      callbackUrl: data.callbackUrl || `${process.env.BASE_URL || ''}/webhooks/payments/mpesa/callback`,
+    };
+
+    const session = await provider.initiatePayment(chargeDTO);
+
+    // Create a pending payment record
+    const payment = await this.prisma.feePayment.create({
+      data: {
+        id: uuidv4(),
+        receiptNo,
+        invoiceId: invoice.id,
+        studentId: invoice.studentId,
+        schoolId: effectiveSchoolId,
+        amount: new Decimal(outstandingBalance),
+        method: 'MPESA',
+        status: 'PENDING',
+        transactionRef: session.providerTransactionId,
+        mpesaCode: session.merchantRequestId,
+        paidAt: null,
+        notes: `Online payment: ${provider.providerName}`,
+        receivedById: this.getSchoolContext().userId ?? null,
+      },
+    });
+
+    logger.info('Online payment initiated', {
+      receiptNo,
+      invoiceId: data.invoiceId,
+      amount: outstandingBalance,
+      provider: provider.providerName,
+      checkoutRequestId: session.providerTransactionId,
+    });
+
+    return {
+      paymentSession: session,
+      invoiceId: invoice.id,
+      receiptNo,
+    };
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAYMENT PROVIDER CONFIGURATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Configure a payment provider for the school.
+   */
+  async configurePaymentProvider(data: ConfigurePaymentProviderInput) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const sid = this.assertSchool(isSuperAdmin ? undefined : schoolId);
+    const effectiveSchoolId = isSuperAdmin ? sid : schoolId!;
+
+    // Check if this provider is already configured
+    const existing = await this.prisma.paymentProviderConfig.findUnique({
+      where: {
+        tenantId_provider: {
+          tenantId: effectiveSchoolId,
+          provider: data.provider.toUpperCase(),
+        },
+      },
+    });
+
+    if (existing) {
+      throw new Error(`Payment provider "${data.provider}" is already configured. Use PATCH to update.`);
+    }
+
+    const config = await this.prisma.paymentProviderConfig.create({
+      data: {
+        id: uuidv4(),
+        tenantId: effectiveSchoolId,
+        provider: data.provider.toUpperCase(),
+        apiKey: data.apiKey,
+        secretKey: data.secretKey,
+        callbackUrl: data.callbackUrl || null,
+        webhookSecret: data.webhookSecret || null,
+        isActive: data.isActive,
+        extraConfig: (data.extraConfig as Record<string, unknown>) || undefined,
+      },
+    });
+
+    // Invalidate factory cache so new config takes effect
+    PaymentProviderFactory.invalidateCache(effectiveSchoolId);
+
+    logger.info('Payment provider configured', {
+      schoolId: effectiveSchoolId,
+      provider: data.provider,
+    });
+
+    return config;
+  }
+
+  /**
+   * Update a payment provider configuration.
+   */
+  async updatePaymentProvider(providerId: string, data: UpdatePaymentProviderInput) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const existing = await this.prisma.paymentProviderConfig.findFirst({
+      where: {
+        id: providerId,
+        ...(isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' }),
+      },
+    });
+    if (!existing) throw new Error('Payment provider config not found or access denied');
+
+    const config = await this.prisma.paymentProviderConfig.update({
+      where: { id: providerId },
+      data: {
+        ...(data.apiKey !== undefined && { apiKey: data.apiKey }),
+        ...(data.secretKey !== undefined && { secretKey: data.secretKey }),
+        ...(data.callbackUrl !== undefined && { callbackUrl: data.callbackUrl }),
+        ...(data.webhookSecret !== undefined && { webhookSecret: data.webhookSecret }),
+        ...(data.isActive !== undefined && { isActive: data.isActive }),
+        ...(data.extraConfig !== undefined && { extraConfig: data.extraConfig as Record<string, unknown> }),
+      },
+    });
+
+    // Invalidate factory cache
+    PaymentProviderFactory.invalidateCache(existing.tenantId);
+
+    logger.info('Payment provider updated', {
+      providerId,
+      tenantId: existing.tenantId,
+    });
+
+    return config;
+  }
+
+  /**
+   * Get all configured payment providers for the school.
+   */
+  async getPaymentProviders() {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const configs = await this.prisma.paymentProviderConfig.findMany({
+      where: isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' },
+      select: {
+        id: true,
+        tenantId: true,
+        provider: true,
+        isActive: true,
+        callbackUrl: true,
+        // Don't expose secrets in the response
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return configs;
+  }
+
+  /**
+   * Remove a payment provider configuration.
+   */
+  async deletePaymentProvider(providerId: string) {
+    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+
+    const existing = await this.prisma.paymentProviderConfig.findFirst({
+      where: {
+        id: providerId,
+        ...(isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' }),
+      },
+    });
+    if (!existing) throw new Error('Payment provider config not found or access denied');
+
+    await this.prisma.paymentProviderConfig.delete({
+      where: { id: providerId },
+    });
+
+    // Invalidate factory cache
+    PaymentProviderFactory.invalidateCache(existing.tenantId);
+
+    logger.info('Payment provider removed', {
+      providerId,
+      provider: existing.provider,
+      tenantId: existing.tenantId,
+    });
   }
 
   // ── Static factory ────────────────────────────────────────────────────────

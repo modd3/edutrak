@@ -31,7 +31,7 @@ export const subscriptionsApi = {
     page?: number;
     limit?: number;
   }) =>
-    api.get<PaginatedResponse<Subscription[]>>('/subscriptions', { params }),
+    api.get<PaginatedResponse<Subscription>>('/subscriptions', { params }),
 
   /**
    * Get a single subscription by ID

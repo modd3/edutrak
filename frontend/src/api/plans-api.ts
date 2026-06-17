@@ -32,7 +32,7 @@ export interface UpdatePlanInput {
 
 export const plansApi = {
   list: (params?: { page?: number; limit?: number; isActive?: boolean }) =>
-    api.get<PaginatedResponse<Plan[]>>('/plans', { params }),
+    api.get<PaginatedResponse<Plan>>('/plans', { params }),
   
   getById: (id: string) => 
     api.get<ApiResponse<Plan>>(`/plans/${id}`),

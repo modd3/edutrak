@@ -46,7 +46,7 @@ export const schoolService = {
    * Get all schools with optional filters
    */
   getAll: (params?: SchoolFilters) =>
-    api.get<PaginatedResponse<School[]>>('/schools', { params }),
+    api.get<PaginatedResponse<School>>('/schools', { params }),
 
   /**
    * Get a single school by ID
@@ -93,13 +93,13 @@ export const schoolService = {
    * Get schools by county
    */
   getByCounty: (county: string) =>
-    api.get<PaginatedResponse<School[]>>(`/schools/county/${county}`),
+    api.get<PaginatedResponse<School>>(`/schools/county/${county}`),
 
   /**
    * Get school users (students, teachers, staff)
    */
   getSchoolUsers: (schoolId: string, role?: string) =>
-    api.get<PaginatedResponse<User[]>>(`/schools/${schoolId}/users`, {
+    api.get<PaginatedResponse<User>>(`/schools/${schoolId}/users`, {
       params: { role },
     }),
     /**
