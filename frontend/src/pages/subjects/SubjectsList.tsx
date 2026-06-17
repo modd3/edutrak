@@ -66,7 +66,7 @@ export function SubjectsList() {
   const { data, isLoading, error } = useSubjects({
     page,
     pageSize: 10,
-    search: search || undefined,
+    category: undefined,
   });
 
   const { mutate: deleteSubject, isPending: isDeleting } = useDeleteSubject();
@@ -252,12 +252,7 @@ export function SubjectsList() {
       <DataTable
         columns={columns}
         data={data.data}
-        pagination={{
-          pageIndex: page - 1,
-          pageSize: 10,
-          pageCount: data.pagination?.pages || 1,
-        }}
-        onPageChange={setPage}
+        pageSize={10}
       />
 
       <SubjectFormModal
