@@ -182,7 +182,7 @@ export default function ClassesList() {
   accessorKey: 'classTeacher',
   header: 'Class Teacher',
   cell: ({ row }) => {
-    const teacher = row.original.classTeacher?.user;
+    const teacher = row.original.classTeacher;
     return (
       <span className="text-sm">
         {teacher  ? `${teacher.firstName} ${teacher.lastName}`
@@ -196,7 +196,7 @@ export default function ClassesList() {
       accessorKey: 'streams',
       header: 'Streams',
       cell: ({ row }) => {
-        const streamsCount = row.original._count?.streams || 0;
+        const streamsCount = (row.original as any)._count?.streams || 0;
         return (
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />
@@ -209,7 +209,7 @@ export default function ClassesList() {
       accessorKey: 'students',
       header: 'Students',
       cell: ({ row }) => {
-        const studentsCount = row.original._count?.students || 0;
+        const studentsCount = (row.original as any)._count?.students || 0;
         return (
           <div className="flex items-center gap-2">
             <Users className="h-4 w-4 text-muted-foreground" />

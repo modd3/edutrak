@@ -305,7 +305,7 @@ function StudentProfileTab({ user }: { user: User }) {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <InfoItem label="Class" value={student?.enrollments[0].class.name} />
+              <InfoItem label="Class" value={student?.enrollments[0]?.class?.name || 'Not assigned'} />
               <InfoItem 
                 label="Stream" 
                 value={student.enrollments[0].stream?.name || 'Not assigned'} 

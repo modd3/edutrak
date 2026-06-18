@@ -17,6 +17,7 @@ import { ResponseUtil } from '../utils/response';
 import { RequestWithUser } from '../middleware/school-context';
 import { PaymentProviderFactory } from '../services/payment-provider/PaymentProviderFactory';
 import { WebhookPayload } from '../types/payment-provider.types';
+import { InputJsonArray } from '@prisma/client/runtime/library';
 
 export class WebhookController {
   private prisma: PrismaClient;
@@ -50,7 +51,7 @@ export class WebhookController {
           provider,
           event: req.headers['x-event-name'] as string || 'payment.notification',
           payload: rawBody,
-          headers: req.headers as Record<string, unknown>,
+          headers: req.headers as Record<string, InputJsonArray>,
           signature: signature || null,
           ipAddress,
           processed: false,
@@ -127,7 +128,7 @@ export class WebhookController {
           provider: 'MPESA',
           event: 'mpesa.callback',
           payload: rawBody,
-          headers: req.headers as Record<string, unknown>,
+          headers: req.headers as Record<string, InputJsonArray>,
           ipAddress,
           processed: false,
         },

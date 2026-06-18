@@ -277,10 +277,10 @@ export function Login() {
               type="button"
               onClick={() => {
                 // Auto-fill admin credentials
-                handleSubmit(onSubmit)({
-                  email: 'admin@school.com',
-                    password: 'Admin123!',
-                  });
+                onSubmit({
+                  email: 'admin@nps.ac.ke',
+                  password: 'Admin123!',
+                });
                 }}
                 className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
               >
@@ -290,8 +290,8 @@ export function Login() {
                 type="button"
                 onClick={() => {
                   // Auto-fill teacher credentials
-                  handleSubmit(onSubmit)({
-                    email: 'teacher@school.com',
+                  onSubmit({
+                    email: 'teacher1@nps.ac.ke',
                     password: 'Teacher123!',
                   });
                 }}

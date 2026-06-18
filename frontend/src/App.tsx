@@ -34,6 +34,9 @@ import FeesPagePro from '@/pages/fees/FeesPagePro';
 import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPagePro';
 import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
 import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
+import { AnalyticsPage } from '@/pages/fees/AnalyticsPage';
+import { ReconciliationPage } from '@/pages/fees/ReconciliationPage';
+import { ProvidersPage } from '@/pages/fees/ProvidersPage';
 import BillingAdminPage from '@/pages/billing/BillingAdminPage';
 import SubscriptionsPage from '@/pages/subscriptions/SubscriptionsPage';
 import { PlansPage } from './pages/subscriptions/PlansPage';
@@ -409,6 +412,42 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <PaymentsPagePro />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Fee Analytics */}
+          <Route
+            path="/fees/analytics"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <AnalyticsPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Bank Reconciliation */}
+          <Route
+            path="/fees/reconciliation"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <ReconciliationPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Payment Providers */}
+          <Route
+            path="/fees/providers"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <ProvidersPage />
                 </DashboardLayout>
               </RoleGuard>
             }

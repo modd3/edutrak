@@ -51,6 +51,9 @@ const CURRICULUM_LABELS: Record<string, string> = {
 
 export function SubjectsList() {
   const [search, setSearch] = useState('');
+  const [category, setCategory] = useState('');
+  const [curriculum, setCurriculum] = useState('');
+  const [code, setCode] = useState('');
   const [page, setPage] = useState(1);
   const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -66,7 +69,10 @@ export function SubjectsList() {
   const { data, isLoading, error } = useSubjects({
     page,
     pageSize: 10,
-    category: undefined,
+    category: category || undefined,
+    curriculum: curriculum || undefined,
+    code: code || undefined,
+    name: search || undefined,
   });
 
   const { mutate: deleteSubject, isPending: isDeleting } = useDeleteSubject();
@@ -202,15 +208,14 @@ export function SubjectsList() {
           }
         />
         <EmptyState
+          icon={PlusCircle}
           title="No subjects found"
           description="Get started by creating your first subject."
           action={
-            canManageSubjects && (
-              <Button onClick={handleCreateClick}>
-                <PlusCircle className="mr-2 h-4 w-4" />
-                Create Subject
-              </Button>
-            )
+            canManageSubjects ? {
+              label: 'Create Subject',
+              onClick: handleCreateClick
+            } : undefined
           }
         />
         <SubjectFormModal

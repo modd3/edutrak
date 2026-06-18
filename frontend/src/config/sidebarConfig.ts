@@ -265,6 +265,24 @@ export const sidebarConfig: NavItem[] = [
         icon: AlertCircle,
         roles: ['ADMIN', 'SUPER_ADMIN'],
       },
+      {
+        title: 'Analytics',
+        href: '/fees/analytics',
+        icon: BarChart3,
+        roles: ['ADMIN', 'SUPER_ADMIN'],
+      },
+      {
+        title: 'Reconciliation',
+        href: '/fees/reconciliation',
+        icon: Receipt,
+        roles: ['ADMIN', 'SUPER_ADMIN'],
+      },
+      {
+        title: 'Payment Providers',
+        href: '/fees/providers',
+        icon: CreditCard,
+        roles: ['ADMIN', 'SUPER_ADMIN'],
+      },
     ],
   },
 

@@ -63,7 +63,6 @@ export class ReminderService extends BaseService {
             id: true,
             firstName: true,
             lastName: true,
-            phone: true,
             guardians: {
               include: {
                 guardian: {

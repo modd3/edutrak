@@ -21,13 +21,14 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Search, Users, BookOpen, Download, Filter } from 'lucide-react';
 import { toast } from 'sonner';
-import { useActiveAcademicYear } from '@/hooks/use-academic';
-import { useClasses } from '@/hooks/use-classes';
+import { useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
+//import { useClasses } from '@/hooks/use-classes';
 import { useClassSubjects } from '@/hooks/use-class-subjects';
 import { useClassStudents } from '@/hooks/use-class-students';
 import { useStudentsEnrolledInSubject } from '@/hooks/use-student-subject-enrollment';
 import { AdminSubjectAssignmentDialog } from '@/components/subjects/AdminSubjectAssignment';
 import { useSchoolContext } from '@/hooks/use-school-context';
+import { SubjectEnrollmentStatus } from '@/types';
 
 export function StudentSubjectManagementPage() {
   const navigate = useNavigate();
@@ -43,11 +44,11 @@ export function StudentSubjectManagementPage() {
   const activeYear = activeYearData;
 
   // Get classes - FIXED: Added schoolId parameter
-  const { data: classesData } = useClasses({
-    academicYearId: activeYear?.id,
-    schoolId: schoolId
-  });
-  const classes = classesData?.data?.data || [];
+  const { data: classesData } = useClasses(
+    activeYear?.id,
+  );
+  const classes = classesData?.data || [];
+  console.log("Classes :", classes)
 
   // Get terms
   const terms = activeYear?.terms || [];
@@ -74,7 +75,7 @@ export function StudentSubjectManagementPage() {
   const { data: enrolledStudentsData } = useStudentsEnrolledInSubject(
     selectedSubject,
     {
-      status: 'ACTIVE'
+      status: SubjectEnrollmentStatus.ACTIVE
     }
   );
   const enrolledStudents = enrolledStudentsData?.data || [];
@@ -374,7 +375,7 @@ export function StudentSubjectManagementPage() {
           classId={selectedClass}
           academicYearId={activeYear?.id || ''}
           termId={selectedTerm}
-          schoolId={schoolId}
+          schoolId={schoolId? schoolId : ''}
         />
       )}
     </div>

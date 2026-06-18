@@ -275,14 +275,16 @@ export class LateFeesService extends BaseService {
 // ─── Static convenience method for cron jobs ─────────────────────────────────
 
 export async function runLateFeeJob(): Promise<void> {
-  const schools = await prisma.school.findMany({
+  const activeConfigs = await prisma.lateFeesConfig.findMany({
     where: {
-      lateFeesConfig: {
-        isActive: true,
-      },
+      isActive: true,
     },
-    select: { id: true },
+    select: {
+      schoolId: true,
+    },
   });
+
+  const schools = activeConfigs.map(config => ({ id: config.schoolId }));
 
   const service = new LateFeesService();
   for (const school of schools) {

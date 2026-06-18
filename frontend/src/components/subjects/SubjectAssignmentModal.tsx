@@ -30,7 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { useSubjects, useAssignSubject, useClassSubjects } from '@/hooks/use-class-subjects';
 import { useTeachers } from '@/hooks/use-teachers';
 import { Loader2, Info, CheckCircle, AlertCircle } from 'lucide-react';
-import { Term, Stream } from '@/types';
+import { Term, Stream, Subject } from '@/types';
 import { toast } from 'sonner';
 
 const formSchema = z.object({
@@ -116,18 +116,18 @@ export function SubjectAssignmentModal({
     
     return new Set(
       assignedSubjects
-        .filter(subject => {
+        .filter((subject: Subject) => {
           // Filter by selected term (already filtered by hook)
           // Filter by stream
           if (selectedStreamId === 'all') {
             // For "entire class", check if subject is assigned to entire class (streamId = null)
-            return subject.streamId === null;
+            return subject.id === null;
           } else {
             // For specific stream, check if subject is assigned to this stream
-            return subject.streamId === selectedStreamId;
+            return subject.id === selectedStreamId;
           }
         })
-        .map(subject => subject.subjectId)
+        .map((subject: Subject) => subject.id)
     );
   }, [assignedSubjects, selectedStreamId]);
 
@@ -135,7 +135,7 @@ export function SubjectAssignmentModal({
   const availableSubjects = useMemo(() => {
     if (!subjects || subjects.length === 0) return [];
     
-    return subjects.filter(subject => !assignedSubjectIds.has(subject.id));
+    return subjects.filter((subject: Subject) => !assignedSubjectIds.has(subject.id));
   }, [subjects, assignedSubjectIds]);
 
   // Check if selected subject is already assigned

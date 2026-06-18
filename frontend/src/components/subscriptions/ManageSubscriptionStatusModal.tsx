@@ -21,7 +21,7 @@ import {
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { useTransitionSubscriptionStatus } from '@/hooks/use-subscriptions';
-import { Subscription } from '@/api/subscriptions-api';
+import { Subscription } from '@/types';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   TRIALING: ['ACTIVE', 'CANCELED', 'EXPIRED'],

@@ -523,7 +523,7 @@ export function BulkUserUploadModal({ open, onOpenChange }: BulkUserUploadModalP
             }}
             disabled={uploading}
           >
-            {uploadResult?.successful > 0 && uploadResult?.failed === 0 ? 'Done' : 'Cancel'}
+            {uploadResult && uploadResult.successful > 0 && uploadResult.failed === 0 ? 'Done' : 'Cancel'}
           </Button>
         </div>
       </DialogContent>

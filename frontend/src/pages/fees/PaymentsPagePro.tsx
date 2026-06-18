@@ -60,6 +60,7 @@ import { useActiveAcademicYear } from '@/hooks/use-academic';
 import { RoleGuard } from '@/components/RoleGuard';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import { unknown } from 'zod';
 
 const PAYMENT_METHODS = {
   CASH: { label: 'Cash', icon: '💵', color: 'bg-green-50 dark:bg-green-950' },
@@ -140,7 +141,7 @@ export function PaymentsPage() {
       },
       {}
     )
-  ).sort(([, a], [, b]) => b - a);
+  ).sort(([, a], [, b]) => (b as number) - (a as number));
   
   const handlePrint = () => window.print();
 

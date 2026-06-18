@@ -372,3 +372,355 @@ export function useGetDefaultersReport(params?: {
     queryFn: () => feesApi.getDefaultersReport(params),
   });
 }
+
+// ══════════════════════════════════════════════════════════════════════════
+// ONLINE PAYMENTS
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useInitiateOnlinePayment() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ invoiceId, ...data }: { invoiceId: string } & Parameters<typeof feesApi.initiateOnlinePayment>[1]) =>
+      feesApi.initiateOnlinePayment(invoiceId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      toast.success('Payment initiated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to initiate payment');
+    },
+  });
+}
+
+export function useGetPaymentStatus(invoiceId: string) {
+  return useQuery({
+    queryKey: ['feePaymentStatus', invoiceId],
+    queryFn: () => feesApi.getPaymentStatus(invoiceId),
+    enabled: !!invoiceId,
+    refetchInterval: 3000,
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAYMENT PROVIDERS
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useGetPaymentProviders() {
+  return useQuery({
+    queryKey: ['paymentProviders'],
+    queryFn: () => feesApi.getPaymentProviders(),
+  });
+}
+
+export function useConfigurePaymentProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Parameters<typeof feesApi.configurePaymentProvider>[0]) =>
+      feesApi.configurePaymentProvider(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });
+      toast.success('Payment provider configured successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to configure payment provider');
+    },
+  });
+}
+
+export function useUpdatePaymentProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ providerId, data }: { providerId: string; data: Parameters<typeof feesApi.updatePaymentProvider>[1] }) =>
+      feesApi.updatePaymentProvider(providerId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });
+      toast.success('Payment provider updated successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to update payment provider');
+    },
+  });
+}
+
+export function useDeletePaymentProvider() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (providerId: string) => feesApi.deletePaymentProvider(providerId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentProviders'] });
+      toast.success('Payment provider deleted successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to delete payment provider');
+    },
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// LATE FEES
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useGetLateFeesConfig() {
+  return useQuery({
+    queryKey: ['lateFeesConfig'],
+    queryFn: () => feesApi.getLateFeesConfig(),
+  });
+}
+
+export function useUpsertLateFeesConfig() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Parameters<typeof feesApi.upsertLateFeesConfig>[0]) =>
+      feesApi.upsertLateFeesConfig(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lateFeesConfig'] });
+      toast.success('Late fees configuration saved');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to save late fees configuration');
+    },
+  });
+}
+
+export function useApplyLateFees() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => feesApi.applyLateFees(),
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      const applied = response.data?.data?.applied || 0;
+      toast.success(`Late fees applied to ${applied} invoice(s)`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to apply late fees');
+    },
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// PAYMENT PLANS (INSTALLMENTS)
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useCreatePaymentPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ invoiceId, ...data }: { invoiceId: string } & Parameters<typeof feesApi.createPaymentPlan>[1]) =>
+      feesApi.createPaymentPlan(invoiceId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      toast.success('Payment plan created successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to create payment plan');
+    },
+  });
+}
+
+export function useGetSchoolPaymentPlans(params?: { status?: string; page?: number; limit?: number }) {
+  return useQuery({
+    queryKey: ['paymentPlans', params],
+    queryFn: () => feesApi.getSchoolPaymentPlans(params),
+  });
+}
+
+export function useGetPaymentPlan(invoiceId: string) {
+  return useQuery({
+    queryKey: ['paymentPlans', invoiceId],
+    queryFn: () => feesApi.getPaymentPlan(invoiceId),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useCancelPaymentPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (invoiceId: string) => feesApi.cancelPaymentPlan(invoiceId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['paymentPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      toast.success('Payment plan cancelled successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to cancel payment plan');
+    },
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// REMINDERS
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useSendReminder() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ invoiceId, ...data }: { invoiceId: string } & Parameters<typeof feesApi.sendReminder>[1]) =>
+      feesApi.sendReminder(invoiceId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['reminders'] });
+      toast.success('Reminder sent successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to send reminder');
+    },
+  });
+}
+
+export function useProcessReminders() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: () => feesApi.processReminders(),
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ['reminders'] });
+      const processed = response.data?.data?.processed || 0;
+      toast.success(`Processed ${processed} reminder(s)`);
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to process reminders');
+    },
+  });
+}
+
+export function useGetReminderHistory(invoiceId: string) {
+  return useQuery({
+    queryKey: ['reminders', invoiceId],
+    queryFn: () => feesApi.getReminderHistory(invoiceId),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useGetReminderStats() {
+  return useQuery({
+    queryKey: ['reminderStats'],
+    queryFn: () => feesApi.getReminderStats(),
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// RECONCILIATION
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useUploadStatement() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (file: File) => feesApi.uploadStatement(file),
+    onSuccess: () => {
+      toast.success('Statement uploaded successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to upload statement');
+    },
+  });
+}
+
+export function useConfirmReconciliation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: Parameters<typeof feesApi.confirmReconciliation>[0]) =>
+      feesApi.confirmReconciliation(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feePayments'] });
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      toast.success('Reconciliation confirmed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to confirm reconciliation');
+    },
+  });
+}
+
+export function useGetReconciliationReport(params?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: ['reconciliationReport', params],
+    queryFn: () => feesApi.getReconciliationReport(params),
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// ANALYTICS
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useGetAnalytics(params?: { from?: string; to?: string; academicYearId?: string; termId?: string }) {
+  return useQuery({
+    queryKey: ['feeAnalytics', params],
+    queryFn: () => feesApi.getAnalytics(params),
+  });
+}
+
+export function useGetCashFlowReport(params?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: ['feeCashFlow', params],
+    queryFn: () => feesApi.getCashFlowReport(params),
+  });
+}
+
+export function useDetectAnomalies(params?: { days?: number }) {
+  return useQuery({
+    queryKey: ['feeAnomalies', params],
+    queryFn: () => feesApi.detectAnomalies(params),
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+// REFUNDS
+// ══════════════════════════════════════════════════════════════════════════
+
+export function useProcessRefund() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ paymentId, ...data }: { paymentId: string } & Parameters<typeof feesApi.processRefund>[1]) =>
+      feesApi.processRefund(paymentId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feePayments'] });
+      queryClient.invalidateQueries({ queryKey: ['feeInvoices'] });
+      toast.success('Refund processed successfully');
+    },
+    onError: (error: any) => {
+      toast.error(error.response?.data?.message || 'Failed to process refund');
+    },
+  });
+}
+
+export function useValidateRefund(paymentId: string) {
+  return useQuery({
+    queryKey: ['refundValidation', paymentId],
+    queryFn: () => feesApi.validateRefund(paymentId),
+    enabled: !!paymentId,
+  });
+}
+
+export function useGetRefundHistory(paymentId: string) {
+  return useQuery({
+    queryKey: ['refundHistory', paymentId],
+    queryFn: () => feesApi.getRefundHistory(paymentId),
+    enabled: !!paymentId,
+  });
+}
+
+export function useGetInvoiceRefunds(invoiceId: string) {
+  return useQuery({
+    queryKey: ['invoiceRefunds', invoiceId],
+    queryFn: () => feesApi.getInvoiceRefunds(invoiceId),
+    enabled: !!invoiceId,
+  });
+}
+
+export function useGetRefundStats(params?: { from?: string; to?: string }) {
+  return useQuery({
+    queryKey: ['refundStats', params],
+    queryFn: () => feesApi.getRefundStats(params),
+  });
+}

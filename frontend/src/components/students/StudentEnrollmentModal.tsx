@@ -153,6 +153,7 @@ export function StudentEnrollmentModal({
           classId: data.classId,
           streamId: data.streamId,
           academicYearId: data.academicYearId,
+          studentId: data.studentId,
         }
       });
     }
@@ -210,7 +211,7 @@ export function StudentEnrollmentModal({
 
           {/* Current Enrollment Info (Edit mode) */}
           {mode === 'edit' && enrollment && (
-            <Alert variant="outline">
+            <Alert variant="default">
               <AlertDescription className="text-sm">
                 <strong>Current Enrollment:</strong> {enrollment.class?.name}
                 {enrollment.stream && ` - ${enrollment.stream.name}`}
@@ -375,7 +376,7 @@ export function StudentEnrollmentModal({
           classId={newEnrollmentData.classId}
           studentId={newEnrollmentData.studentId}
           enrollmentId={newEnrollmentData.id}
-          schoolId={schoolId}
+          schoolId={schoolId || ''}
           onSuccess={() => {
             // Close enrollment modal after subject selection is complete
             setNewEnrollmentData(null);

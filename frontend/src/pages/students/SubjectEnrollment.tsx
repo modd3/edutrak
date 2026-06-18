@@ -32,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { SubjectEnrollmentStatus } from '@/types';
 
 export function StudentSubjectEnrollmentPage() {
   const { studentId } = useParams<{ studentId: string }>();
@@ -49,8 +50,9 @@ export function StudentSubjectEnrollmentPage() {
   const handleReEnroll = (enrollment: any) => {
     updateStatus({
       enrollmentId: enrollment.id,
-      status: 'ACTIVE',
+      status: SubjectEnrollmentStatus.ACTIVE,
       schoolId: schoolId!,
+      classSubjectId: enrollment.classSubjectId
     });
   };
 

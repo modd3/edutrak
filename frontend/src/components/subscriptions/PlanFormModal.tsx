@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
 import { useCreatePlan, useUpdatePlan } from '@/hooks/use-plans';
-import { Plan } from '@/api/plans-api';
+import { Plan } from '@/types';
 
 const planFormSchema = z.object({
   key: z.string().min(1, 'Plan key is required').regex(/^[a-z0-9_-]+$/, 'Key must be lowercase with only letters, numbers, hyphens, and underscores'),

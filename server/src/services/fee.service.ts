@@ -1,6 +1,6 @@
 // src/services/fee.service.ts
-import { Decimal } from '@prisma/client/runtime/library';
-import { InvoiceStatus } from '@prisma/client';
+import { Decimal, InputJsonValue } from '@prisma/client/runtime/library';
+import { InvoiceStatus,  } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger';
 import { BaseService } from './base.service';
@@ -1142,7 +1142,7 @@ export class FeeService extends BaseService {
         callbackUrl: data.callbackUrl || null,
         webhookSecret: data.webhookSecret || null,
         isActive: data.isActive,
-        extraConfig: (data.extraConfig as Record<string, unknown>) || undefined,
+        extraConfig: (data.extraConfig as Record<string, InputJsonValue>) || undefined,
       },
     });
 
@@ -1179,7 +1179,7 @@ export class FeeService extends BaseService {
         ...(data.callbackUrl !== undefined && { callbackUrl: data.callbackUrl }),
         ...(data.webhookSecret !== undefined && { webhookSecret: data.webhookSecret }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),
-        ...(data.extraConfig !== undefined && { extraConfig: data.extraConfig as Record<string, unknown> }),
+        ...(data.extraConfig !== undefined && { extraConfig: data.extraConfig as Record<string, InputJsonValue> }),
       },
     });
 

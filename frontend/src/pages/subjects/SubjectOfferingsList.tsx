@@ -78,7 +78,7 @@ function AddSubjectOfferingDialog({ schoolId }: { schoolId: string }) {
                         <SelectValue placeholder="Select a subject" />
                     </SelectTrigger>
                     <SelectContent>
-                        {coreSubjectsData?.data.map((subject) => (
+                        {coreSubjectsData?.data?.map((subject) => (
                             <SelectItem key={subject.id} value={subject.id}>
                                 {subject.name} ({subject.code})
                             </SelectItem>
@@ -122,7 +122,7 @@ export default function SubjectOfferingsList() {
   };
 
   const handleToggleClick = (offering: SubjectOffering) => {
-    toggleOffering(offering.id);
+    toggleOffering(offering.id as string);
   };
 
   const confirmDelete = () => {
@@ -226,7 +226,7 @@ export default function SubjectOfferingsList() {
         <AddSubjectOfferingDialog schoolId={schoolId} />
       </div>
       
-      {offeringsData?.data.length === 0 && (
+      {offeringsData?.data?.length === 0 && (
           <div className="text-center p-12 border rounded-lg border-dashed">
               <BookOpen className="mx-auto h-12 w-12 text-muted-foreground" />
               <h3 className="mt-4 text-lg font-semibold">
@@ -238,11 +238,11 @@ export default function SubjectOfferingsList() {
           </div>
       )}
 
-      {offeringsData && offeringsData.data.length > 0 && (
+      {offeringsData?.data && offeringsData.data.length > 0 && (
         <DataTable
           columns={columns}
           data={offeringsData?.data || []}
-          searchKey="subject.name"
+          pageSize={10}
         />
       )}
 

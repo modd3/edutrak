@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { User, Role } from '@/types';
 import { useCreateUserWithProfile, useUpdateUserWithProfile } from '@/hooks/use-users';
 import { useSchools } from '@/hooks/use-schools';
-import { useSchoolContext, isSuperAdmin } from '@/hooks/use-school-context';
+import { useSchoolContext } from '@/hooks/use-school-context';
 import { toast } from 'sonner';
 import { UserIcon, Eye, EyeOff, GraduationCap, BookOpen, Users, Sparkles, RefreshCw, Building2 } from 'lucide-react';
 import { Checkbox } from '../ui/checkbox';
@@ -27,7 +27,7 @@ const baseUserSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   middleName: z.string().optional(),
   phone: z.string().optional(),
-  idNumber: z.string().nullable().optional().transform(e => e === "" ? null : e),
+  idNumber: z.string().optional().transform(e => e === "" ? undefined : e),
   role: z.enum(['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPPORT_STAFF']),
   schoolId: z.string().optional(),
 });
@@ -312,11 +312,6 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
       delete userData.password;
     }
 
-    // Ensure idNumber is null if empty (extra safety)
-    if (userData.idNumber === '') {
-      userData.idNumber = null;
-    }
-
     // Validate and get profile data based on role
     if (selectedRole === 'STUDENT') {
       const isProfileValid = await studentForm.trigger();
@@ -388,7 +383,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
 
     // Prepare request body
     const requestBody = {
-      user: userData,
+      user: userData as Partial<User>,
       profile: profileData,
     };
 
@@ -451,7 +446,7 @@ export function UserFormModal({ open, onOpenChange, mode, user }: UserFormModalP
     setShowPassword(false);
     setAutoGenerateAdmission(mode === 'create');
     setAutoGenerateEmployee(mode === 'create');
-    setSelectedRole('STUDENT');
+    setSelectedRole('STUDENT' as Role);
   };
 
   useEffect(() => {

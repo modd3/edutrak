@@ -1,7 +1,7 @@
 import api from '@/api';
 import { ApiResponse, Class, PaginatedResponse, School, Student, User } from '@/types';
 // Define the shape for creating/updating a school based on your schema
-export type CreateSchoolDto = Omit<School, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateSchoolDto = Omit<School, 'id' | 'createdAt' | 'updatedAt' | 'classes' | 'students' | 'streams' | 'subjectOfferings' | '_count'>;
 export type UpdateSchoolDto  = Partial<CreateSchoolDto>;
 
 

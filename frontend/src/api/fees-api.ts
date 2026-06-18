@@ -225,4 +225,182 @@ export const feesApi = {
     classLevel?: string;
     daysOverdue?: number;
   }) => api.get('/fees/reports/defaulters', { params }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ONLINE PAYMENTS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  /**
+   * Initiate an online payment (M-Pesa STK Push / Flutterwave checkout)
+   */
+  initiateOnlinePayment: (invoiceId: string, data: {
+    provider: 'MPESA' | 'FLUTTERWAVE';
+    callbackUrl?: string;
+    idempotencyKey?: string;
+  }) => api.post(`/fees/invoices/${invoiceId}/pay-online`, data),
+
+  /**
+   * Check payment status for an invoice
+   */
+  getPaymentStatus: (invoiceId: string) =>
+    api.get(`/fees/invoices/${invoiceId}/payment-status`),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAYMENT PROVIDERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  getPaymentProviders: () =>
+    api.get('/fees/providers'),
+
+  configurePaymentProvider: (data: {
+    provider: 'MPESA' | 'FLUTTERWAVE' | 'STRIPE';
+    apiKey: string;
+    secretKey: string;
+    callbackUrl?: string;
+    webhookSecret?: string;
+    extraConfig?: Record<string, string>;
+  }) => api.post('/fees/providers/configure', data),
+
+  updatePaymentProvider: (providerId: string, data: {
+    apiKey?: string;
+    secretKey?: string;
+    callbackUrl?: string;
+    webhookSecret?: string;
+    isActive?: boolean;
+    extraConfig?: Record<string, string>;
+  }) => api.patch(`/fees/providers/${providerId}`, data),
+
+  deletePaymentProvider: (providerId: string) =>
+    api.delete(`/fees/providers/${providerId}`),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // LATE FEES
+  // ══════════════════════════════════════════════════════════════════════════
+
+  getLateFeesConfig: () =>
+    api.get('/fees/late-fees/config'),
+
+  upsertLateFeesConfig: (data: {
+    penaltyType: 'FLAT' | 'PERCENTAGE' | 'COMPOUND';
+    penaltyAmount: number;
+    graceDays?: number;
+    maxPenalty?: number;
+    applyRecurring?: boolean;
+    recurrenceDays?: number;
+    isActive?: boolean;
+  }) => api.put('/fees/late-fees/config', data),
+
+  applyLateFees: () =>
+    api.post('/fees/late-fees/apply'),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // PAYMENT PLANS (INSTALLMENTS)
+  // ══════════════════════════════════════════════════════════════════════════
+
+  createPaymentPlan: (invoiceId: string, data: {
+    installments: number;
+    frequency: 'MONTHLY' | 'WEEKLY' | 'BIWEEKLY' | 'CUSTOM';
+    firstDueDate: string;
+    notes?: string;
+  }) => api.post(`/fees/plans`, { ...data, invoiceId }),
+
+  getSchoolPaymentPlans: (params?: {
+    status?: string;
+    page?: number;
+    limit?: number;
+  }) => api.get('/fees/plans', { params }),
+
+  getPaymentPlan: (invoiceId: string) =>
+    api.get(`/fees/plans/${invoiceId}`),
+
+  cancelPaymentPlan: (invoiceId: string) =>
+    api.patch(`/fees/plans/${invoiceId}/cancel`, {}),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // REMINDERS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  sendReminder: (invoiceId: string, data?: {
+    method?: 'SMS' | 'EMAIL' | 'PUSH' | 'SYSTEM';
+    reminderType?: string;
+  }) => api.post(`/fees/reminders/send`, { invoiceId, ...data }),
+
+  processReminders: () =>
+    api.post('/fees/reminders/process'),
+
+  getReminderHistory: (invoiceId: string) =>
+    api.get(`/fees/reminders/${invoiceId}`),
+
+  getReminderStats: () =>
+    api.get('/fees/reminders/stats'),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // RECONCILIATION
+  // ══════════════════════════════════════════════════════════════════════════
+
+  uploadStatement: (file: File) => {
+    const formData = new FormData();
+    formData.append('statement', file);
+    return api.post('/fees/reconciliation/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  confirmReconciliation: (data: {
+    matches: Array<{
+      transactionId: string;
+      invoiceId: string;
+      amount: number;
+      confidence: 'HIGH' | 'MEDIUM' | 'LOW';
+    }>;
+  }) => api.post('/fees/reconciliation/confirm', data),
+
+  getReconciliationReport: (params?: {
+    from?: string;
+    to?: string;
+  }) => api.get('/fees/reconciliation/report', { params }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ANALYTICS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  getAnalytics: (params?: {
+    from?: string;
+    to?: string;
+    academicYearId?: string;
+    termId?: string;
+  }) => api.get('/fees/analytics', { params }),
+
+  getCashFlowReport: (params?: {
+    from?: string;
+    to?: string;
+  }) => api.get('/fees/analytics/cash-flow', { params }),
+
+  detectAnomalies: (params?: {
+    days?: number;
+  }) => api.get('/fees/analytics/anomalies', { params }),
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // REFUNDS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  processRefund: (paymentId: string, data: {
+    amount: number;
+    reason: string;
+    notes?: string;
+  }) => api.post(`/fees/payments/${paymentId}/refund`, data),
+
+  validateRefund: (paymentId: string) =>
+    api.get(`/fees/payments/${paymentId}/refund/validate`),
+
+  getRefundHistory: (paymentId: string) =>
+    api.get(`/fees/payments/${paymentId}/refund/history`),
+
+  getInvoiceRefunds: (invoiceId: string) =>
+    api.get(`/fees/invoices/${invoiceId}/refunds`),
+
+  getRefundStats: (params?: {
+    from?: string;
+    to?: string;
+  }) => api.get('/fees/refunds/stats', { params }),
 };

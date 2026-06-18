@@ -18,6 +18,7 @@ import {
   ProviderConfig,
 } from '../../types/payment-provider.types';
 import { DarajaProvider } from './DarajaProvider';
+import { FlutterwaveProvider } from './FlutterwaveProvider';
 
 export class PaymentProviderFactory {
   private static prisma: PrismaClient = prisma;
@@ -161,9 +162,9 @@ export class PaymentProviderFactory {
     switch (config.provider.toUpperCase()) {
       case 'MPESA':
         return new DarajaProvider(config);
+      case 'FLUTTERWAVE':
+        return new FlutterwaveProvider(config as any);
       // Future providers:
-      // case 'FLUTTERWAVE':
-      //   return new FlutterwaveProvider(config);
       // case 'STRIPE':
       //   return new StripeProvider(config);
       default:
