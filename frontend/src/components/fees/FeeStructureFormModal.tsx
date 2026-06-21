@@ -35,6 +35,7 @@ import { Badge } from '@/components/ui/badge';
 import { Trash2, Plus, GripVertical } from 'lucide-react';
 import { useCreateFeeStructure, useGetFeeStructureById, useUpdateFeeStructure } from '@/hooks/use-fees';
 import { useSchoolContext } from '@/hooks/use-school-context';
+import { Term } from '@/types';
 
 // ─── Zod Schema ────────────────────────────────────────────────────────────────
 
@@ -86,7 +87,7 @@ interface FeeStructureFormModalProps {
     }>;
   };
   /** Injected dropdown options — fetch from your academic year / term hooks */
-  academicYears?: Array<{ id: string; name: string }>;
+  academicYears?: Array<{ id: string; year: string, terms: Term[] }>;
   terms?: Array<{ id: string; name: string }>;
   classLevels?: string[];   // e.g. ['Grade 1', 'Grade 2', ...]
   onSuccess?: () => void;
@@ -129,7 +130,6 @@ export default function FeeStructureFormModal({
   structureId,
   initialData,
   academicYears,
-  terms,
   classLevels,
   onSuccess,
 }: FeeStructureFormModalProps) {
@@ -144,7 +144,7 @@ export default function FeeStructureFormModal({
   const updateStructure = useUpdateFeeStructure();
 
   const academicYearOptions = academicYears ?? [];
-  const termOptions = terms ?? [];
+ // const termOptions = terms ?? [];
   const classLevelOptions = classLevels ?? [];
 
   const form = useForm<FeeStructureFormValues>({
@@ -159,6 +159,10 @@ export default function FeeStructureFormModal({
     },
   });
 
+  const selectedAcademicYearId = form.watch('academicYearId');
+  const selectedAY = academicYearOptions.find((y) => y.id === selectedAcademicYearId);
+  const termOptions = selectedAY?.terms;
+  
   const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: 'items',
@@ -264,7 +268,7 @@ export default function FeeStructureFormModal({
                       </FormControl>
                       <SelectContent>
                         {academicYearOptions.map((y) => (
-                          <SelectItem key={y.id} value={y.id}>{y.name}</SelectItem>
+                          <SelectItem key={y.id} value={y.id}>{y.year}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -287,9 +291,9 @@ export default function FeeStructureFormModal({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">All terms</SelectItem>
-                        {termOptions.map((t) => (
-                          <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>
+                        <SelectItem value="null">All terms</SelectItem>
+                        {termOptions?.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>{t.name.replace('_', ' ')}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

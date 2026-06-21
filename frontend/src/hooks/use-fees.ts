@@ -5,7 +5,8 @@ import { toast } from 'sonner';
 /**
  * Fetch fee structures with pagination and filters
  */
-export function useGetFeeStructures(params?: {
+export function useGetFeeStructures(params: {
+  schoolId: string;
   academicYearId?: string;
   termId?: string;
   classLevel?: string;

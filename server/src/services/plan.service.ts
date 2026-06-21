@@ -1,6 +1,10 @@
-import { PrismaClient, BillingInterval } from '@prisma/client';
+import { PrismaClient, BillingInterval, PlanFeature } from '@prisma/client';
 import { BaseService } from './base.service';
 import prisma from '../database/client';
+import { UpsertPlanFeatureInput } from '@/validation/plan-feature.validation';
+import { CreatePlanInput, UpdatePlanInput } from '../validation/plan.validation';
+import { isValidFeatureKey } from '../config/feature-registry';
+import logger from '../utils/logger';
 
 export interface PlanFilters {
   page?: number;
@@ -8,25 +12,27 @@ export interface PlanFilters {
   isActive?: boolean;
 }
 
-export interface CreatePlanData {
+/*export interface CreatePlanData {
   key: string;
   name: string;
   description?: string;
   priceMinor: number;
   currency?: string;
   billingInterval: BillingInterval;
+  features?: UpsertPlanFeatureInput[];
   isActive?: boolean;
 }
-
-export interface UpdatePlanData {
+*/
+/*export interface UpdatePlanData {
   name?: string;
   description?: string;
   priceMinor?: number;
   currency?: string;
   billingInterval?: BillingInterval;
+  features?: UpsertPlanFeatureInput[];
   isActive?: boolean;
 }
-
+*/
 export class PlanService extends BaseService {
   constructor() {
     super();
@@ -69,7 +75,7 @@ export class PlanService extends BaseService {
     });
   }
 
-  async createPlan(data: CreatePlanData) {
+  async createPlan(data: CreatePlanInput) {
     // Check if plan key is already taken
     const existing = await prisma.plan.findUnique({ where: { key: data.key } });
     if (existing) {
@@ -85,30 +91,87 @@ export class PlanService extends BaseService {
         currency: data.currency ?? 'KES',
         billingInterval: data.billingInterval,
         isActive: data.isActive ?? true,
+        features: data.features?.length
+        ? {
+            create: data.features.map(f => ({
+              featureKey: f.featureKey,
+              enabled: f.enabled ?? true,
+              limitType: f.limitType ?? 'BOOLEAN',
+              limitValue: f.limitValue ?? null,
+            })),
+          }
+        : undefined,
       },
       include: { features: true },
     });
   }
 
-  async updatePlan(id: string, data: UpdatePlanData) {
+  async updatePlan(id: string, data: UpdatePlanInput) {
     const plan = await prisma.plan.findUnique({ where: { id } });
     if (!plan) {
       throw new Error('Plan not found');
     }
 
-    return await prisma.plan.update({
-      where: { id },
-      data: {
-        name: data.name ?? plan.name,
-        description: data.description ?? plan.description,
-        priceMinor: data.priceMinor ?? plan.priceMinor,
-        currency: data.currency ?? plan.currency,
-        billingInterval: data.billingInterval ?? plan.billingInterval,
-        isActive: data.isActive ?? plan.isActive,
-      },
-      include: { features: true },
+    return await prisma.$transaction(async (tx) => {
+      // 1. Update plan-level fields (key is intentionally never updatable)
+      await tx.plan.update({
+        where: { id },
+        data: {
+          name: data.name ?? plan.name,
+          description: data.description ?? plan.description,
+          priceMinor: data.priceMinor ?? plan.priceMinor,
+          currency: data.currency ?? plan.currency,
+          billingInterval: data.billingInterval ?? plan.billingInterval,
+          isActive: data.isActive ?? plan.isActive,
+        },
+      });
+
+      // 2. If features were provided, upsert each one in the same transaction.
+      //    This does NOT remove features that are omitted from the array —
+      //    it's a merge, not a replace. Use removeFeature() for deletions.
+      if (data.features?.length) {
+        for (const f of data.features) {
+          if (!isValidFeatureKey(f.featureKey)) {
+            logger.warn('Unregistered feature key used on plan update', {
+              planId: id,
+              featureKey: f.featureKey,
+            });
+          }
+
+          await tx.planFeature.upsert({
+            where: {
+              planId_featureKey: { planId: id, featureKey: f.featureKey },
+            },
+            update: {
+              enabled: f.enabled,
+              limitType: f.limitType,
+              limitValue: f.limitValue ?? null,
+            },
+            create: {
+              planId: id,
+              featureKey: f.featureKey,
+              enabled: f.enabled,
+              limitType: f.limitType,
+              limitValue: f.limitValue ?? null,
+            },
+          });
+        }
+      }
+
+      logger.info('Plan updated', {
+        planId: id,
+        fieldsChanged: Object.keys(data).filter(k => k !== 'features'),
+        featuresUpdated: data.features?.length ?? 0,
+      });
+
+      // 3. Return the fresh plan with its current feature set
+      return tx.plan.findUnique({
+        where: { id },
+        include: { features: true },
+      });
     });
   }
+  
 
   async deletePlan(id: string) {
     const plan = await prisma.plan.findUnique({

@@ -109,7 +109,7 @@ export default function FeesPagePro() {
                 <SelectItem value="All">All Terms</SelectItem>
                 {terms.map((term: any) => (
                   <SelectItem key={term.id} value={term.id}>
-                    {term.name}
+                    {term.name.replace('_', ' ')}
                   </SelectItem>
                 ))}
               </SelectContent>

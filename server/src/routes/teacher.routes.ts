@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { TeacherController } from '../controllers/teacher.controller';
 import { authenticate, authorize, optionalAuth,  } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
 
 const router = Router();
@@ -9,6 +10,7 @@ const teacherController = new TeacherController();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 
 // Teacher management (Admin only)
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), teacherController.createTeacher);

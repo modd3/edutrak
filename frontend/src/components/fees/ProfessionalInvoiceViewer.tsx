@@ -28,7 +28,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Badge,
+  //Badge,
   Printer,
   Download,
   Edit2,
@@ -48,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import {Badge} from '@/components/ui/badge';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { PaymentRecordingModal } from './PaymentRecordingModal';
 

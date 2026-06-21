@@ -1,30 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-
-export type UserRole = 'SUPER_ADMIN' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT' | 'SUPPORT_STAFF';
-
-export interface User {
-  id: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  middleName?: string;
-  role: UserRole;
-  schoolId?: string;
-  school?: {
-    id: string;
-    name: string;
-    type: string;
-  };
-  student?: {
-    id: string;
-    admissionNo: string;
-  };
-  teacher?: {
-    id: string;
-    tscNumber: string;
-  };
-}
+import {User, Role} from '@/types'
 
 interface AuthState {
   user: User | null;
@@ -36,7 +12,7 @@ interface AuthState {
   setAuth: (user: User, token: string, refreshToken?: string) => void;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
-  hasRole: (roles: UserRole | UserRole[]) => boolean;
+  hasRole: (roles: Role | Role[]) => boolean;
   hasPermission: (permission: string) => boolean;
 }
 
@@ -89,7 +65,7 @@ export const useAuthStore = create<AuthState>()(
         if (!user) return false;
 
         // Define permissions based on roles
-        const permissions: Record<UserRole, string[]> = {
+        const permissions: Record<Role, string[]> = {
           SUPER_ADMIN: ['*'], // All permissions
           ADMIN: [
             'manage_users',

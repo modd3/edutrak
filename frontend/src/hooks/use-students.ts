@@ -1,5 +1,5 @@
 // src/hooks/use-students.ts (Enhanced)
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query';
 import { studentService } from '@/services/student.service';
 import { Student } from '@/types';
 import { toast } from 'sonner';
@@ -18,6 +18,7 @@ export function useStudents(params?: {
     queryKey: ['students', params],
     queryFn: () => studentService.getAll(params),
     enabled: !!params?.schoolId,
+    placeholderData: keepPreviousData
   });
 }
 

@@ -4,8 +4,11 @@ import multer from 'multer';
 import { feeController } from '../controllers/fee.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 import { requireFeature } from '../middleware/entitlement.middleware';
 import { idempotencyMiddleware } from '../middleware/idempotency.middleware';
+import logger from '@/utils/logger';
+import { request } from 'http';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -13,6 +16,7 @@ const router = Router();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 router.use(requireFeature('fees.core'));
 
 // ── Fee Structures ────────────────────────────────────────────────────────────

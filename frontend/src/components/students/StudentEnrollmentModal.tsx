@@ -83,7 +83,8 @@ export function StudentEnrollmentModal({
   const streams = Array.isArray(streamsData) ? streamsData : [];
   
   // Extract classes data properly
-  const classes = Array.isArray(classesData) ? classesData : classesData?.data?.data || [];
+  const classes = Array.isArray(classesData) ? classesData : classesData?.data || [];
+  console.log("Classes Data: ", classesData)
   
   // Enroll mutation (create)
   const { mutate: createEnrollment, isPending: isCreating } = useMutation({
@@ -154,6 +155,7 @@ export function StudentEnrollmentModal({
           streamId: data.streamId,
           academicYearId: data.academicYearId,
           studentId: data.studentId,
+          schoolId: schoolId || ""
         }
       });
     }

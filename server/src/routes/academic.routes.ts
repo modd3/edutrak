@@ -2,6 +2,7 @@
 import express from 'express';
 import AcademicController from '../controllers/academic.controller';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { ClassSubjectController } from '../controllers/classSubject.controller';
 import { StudentClassSubjectController } from '../controllers/student-class-subject.controller';
@@ -15,6 +16,7 @@ const router = express.Router();
 // Apply authentication and school context to all routes
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 router.use(validateResourceOwnership);
 
 // Academic Years

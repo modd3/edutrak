@@ -1,6 +1,9 @@
 // src/middleware/school-context.ts
 import { Request, Response, NextFunction } from 'express';
 import { JwtPayload } from '../utils/jwt';
+import logger from '../utils/logger';
+import { SubscriptionService } from '../services/subscription.service';
+import { TenantSubscription } from '@prisma/client';
 
 export interface RequestWithUser extends Request {
   user?: JwtPayload & {
@@ -9,24 +12,45 @@ export interface RequestWithUser extends Request {
   };
   schoolId?: string;
   isSuperAdmin?: boolean;
+  subscription?: any;
 }
+
+const SUBSCRIPTION_ACCESS_STATES = ['TRIALING', 'ACTIVE', 'GRACE'];
 
 /**
  * Middleware to enforce school context for ALL resources
  * This is the CRITICAL security layer for multi-tenant isolation
  */
-export function enforceSchoolContext(
+export async function enforceSchoolContext(
   req: RequestWithUser,
   res: Response,
   next: NextFunction
 ) {
   const user = req.user;
+  const subscriptionService = new SubscriptionService()
+  const userSchoolSubscriptions = await subscriptionService.getSubscriptions({
+    schoolId: user.schoolId
+  });
+
+  const validSubscriptions = userSchoolSubscriptions.subscriptions;
+  const subscription = validSubscriptions.find((s) => SUBSCRIPTION_ACCESS_STATES.includes(s.status)) 
+
+  req.subscription = subscription;
 
   if (!user) {
     return res.status(401).json({
       error: 'UNAUTHORIZED',
       message: 'User not authenticated',
     });
+  }
+console.log("Userschool Subscription: ", JSON.stringify(subscription, null, 2))
+console.log("Req: ", req)
+  if (!subscription) {
+    logger.error(`School ${user.schoolId} has no active subscription ${req.subscription}`, user.schoolId);
+    return res.status(403).json({
+      error: 'NO_ACTIVE_SUBSCRIPTION',
+      message: 'An Active Subscription is required!',
+    })
   }
 
   // Super admins can access all schools
@@ -46,7 +70,7 @@ export function enforceSchoolContext(
     });
   }
 
-  // Add schoolId to request for filtering ALL queries
+  // Add schoolId (and subscription?) to request for filtering ALL queries
   req.schoolId = user.schoolId;
   next();
 }

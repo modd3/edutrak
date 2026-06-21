@@ -5,7 +5,7 @@ import { Loader2, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 export function ProviderConfig() {
-  const { data: providers, isLoading } = useGetPaymentProviders();
+  const { data: providersData, isLoading } = useGetPaymentProviders();
   const configureMutation = useConfigurePaymentProvider();
   const deleteMutation = useDeletePaymentProvider();
   const [showForm, setShowForm] = useState(false);
@@ -16,6 +16,8 @@ export function ProviderConfig() {
     callbackUrl: '',
     webhookSecret: '',
   });
+  
+  const providers = providersData?.data;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

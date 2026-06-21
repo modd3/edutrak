@@ -8,6 +8,45 @@ export enum SubscriptionStatus {
   EXPIRED = 'EXPIRED',
 }
 
+export enum FeeCategory {
+  TUITION = 'TUITION',
+  BOARDING = 'BOARDING',
+  LUNCH = 'LUNCH',
+  TRANSPORT = 'TRANSPORT',
+  ACTIVITY = 'TRANSPORT',
+  UNIFORM = 'UNIFORM',
+  EXAM = 'EXAM',
+  LIBRARY = 'LIBRARY',
+  LABORATORY = 'LABORATORY',
+  DEVELOPMENT = 'DEVELOPMENT',
+  MISCELLANEOUS = 'MISCELLANEOUS',
+}
+
+export enum InvoiceStatus {
+  UNPAID = 'UNPAID',
+  PARTIAL = 'PARTIAL',
+  PAID = 'PAID',
+  OVERDUE = 'OVERDUE',
+  CANCELLED = 'CANCELLED',
+  WAIVED = 'WAIVED' // fully waived (scholarship etc.)
+}
+
+export enum PaymentMethod {
+  CASH = 'CASH',
+  MPESA = 'MPESA',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+  CHEQUE = 'CHEQUE',
+  CARD = 'CARD',
+  SCHOLARSHIP = 'SCHOLARSHIP', // fee covered by scholarship fund
+}
+
+export enum PaymentStatus {
+  PENDING = 'PENDING', // awaiting confirmation (e.g. bank transfer)
+  COMPLETED = 'COMPLETED',
+  REVERSED = 'REVERSED', // payment reversed / bounced
+  FAILED ='FAILED',
+}
+
 export enum SchoolType {
   PRE_PRIMARY = 'PRE_PRIMARY',
   PRIMARY = 'PRIMARY',
@@ -15,6 +54,7 @@ export enum SchoolType {
   TVET = 'TVET',
   SPECIAL_NEEDS = 'SPECIAL_NEEDS',
 }
+
 export enum Role {
   SUPER_ADMIN = 'SUPER_ADMIN',
   ADMIN = 'ADMIN',
@@ -238,6 +278,176 @@ export interface Subscription {
   updatedAt: string;
   plan?: Plan;
   school?: { id: string; name: string };
+}
+
+export interface FeeStructure {
+  id: string;
+  name: string;
+  description: string;
+  academicYearId: string;
+  termId?: string;
+  classLevel?: string;
+  boardingStatus?: BoardingStatus;
+  currency: string;
+  school: {id: string; name: string};
+  academicYear: AcademicYear;
+  term?: Term;
+  items: FeeItem[];
+  invoices: FeeInvoice[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FeeItem {
+  id: string;
+  feeStructureId: string;
+  name: string;
+  category: FeeCategory[];
+  amount: number;
+  isOptional: boolean;
+  descrition?: string;
+  feeStructure: FeeStructure;
+  invoiceItems: FeeInvoiceItem[];
+  createdAt: string;
+  updatedAt: string; 
+}
+
+export interface FeeInvoice {
+  id: string;
+  invoiceNumber: string;
+  studentId: string;
+  feeStructureId: string;
+  academicYearId: string;
+  termID?: string;
+  schoolId: string;
+  status: InvoiceStatus;
+  totalAmount: number;
+  discountAmount: number;
+  paidAmount: number;
+  balanceAmount: number;
+  dueDate: string;
+  notes: string;
+  issuedAt: string;
+  createdAt: string;
+  updatedAt: string;
+
+  student: Student;
+  feeStructure: FeeStructure;
+  academicYear: AcademicYear;
+  term?: Term;
+  school: School;
+  items: FeeInvoiceItem[];
+  payments: FeePayment[];
+  paymentPlan?: PaymentPlan;
+  reminders: PaymentReminder[];
+  feeRefunds: FeeRefund[];
+}
+
+export interface FeeInvoiceItem {
+  id: string;
+  invoiceId: string;
+  feeItemId: string;
+  name: string // snapshot of FeeItem.name
+  category: FeeCategory;
+  amount: number; // may differ from FeeItem.amount (waived)
+  isWaived: boolean;
+  waiverNote: string;
+  createdAt: string;
+
+  invoice: FeeInvoice;
+  feeItem: FeeItem;
+}
+
+export interface FeePayment {
+  id: string;
+  receiptNo: string;
+  invoiceId: string;
+  studentId: string;
+  schoolId: string;
+  amount: number;
+  method: PaymentMethod;
+  status: PaymentStatus;
+  transactionRef?: string; // M-Pesa code, cheque no., etc.
+  mpesaCode?: string; // specific M-Pesa confirmation code
+  bankName?: string;
+  chequeNo: string;
+  paidAt: string;
+  reversedAt? : string;
+  reversalReason: string;
+  receivedById: string; // User.id who accepted the cash
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+
+  invoice: FeeInvoice;
+  student: Student;  
+  school: School;
+  feeRefunds: FeeRefund[];
+}
+
+export interface PaymentPlan {
+  id: string;
+  invoiceId: string;
+  totalAmount: number;
+  installments: number; // Number of installments (e.g., 3)
+  frequency: string; // "MONTHLY", "WEEKLY", "BIWEEKLY", "CUSTOM"
+  firstDueDate: string;
+  notes?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+
+  invoice: FeeInvoice;
+  schedule: PaymentPlanInstallment[];
+}
+
+export interface PaymentPlanInstallment {
+  id: string;
+  planId: string;
+  installmentNo: number; // 1, 2, 3...
+  dueDate: string;
+  amount: number;
+  status: string;
+  paidAmount: number;
+  paidAt: string;
+  paymentId?: string; // FeePayment.id when paid
+  createdAt: string;
+  updatedAt: string;
+  plan: PaymentPlan;
+}
+
+export interface FeeRefund {
+  id: string;
+  paymentId: string;
+  invoiceId: string;
+  studentId: string;
+  schoolId: string;
+  amount: number;
+  reason: string;
+  status: string;
+  paymentMethod: PaymentMethod;
+  providerRefundId?: string;
+  initiatedBy: string;
+  completedAt?: string;
+  errorMessage? : string;
+  notes: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaymentReminder {
+  id: string;
+  invoiceId: string;
+  reminderType: string; // "PAYMENT_DUE", "OVERDUE_3DAYS", "OVERDUE_7DAYS", "FINAL_NOTICE"
+  method: string; // "SMS", "EMAIL", "PUSH", "SYSTEM"
+  recipientId?: string // User or Guardian ID
+  recipientContact?: string; // Phone or email used
+  status: string;
+  sentAt: string;
+  errorMessage?: string;
+  createdAt: string;
+  invoice: FeeInvoice ;
 }
 
 export interface Student {

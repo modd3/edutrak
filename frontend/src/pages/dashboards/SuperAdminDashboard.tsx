@@ -12,7 +12,6 @@ export function SuperAdminDashboard() {
   const navigate = useNavigate();
 
   const { data: schoolsData } = useSchools();
-  console.log('Schools data:', schoolsData);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const schools: any[] = (schoolsData as any)?.data.data || [];
 

@@ -1,3 +1,4 @@
+import { FeeStructure, PaginatedResponse } from '@/types';
 import api from './index';
 
 /**
@@ -33,14 +34,17 @@ export const feesApi = {
   /**
    * Get list of fee structures with pagination and filters
    */
-  getStructures: (params?: {
+  getStructures: async (params?: {
     academicYearId?: string;
     termId?: string;
     classLevel?: string;
     isActive?: boolean;
     page?: number;
     limit?: number;
-  }) => api.get('/fees/structures', { params }),
+  }): Promise<PaginatedResponse<FeeStructure>> => {
+    const results = await api.get<PaginatedResponse<FeeStructure>>('/fees/structures', { params });
+    return results.data
+  },
 
   /**
    * Get a single fee structure with all items and invoice count

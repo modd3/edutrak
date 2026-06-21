@@ -2,12 +2,14 @@ import { Router } from 'express';
 import { StudentController } from '../controllers/student.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const studentController = new StudentController();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 
 // Specific routes FIRST (before :id parameter routes)
 router.post('/enroll', 

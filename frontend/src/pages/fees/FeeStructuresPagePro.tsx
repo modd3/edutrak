@@ -1,5 +1,5 @@
 /**
- * Professional Fee Structures Management Page
+ * Fee Structures Management Page
  * Complete fee structure lifecycle: create, view, edit, generate invoices
  */
 
@@ -56,6 +56,7 @@ import {
   Settings,
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Combobox } from '@/components/ui/combobox';
 import { useGetFeeStructures } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
 import { useAcademicYears, useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
@@ -65,6 +66,11 @@ import { FeeStructureViewerModal } from '@/components/fees/FeeStructureViewerMod
 import  FeeStructureFormModal  from '@/components/fees/FeeStructureFormModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
 import { toast } from 'sonner';
+import { useSchoolContext } from '@/hooks/use-school-context';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useSchools } from '@/hooks/use-schools';
+import { useDebounce } from '@/hooks/use-debounce';
+import { School } from '@/types';
 
 interface StructureWithActions {
   id: string;
@@ -76,36 +82,62 @@ interface StructureWithActions {
   items: Array<{ id: string; name: string; amount: number; isOptional: boolean }>;
   _count?: { invoices: number };
   createdAt: string;
-  academicYear?: { year: string };
+  academicYear?: { year: number };
 }
 
 export function FeeStructuresPage() {
   const { can } = usePermission();
+  const {schoolId, schoolName, isSuperAdmin} = useSchoolContext();
   const queryClient = useQueryClient();
 
   // State management
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
+  const debouncedSearch = useDebounce(searchInput, 300);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showBulkGenerateModal, setShowBulkGenerateModal] = useState(false);
   const [selectedStructure, setSelectedStructure] = useState<StructureWithActions | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [schoolFilter, setSchoolFilter] = useState('');
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
 
-  // Data fetching
+  // Fetch all schools
+  const { data: schoolsData, isFetching} = useSchools(
+    {
+      search: debouncedSearch
+    },
+    {enabled: isSuperAdmin}
+  );
+  console.log("Schools Data: ", useSchools(
+    {
+      search: debouncedSearch
+    },
+    {enabled: isSuperAdmin}
+  ));
+  const allSchools = schoolsData.data
+  const schoolOptions: School[] = (allSchools || []).map((school: School) => ({
+    value: school.id,
+    label: school.name,
+    description: school.county ? `${school.county} County` : "Unassigned Region",
+  }));
+  console.log("SChool options: ", schoolOptions)
+  const activeSchool = allSchools?.find((s: School) => s.id === selectedSchoolId);
+
+  // Structures Data fetching
   const { data: structuresData, isLoading } = useGetFeeStructures({
+    schoolId: schoolId || activeSchool.id,
     page: 1,
     limit: 100,
   });
-
-  const structures: StructureWithActions[] =
-    structuresData?.data?.data || structuresData?.data || [];
-
+  
+  const structures: StructureWithActions[] = structuresData?.data || [];
   const { data: academicYearsData } = useAcademicYears();
   const academicYears = academicYearsData?.data || [];
 
   const { data: activeAcademicYear } = useActiveAcademicYear();
-  const termOptions = activeAcademicYear?.terms ?? [];
+  //const termOptions = activeAcademicYear?.terms ?? [];
 
   const classesQuery = useClasses(activeAcademicYear?.id);
   const classesData = unwrapPaginated<any>(classesQuery.data);
@@ -119,7 +151,7 @@ export function FeeStructuresPage() {
       ? true
       : s.name.toLowerCase().includes(search.toLowerCase()) ||
         s.classLevel?.toLowerCase().includes(search.toLowerCase()) ||
-        s.academicYear?.year.includes(search)
+        s.academicYear?.year.toString() === search
   );
 
   // Handlers
@@ -187,6 +219,25 @@ export function FeeStructuresPage() {
               className="h-10"
             />
           </div>
+          {/* Select Box Block */}
+          {isSuperAdmin && 
+            
+      <div className="space-y-2 max-w-md">
+        <label className="text-sm font-medium text-foreground">
+          Switch Managed Institution
+        </label>
+        
+        <Combobox
+          options={schoolOptions}
+          value={selectedSchoolId}
+          onChange={setSelectedSchoolId}
+          placeholder="Type to find a school..."
+          searchPlaceholder="Search by name or county location..."
+          emptyMessage="No matching institutions registered."
+          isLoading={isLoading}
+        />
+      </div>
+               }
           {can('manage_fees') && (
             <Button
               onClick={() => {
@@ -401,7 +452,7 @@ export function FeeStructuresPage() {
             onOpenChange={setShowCreateModal}
             mode="create"
             academicYears={academicYears}
-            terms={termOptions}
+            //terms={termOptions}
             classLevels={classLevels}
           />
         )}
@@ -413,7 +464,7 @@ export function FeeStructuresPage() {
             mode="edit"
             structureId={selectedStructure.id}
             academicYears={academicYears}
-            terms={termOptions}
+            //terms={termOptions}
             classLevels={classLevels}
           />
         )}

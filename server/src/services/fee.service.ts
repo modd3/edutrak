@@ -1,6 +1,6 @@
 // src/services/fee.service.ts
 import { Decimal, InputJsonValue } from '@prisma/client/runtime/library';
-import { InvoiceStatus,  } from '@prisma/client';
+import { InvoiceStatus, FeeStructure } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger';
 import { BaseService } from './base.service';
@@ -165,7 +165,7 @@ export class FeeService extends BaseService {
       }),
       this.prisma.feeStructure.count({ where }),
     ]);
-
+    
     return { structures, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
   }
 

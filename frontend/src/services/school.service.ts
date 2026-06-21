@@ -45,8 +45,10 @@ export const schoolService = {
   /**
    * Get all schools with optional filters
    */
-  getAll: (params?: SchoolFilters) =>
-    api.get<PaginatedResponse<School>>('/schools', { params }),
+  getAll: async (params?: SchoolFilters) =>{
+    const results = await api.get('/schools', { params });
+    return results.data;
+  },
 
   /**
    * Get a single school by ID

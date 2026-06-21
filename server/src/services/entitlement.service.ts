@@ -47,6 +47,44 @@ class EntitlementService {
     return { allowed: true };
   }
 
+  async withinResourceLimit(
+  schoolId: string,
+  metricKey: string,
+  countFn: () => Promise<number>
+): Promise<EntitlementDecision> {
+  const subscription = await (prisma as any).tenantSubscription.findFirst({
+    where: { schoolId },
+    orderBy: { createdAt: 'desc' },
+    include: { plan: { include: { features: { where: { featureKey: metricKey } } } } },
+  });
+
+  if (!subscription || !SUBSCRIPTION_ACCESS_STATES.has(subscription.status)) {
+    return { allowed: false, reason: 'Subscription not active' };
+  }
+
+  const feature = subscription.plan?.features?.[0];
+  if (!feature?.enabled || feature.limitType !== 'COUNT') return { allowed: true };
+
+  const currentCount = await countFn();
+  if (currentCount >= (feature.limitValue ?? 0)) {
+    return { allowed: false, reason: `Limit reached: ${currentCount}/${feature.limitValue} (${metricKey})` };
+  }
+  return { allowed: true };
+}
+
+// src/services/entitlement.service.ts — add
+async incrementUsage(schoolId: string, metricKey: string, units: number = 1) {
+  const now = new Date();
+  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  await (prisma as any).usageMetric.upsert({
+    where: { schoolId_metricKey_periodStart_periodEnd: { schoolId, metricKey, periodStart, periodEnd } },
+    update: { usedUnits: { increment: units } },
+    create: { schoolId, metricKey, periodStart, periodEnd, usedUnits: units },
+  });
+}
+
   async withinQuota(schoolId: string, metricKey: string, requestedUnits: number): Promise<EntitlementDecision> {
     if (!schoolId) return { allowed: false, reason: 'School context required' };
     if (requestedUnits <= 0) return { allowed: true };

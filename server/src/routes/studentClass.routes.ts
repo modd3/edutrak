@@ -1,8 +1,9 @@
 // src/routes/studentClass.routes.ts
 
 import { Router } from 'express';
-import { authenticate } from '../middleware/auth.middleware';
-import { authorize } from '../middleware/auth.middleware';
+import { authenticate, authorize } from '../middleware/auth.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 import {
   assignStudentToClass,
   getStudentsInClass,
@@ -15,6 +16,10 @@ import {
 
 const router = Router();
 
+router.use(authenticate);
+router.use(enforceSchoolContext);
+router.use(enforceSubscription);
+
 /**
  * @route   POST /api/student-classes
  * @desc    Assign a student to a class for an academic year
@@ -22,7 +27,6 @@ const router = Router();
  */
 router.post(
   '/',
-  authenticate,
   authorize('ADMIN'),
   assignStudentToClass
 );
@@ -34,7 +38,6 @@ router.post(
  */
 router.get(
   '/class/:classId/year/:academicYearId',
-  authenticate,
   authorize('ADMIN', 'TEACHER'),
   getStudentsInClass
 );
@@ -46,7 +49,6 @@ router.get(
  */
 router.get(
   '/:id',
-  authenticate,
   authorize('ADMIN', 'TEACHER'),
   getStudentClassAssignment
 );
@@ -58,7 +60,6 @@ router.get(
  */
 router.put(
   '/:id',
-  authenticate,
   authorize('ADMIN'),
   updateStudentClassAssignment
 );
@@ -70,7 +71,6 @@ router.put(
  */
 router.post(
   '/promote',
-  authenticate,
   authorize('ADMIN'),
   promoteStudent
 );
@@ -82,7 +82,6 @@ router.post(
  */
 router.post(
   '/transfer',
-  authenticate,
   authorize('ADMIN'),
   transferStudent
 );
@@ -94,7 +93,6 @@ router.post(
  */
 router.get(
   '/history/:studentId',
-  authenticate,
   authorize('ADMIN', 'TEACHER'),
   getStudentEnrollmentHistory
 );

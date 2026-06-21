@@ -112,23 +112,85 @@ export class SchoolService {
       where: { id },
       include: {
         users: {
-          include: {
-            student: true,
-            teacher: true,
-            guardian: true,
+          select: {
+            id: true,
+            email: true,
+            role: true,
+            createdAt :true,
+            student: {
+              select: {
+                firstName: true,
+                lastName: true,
+                admissionNo: true,
+                enrollments: {
+                  select: {
+                    class: {
+                      select: {
+                        name: true,
+                        level: true
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            teacher: {
+              select: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true
+                  }
+                },
+                tscNumber: true,
+                _count: {
+                  select: { teachingSubjects: true}
+                }
+              }
+            },
+            guardian :{
+              select: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true
+                  },
+                },
+                _count: {
+                  select: {students: true}
+                }
+              }
+            }
+          }
           },
-        },
         classes: {
           include: {
             _count: {
               select: { students: true },
             },
-            academicYear: true,
-            classTeacher: {
-              include: {
-                user: true,
-              },
+            academicYear: {
+              select: {
+                isActive: true,
+                year: true,
+                terms: {
+                  select: {
+                    name: true,
+                  }
+                }
+              }
             },
+            classTeacher: {
+              select: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true,
+                    idNumber: true
+                  }
+                },
+                tscNumber: true
+              }
+            }
           },
         },
         students: {
@@ -137,27 +199,38 @@ export class SchoolService {
             lastName: true,
             admissionNo: true,
           },
-          include: {
-            enrollments: {
-              include: {
-                class: true,
-                stream: true,
+        },
+        subjectOfferings: {
+          select: {
+            subject: {
+              select: {
+                name: true,
+                code: true,
+                curriculum: true
               },
             },
           },
         },
-        subjectOfferings: {
-          include: {
-            subject: true,
-          },
-        },
         streams: {
-          include: {
+          select: {
+            name: true,
+            capacity: true,
+            streamTeacher: {
+              select: {
+                user: {
+                  select: {
+                    firstName: true,
+                    lastName: true
+                  }
+                }
+              }
+            },
             _count: {
-              select: { students: true },
+              select: { students: true}
             },
           },
         },
+        subscriptions: true
       },
     });
   }

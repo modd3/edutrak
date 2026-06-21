@@ -12,15 +12,15 @@ model Tenant {
   id        String   @id @default(uuid())
   name      String
   slug      String   @unique
-  type      String   @default("SCHOOL")  // "SCHOOL", "COLLEGE", "TRAINING_CENTER", "BUSINESS"
+  type      String   @default("SCHOOL") // "SCHOOL", "COLLEGE", "TRAINING_CENTER", "BUSINESS"
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  school                     School?
-  paymentProviderConfigs     PaymentProviderConfig[]
-  webhookLogs                WebhookLog[]
-  lateFeesConfigs            LateFeesConfig[]
+  school                 School?
+  paymentProviderConfigs PaymentProviderConfig[]
+  webhookLogs            WebhookLog[]
+  lateFeesConfigs        LateFeesConfig[]
 
   @@index([slug])
   @@index([type])
@@ -57,19 +57,20 @@ model School {
   students              Student[]
   studentClasses        StudentClass[]
   subjectOfferings      SubjectOffering[]
-  studentClassSubjects StudentClassSubject[]
+  studentClassSubjects  StudentClassSubject[]
   terms                 Term[]
   users                 User[]
-  feeStructures        FeeStructure[]
-  feeInvoices          FeeInvoice[]
-  feePayments          FeePayment[]
-  brandingConfig       SchoolBrandingConfig?
-  subscriptions        TenantSubscription[]
-  billingAccount       BillingAccount?
-  billingInvoices      BillingInvoice[]
-  billingPayments      BillingPayment[]
-  documentTemplates    DocumentTemplate[]
-  usageMetrics         UsageMetric[]
+  feeStructures         FeeStructure[]
+  feeInvoices           FeeInvoice[]
+  feePayments           FeePayment[]
+  brandingConfig        SchoolBrandingConfig?
+  subscriptions         TenantSubscription[]
+  billingAccount        BillingAccount?
+  billingInvoices       BillingInvoice[]
+  billingPayments       BillingPayment[]
+  documentTemplates     DocumentTemplate[]
+  usageMetrics          UsageMetric[]
+  feeRefunds            FeeRefund[]
 
   @@index([county])
   @@index([type])
@@ -96,221 +97,223 @@ model SchoolBrandingConfig {
 }
 
 model Plan {
-  id                String               @id @default(uuid())
-  key               String               @unique
-  name              String
-  description       String?
-  priceMinor        Int
-  currency          String               @default("KES")
-  billingInterval   BillingInterval
-  isActive          Boolean              @default(true)
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  features          PlanFeature[]
-  subscriptions     TenantSubscription[]
+  id              String               @id @default(uuid())
+  key             String               @unique
+  name            String
+  description     String?
+  priceMinor      Int
+  currency        String               @default("KES")
+  billingInterval BillingInterval
+  isActive        Boolean              @default(true)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  features        PlanFeature[]
+  subscriptions   TenantSubscription[]
 }
 
 model PlanFeature {
-  id           String    @id @default(uuid())
-  planId       String
-  featureKey   String
-  limitType    LimitType @default(BOOLEAN)
-  limitValue   Int?
-  enabled      Boolean   @default(true)
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  plan         Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
+  id         String    @id @default(uuid())
+  planId     String
+  featureKey String
+  limitType  LimitType @default(BOOLEAN)
+  limitValue Int?
+  enabled    Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  plan       Plan      @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([planId, featureKey])
   @@index([featureKey])
 }
 
 model TenantSubscription {
-  id                     String             @id @default(uuid())
-  schoolId               String
-  planId                 String
-  status                 SubscriptionStatus @default(TRIALING)
-  startsAt               DateTime
-  currentPeriodStart     DateTime
-  currentPeriodEnd       DateTime
-  trialEndsAt            DateTime?
-  graceEndsAt            DateTime?
-  cancelAt               DateTime?
-  canceledAt             DateTime?
-  metadata               Json?
-  createdAt              DateTime           @default(now())
-  updatedAt              DateTime           @updatedAt
-  school                 School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  plan                   Plan               @relation(fields: [planId], references: [id])
-  invoices               BillingInvoice[]
-  payments               BillingPayment[]
+  id                 String             @id @default(uuid())
+  schoolId           String
+  planId             String
+  status             SubscriptionStatus @default(TRIALING)
+  startsAt           DateTime
+  currentPeriodStart DateTime
+  currentPeriodEnd   DateTime
+  trialEndsAt        DateTime?
+  graceEndsAt        DateTime?
+  cancelAt           DateTime?
+  canceledAt         DateTime?
+  metadata           Json?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  plan               Plan               @relation(fields: [planId], references: [id])
+  invoices           BillingInvoice[]
+  payments           BillingPayment[]
 
   @@index([schoolId, status])
   @@index([planId])
 }
 
 model BillingAccount {
-  id               String   @id @default(uuid())
-  schoolId         String   @unique
-  legalName        String
-  email            String?
-  phone            String?
-  taxId            String?
-  country          String?
-  city             String?
-  addressLine1     String?
-  addressLine2     String?
-  preferredCurrency String  @default("KES")
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  school           School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id                String   @id @default(uuid())
+  schoolId          String   @unique
+  legalName         String
+  email             String?
+  phone             String?
+  taxId             String?
+  country           String?
+  city              String?
+  addressLine1      String?
+  addressLine2      String?
+  preferredCurrency String   @default("KES")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  school            School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 }
 
 model BillingInvoice {
-  id                 String             @id @default(uuid())
-  schoolId           String
-  subscriptionId     String
-  invoiceNumber      String             @unique
-  status             BillingInvoiceStatus @default(OPEN)
-  subtotalMinor      Int
-  taxMinor           Int                @default(0)
-  totalMinor         Int
-  amountPaidMinor    Int                @default(0)
-  currency           String             @default("KES")
-  issuedAt           DateTime           @default(now())
-  dueAt              DateTime
-  paidAt             DateTime?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subscription       TenantSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  payments           BillingPayment[]
+  id              String               @id @default(uuid())
+  schoolId        String
+  subscriptionId  String
+  invoiceNumber   String               @unique
+  status          BillingInvoiceStatus @default(OPEN)
+  subtotalMinor   Int
+  taxMinor        Int                  @default(0)
+  totalMinor      Int
+  amountPaidMinor Int                  @default(0)
+  currency        String               @default("KES")
+  issuedAt        DateTime             @default(now())
+  dueAt           DateTime
+  paidAt          DateTime?
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  school          School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscription    TenantSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  payments        BillingPayment[]
 
   @@index([schoolId, status])
   @@index([subscriptionId])
 }
 
 model BillingPayment {
-  id                 String             @id @default(uuid())
-  schoolId           String
-  subscriptionId     String
-  billingInvoiceId   String?
-  provider           String
-  providerReference  String?
-  amountMinor        Int
-  currency           String             @default("KES")
-  status             BillingPaymentStatus @default(PENDING)
-  paidAt             DateTime?
-  metadata           Json?
-  createdAt          DateTime           @default(now())
-  updatedAt          DateTime           @updatedAt
-  school             School             @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subscription       TenantSubscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
-  invoice            BillingInvoice?    @relation(fields: [billingInvoiceId], references: [id], onDelete: SetNull)
+  id                String               @id @default(uuid())
+  schoolId          String
+  subscriptionId    String
+  billingInvoiceId  String?
+  provider          String
+  providerReference String?
+  amountMinor       Int
+  currency          String               @default("KES")
+  status            BillingPaymentStatus @default(PENDING)
+  paidAt            DateTime?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  school            School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscription      TenantSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  invoice           BillingInvoice?      @relation(fields: [billingInvoiceId], references: [id], onDelete: SetNull)
 
   @@index([schoolId, status])
   @@index([billingInvoiceId])
 }
 
 model UsageMetric {
-  id            String   @id @default(uuid())
-  schoolId      String
-  metricKey     String
-  periodStart   DateTime
-  periodEnd     DateTime
-  usedUnits     Int      @default(0)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
-  school        School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  schoolId    String
+  metricKey   String
+  periodStart DateTime
+  periodEnd   DateTime
+  usedUnits   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  school      School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   @@unique([schoolId, metricKey, periodStart, periodEnd])
   @@index([schoolId, metricKey])
 }
 
 model DocumentTemplate {
-  id             String                 @id @default(uuid())
-  schoolId       String
-  name           String
-  scope          DocumentTemplateScope
-  status         TemplateStatus         @default(DRAFT)
+  id              String                @id @default(uuid())
+  schoolId        String
+  name            String
+  scope           DocumentTemplateScope
+  status          TemplateStatus        @default(DRAFT)
   createdByUserId String?
-  createdAt      DateTime               @default(now())
-  updatedAt      DateTime               @updatedAt
-  school         School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  versions       TemplateVersion[]
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  school          School                @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  versions        TemplateVersion[]
 
   @@index([schoolId, scope])
 }
 
 model TemplateVersion {
-  id                String         @id @default(uuid())
-  templateId        String
-  versionNumber     Int
-  htmlContent       String
-  cssContent        String?
-  schemaJson        Json?
-  publishedAt       DateTime?
-  createdAt         DateTime       @default(now())
-  template          DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  id            String           @id @default(uuid())
+  templateId    String
+  versionNumber Int
+  htmlContent   String
+  cssContent    String?
+  schemaJson    Json?
+  publishedAt   DateTime?
+  createdAt     DateTime         @default(now())
+  template      DocumentTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@unique([templateId, versionNumber])
 }
 
 model User {
-  id         String    @id @default(uuid())
-  email      String    @unique
+  id         String      @id @default(uuid())
+  email      String      @unique
   password   String
   firstName  String
   lastName   String
   middleName String?
   phone      String?
-  idNumber   String?   @unique
-  role       Role      @default(TEACHER)
+  idNumber   String?     @unique
+  role       Role        @default(TEACHER)
   schoolId   String?
-  isActive   Boolean   @default(true)
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  isActive   Boolean     @default(true)
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
   guardian   Guardian?
   student    Student?
   teacher    Teacher?
-  school     School?   @relation(fields: [schoolId], references: [id])
-  auditLogs  AuditLog[] @relation("ActorAuditLogs")
+  school     School?     @relation(fields: [schoolId], references: [id])
+  auditLogs  AuditLog[]  @relation("ActorAuditLogs")
+  feeRefunds FeeRefund[]
 
   @@index([role])
   @@index([schoolId])
 }
 
 model Student {
-  id                String             @id @default(uuid())
-  admissionNo       String             @unique
-  upiNumber         String?            @unique
-  kemisUpi          String?            @unique
-  firstName         String
-  middleName        String?
-  lastName          String
-  gender            Gender
-  dob               DateTime?
-  birthCertNo       String?
-  nationality       String             @default("Kenyan")
-  county            String?
-  subCounty         String?
-  hasSpecialNeeds   Boolean            @default(false)
-  specialNeedsType  String?
-  medicalCondition  String?
-  allergies         String?
-  schoolId          String?
-  userId            String?            @unique
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  assessmentResults AssessmentResult[]
-  school            School?            @relation(fields: [schoolId], references: [id])
-  user              User?              @relation(fields: [userId], references: [id])
-  enrollments       StudentClass[]
-  subjectEnrollments    StudentClassSubject[]
-  guardians         StudentGuardian[]
-  feeInvoices       FeeInvoice[]
-  feePayments       FeePayment[]
-  
+  id                 String                @id @default(uuid())
+  admissionNo        String                @unique
+  upiNumber          String?               @unique
+  kemisUpi           String?               @unique
+  firstName          String
+  middleName         String?
+  lastName           String
+  gender             Gender
+  dob                DateTime?
+  birthCertNo        String?
+  nationality        String                @default("Kenyan")
+  county             String?
+  subCounty          String?
+  hasSpecialNeeds    Boolean               @default(false)
+  specialNeedsType   String?
+  medicalCondition   String?
+  allergies          String?
+  schoolId           String?
+  userId             String?               @unique
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  assessmentResults  AssessmentResult[]
+  school             School?               @relation(fields: [schoolId], references: [id])
+  user               User?                 @relation(fields: [userId], references: [id])
+  enrollments        StudentClass[]
+  subjectEnrollments StudentClassSubject[]
+  guardians          StudentGuardian[]
+  feeInvoices        FeeInvoice[]
+  feePayments        FeePayment[]
+  feeRefunds         FeeRefund[]
+
   @@index([schoolId])
   @@index([schoolId, admissionNo])
   @@index([schoolId, gender])
@@ -330,18 +333,18 @@ model Guardian {
 }
 
 model StudentGuardian {
-  id             String     @id @default(uuid())
-  studentId      String
-  guardianId     String
-  relationship   String?     // Override relationship specific to this student-guardian pair
-  isPrimary      Boolean    @default(false)
-  isVerified     Boolean    @default(false)
-  verifiedAt     DateTime?
-  verifiedById   String?    
-  createdAt      DateTime   @default(now())
-  updatedAt      DateTime   @default(now()) @updatedAt
-  guardian       Guardian   @relation(fields: [guardianId], references: [id], onDelete: Cascade)
-  student        Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  id           String    @id @default(uuid())
+  studentId    String
+  guardianId   String
+  relationship String? // Override relationship specific to this student-guardian pair
+  isPrimary    Boolean   @default(false)
+  isVerified   Boolean   @default(false)
+  verifiedAt   DateTime?
+  verifiedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @default(now()) @updatedAt
+  guardian     Guardian  @relation(fields: [guardianId], references: [id], onDelete: Cascade)
+  student      Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, guardianId])
   @@index([studentId])
@@ -399,8 +402,8 @@ model AcademicYear {
   classSubjects         ClassSubject[]         @relation("AcademicYearClassSubjects")
   studentClasses        StudentClass[]
   terms                 Term[]
-  feeStructures        FeeStructure[]
-  feeInvoices          FeeInvoice[]
+  feeStructures         FeeStructure[]
+  feeInvoices           FeeInvoice[]
 
   @@unique([year, schoolId])
   @@index([isActive])
@@ -422,8 +425,8 @@ model Term {
   classSubjects         ClassSubject[]         @relation("TermClassSubjects")
   academicYear          AcademicYear           @relation(fields: [academicYearId], references: [id])
   school                School?                @relation(fields: [schoolId], references: [id])
-  feeStructures        FeeStructure[]
-  feeInvoices          FeeInvoice[]
+  feeStructures         FeeStructure[]
+  feeInvoices           FeeInvoice[]
 
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
@@ -509,25 +512,25 @@ model SubjectOffering {
 }
 
 model ClassSubject {
-  id              String                 @id @default(uuid())
-  classId         String
-  streamId        String?
-  subjectId       String
-  teacherId       String?
-  termId          String
-  academicYearId  String
-  subjectCategory SubjectCategory
-  schoolId        String?
-  assessments     AssessmentDefinition[]
-  assessmentWeights AssessmentWeight[]
-  academicYear    AcademicYear           @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
-  class           Class                  @relation(fields: [classId], references: [id])
-  stream          Stream?                @relation(fields: [streamId], references: [id])
-  school          School?                @relation(fields: [schoolId], references: [id])
-  subject         Subject                @relation(fields: [subjectId], references: [id])
-  teacherProfile  Teacher?                @relation("TeacherClassSubjects", fields: [teacherId], references: [id])
-  term            Term                   @relation("TermClassSubjects", fields: [termId], references: [id])
-  strands         ClassSubjectStrand[]
+  id                 String                 @id @default(uuid())
+  classId            String
+  streamId           String?
+  subjectId          String
+  teacherId          String?
+  termId             String
+  academicYearId     String
+  subjectCategory    SubjectCategory
+  schoolId           String?
+  assessments        AssessmentDefinition[]
+  assessmentWeights  AssessmentWeight[]
+  academicYear       AcademicYear           @relation("AcademicYearClassSubjects", fields: [academicYearId], references: [id])
+  class              Class                  @relation(fields: [classId], references: [id])
+  stream             Stream?                @relation(fields: [streamId], references: [id])
+  school             School?                @relation(fields: [schoolId], references: [id])
+  subject            Subject                @relation(fields: [subjectId], references: [id])
+  teacherProfile     Teacher?               @relation("TeacherClassSubjects", fields: [teacherId], references: [id])
+  term               Term                   @relation("TermClassSubjects", fields: [termId], references: [id])
+  strands            ClassSubjectStrand[]
   studentEnrollments StudentClassSubject[]
 
   @@unique([classId, streamId, subjectId, termId, academicYearId])
@@ -560,26 +563,26 @@ model ClassSubjectStrand {
 }
 
 model StudentClass {
-  id               String           @id @default(uuid())
-  studentId        String
-  classId          String
-  streamId         String?
-  academicYearId   String
-  schoolId         String?
-  status           EnrollmentStatus @default(ACTIVE)
+  id                 String                @id @default(uuid())
+  studentId          String
+  classId            String
+  streamId           String?
+  academicYearId     String
+  schoolId           String?
+  status             EnrollmentStatus      @default(ACTIVE)
   subjectEnrollments StudentClassSubject[]
-  promotedToId     String?
-  promotionDate    DateTime?
-  transferredFrom  String?
-  transferDate     DateTime?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  academicYear     AcademicYear     @relation(fields: [academicYearId], references: [id])
-  class            Class            @relation(fields: [classId], references: [id])
-  promotedTo       Class?           @relation("Promotion", fields: [promotedToId], references: [id])
-  school           School?          @relation(fields: [schoolId], references: [id])
-  stream           Stream?          @relation(fields: [streamId], references: [id])
-  student          Student          @relation(fields: [studentId], references: [id])
+  promotedToId       String?
+  promotionDate      DateTime?
+  transferredFrom    String?
+  transferDate       DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+  academicYear       AcademicYear          @relation(fields: [academicYearId], references: [id])
+  class              Class                 @relation(fields: [classId], references: [id])
+  promotedTo         Class?                @relation("Promotion", fields: [promotedToId], references: [id])
+  school             School?               @relation(fields: [schoolId], references: [id])
+  stream             Stream?               @relation(fields: [streamId], references: [id])
+  student            Student               @relation(fields: [studentId], references: [id])
 
   @@index([studentId])
   @@index([classId])
@@ -589,21 +592,21 @@ model StudentClass {
 }
 
 model StudentClassSubject {
-  id             String       @id @default(uuid())
+  id             String                  @id @default(uuid())
   studentId      String
   classSubjectId String
-  enrollmentId   String       // Link to StudentClass for context
+  enrollmentId   String // Link to StudentClass for context
   schoolId       String?
-  enrolledAt     DateTime     @default(now())
+  enrolledAt     DateTime                @default(now())
   status         SubjectEnrollmentStatus @default(ACTIVE)
   droppedAt      DateTime?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  
-  student        Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  classSubject   ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
-  enrollment     StudentClass @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
-  school         School?      @relation(fields: [schoolId], references: [id])
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject @relation(fields: [classSubjectId], references: [id], onDelete: Cascade)
+  enrollment   StudentClass @relation(fields: [enrollmentId], references: [id], onDelete: Cascade)
+  school       School?      @relation(fields: [schoolId], references: [id])
 
   @@unique([studentId, classSubjectId, enrollmentId])
   @@index([studentId])
@@ -613,13 +616,12 @@ model StudentClassSubject {
   @@index([status])
 }
 
-
 model AssessmentWeight {
   id             String         @id @default(uuid())
   assessmentType AssessmentType
   termId         String
   classSubjectId String
-  weight         Float          // percentage (e.g., 20 for 20%)
+  weight         Float // percentage (e.g., 20 for 20%)
   schoolId       String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -634,27 +636,27 @@ model AssessmentWeight {
 }
 
 model AssessmentDefinition {
-  id                String             @id @default(uuid())
-  name              String
-  type              AssessmentType
-  status            AssessmentStatus   @default(DRAFT)
-  maxMarks          Float?
-  termId            String
-  classSubjectId    String
-  schoolId          String?
-  academicYearId    String?
-  strandId          String?
-  createdById       String?
-  publishedAt       DateTime?
+  id                 String             @id @default(uuid())
+  name               String
+  type               AssessmentType
+  status             AssessmentStatus   @default(DRAFT)
+  maxMarks           Float?
+  termId             String
+  classSubjectId     String
+  schoolId           String?
+  academicYearId     String?
+  strandId           String?
+  createdById        String?
+  publishedAt        DateTime?
   resultsPublishedAt DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  academicYear      AcademicYear?      @relation(fields: [academicYearId], references: [id])
-  classSubject      ClassSubject       @relation(fields: [classSubjectId], references: [id])
-  school            School?            @relation(fields: [schoolId], references: [id])
-  strand            Strand?            @relation(fields: [strandId], references: [id])
-  term              Term               @relation(fields: [termId], references: [id])
-  results           AssessmentResult[]
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+  academicYear       AcademicYear?      @relation(fields: [academicYearId], references: [id])
+  classSubject       ClassSubject       @relation(fields: [classSubjectId], references: [id])
+  school             School?            @relation(fields: [schoolId], references: [id])
+  strand             Strand?            @relation(fields: [strandId], references: [id])
+  term               Term               @relation(fields: [termId], references: [id])
+  results            AssessmentResult[]
 
   @@index([schoolId])
   @@index([academicYearId])
@@ -700,22 +702,22 @@ model AssessmentResult {
 //   "GRADE", "PUBLISH", "PAYMENT", "REVERSE", "TRANSITION", "ASSIGN"
 // ────────────────────────────────────────────────────────────────────────────────
 model AuditLog {
-  id              String   @id @default(uuid())
-  schoolId        String?
-  actorId         String?
-  actorRole       String?                    // Snapshot of actor's role
-  action          String                     // e.g. "CREATE", "UPDATE", "DELETE"
-  entityType      String                     // e.g. "Student", "User", "Teacher"
-  entityId        String?
-  entityName      String?                    // Human-readable name (e.g. "John Doe")
-  details         String?                    // Short human-readable summary
-  metadata        Json?                      // Extra context (old/new values, diff)
-  ipAddress       String?
-  userAgent       String?
-  createdAt       DateTime   @default(now())
+  id         String   @id @default(uuid())
+  schoolId   String?
+  actorId    String?
+  actorRole  String? // Snapshot of actor's role
+  action     String // e.g. "CREATE", "UPDATE", "DELETE"
+  entityType String // e.g. "Student", "User", "Teacher"
+  entityId   String?
+  entityName String? // Human-readable name (e.g. "John Doe")
+  details    String? // Short human-readable summary
+  metadata   Json? // Extra context (old/new values, diff)
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
 
-  school          School?    @relation(fields: [schoolId], references: [id])
-  actor           User?      @relation("ActorAuditLogs", fields: [actorId], references: [id])
+  school School? @relation(fields: [schoolId], references: [id])
+  actor  User?   @relation("ActorAuditLogs", fields: [actorId], references: [id])
 
   @@index([schoolId, createdAt(sort: Desc)])
   @@index([actorId])
@@ -854,10 +856,9 @@ enum AssessmentType {
   SUMMATIVE
   SBA
   DIAGNOSTIC
-  KPSEA                       // Kenya Primary School Education Assessment
-  KJSEA                      // Kenya Junior Secondary Education Assessment
-  GRADE_9_PLACEMENT         // Pathway placement exam
-  
+  KPSEA // Kenya Primary School Education Assessment
+  KJSEA // Kenya Junior Secondary Education Assessment
+  GRADE_9_PLACEMENT // Pathway placement exam
 }
 
 enum CompetencyLevel {
@@ -881,30 +882,29 @@ enum CoreCompetency {
   LEARNING_TO_LEARN
 }
 
-
 // ─── FeeStructure ────────────────────────────────────────────────────────────
 // Defines the fee schedule for a given class level / term.
 // A school might have different structures for Form 1 vs Form 4, or Day vs Boarding.
 
 model FeeStructure {
-  id             String      @id @default(uuid())
-  name           String                              // e.g. "Form 1 – Term 1 2025"
+  id             String          @id @default(uuid())
+  name           String // e.g. "Form 1 – Term 1 2025"
   description    String?
   academicYearId String
-  termId         String?                             // null = applies to all terms
-  classLevel     String?                             // null = applies to all levels
-  boardingStatus BoardingStatus?                     // null = both day & boarding
-  currency       String      @default("KES")
-  isActive       Boolean     @default(true)
+  termId         String? // null = applies to all terms
+  classLevel     String? // null = applies to all levels
+  boardingStatus BoardingStatus? // null = both day & boarding
+  currency       String          @default("KES")
+  isActive       Boolean         @default(true)
   schoolId       String
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
 
-  school         School       @relation(fields: [schoolId], references: [id])
-  academicYear   AcademicYear @relation(fields: [academicYearId], references: [id])
-  term           Term?        @relation(fields: [termId], references: [id])
-  items          FeeItem[]
-  invoices       FeeInvoice[]
+  school       School       @relation(fields: [schoolId], references: [id])
+  academicYear AcademicYear @relation(fields: [academicYearId], references: [id])
+  term         Term?        @relation(fields: [termId], references: [id])
+  items        FeeItem[]
+  invoices     FeeInvoice[]
 
   @@index([schoolId])
   @@index([schoolId, academicYearId])
@@ -915,18 +915,18 @@ model FeeStructure {
 // Individual line items within a fee structure (tuition, boarding, activity…).
 
 model FeeItem {
-  id              String      @id @default(uuid())
-  feeStructureId  String
-  name            String                             // e.g. "Tuition Fee"
-  category        FeeCategory
-  amount          Decimal     @db.Decimal(12, 2)
-  isOptional      Boolean     @default(false)       // optional items can be waived
-  description     String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String      @id @default(uuid())
+  feeStructureId String
+  name           String // e.g. "Tuition Fee"
+  category       FeeCategory
+  amount         Decimal     @db.Decimal(12, 2)
+  isOptional     Boolean     @default(false) // optional items can be waived
+  description    String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
 
-  feeStructure    FeeStructure      @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
-  invoiceItems    FeeInvoiceItem[]
+  feeStructure FeeStructure     @relation(fields: [feeStructureId], references: [id], onDelete: Cascade)
+  invoiceItems FeeInvoiceItem[]
 
   @@index([feeStructureId])
   @@index([category])
@@ -937,33 +937,34 @@ model FeeItem {
 // Amounts can be adjusted (scholarships, sibling discounts, etc.).
 
 model FeeInvoice {
-  id              String        @id @default(uuid())
-  invoiceNo       String        @unique            // auto-generated: INV/2025/000001
-  studentId       String
-  feeStructureId  String
-  academicYearId  String
-  termId          String?
-  schoolId        String
-  status          InvoiceStatus @default(UNPAID)
-  totalAmount     Decimal       @db.Decimal(12, 2)
-  discountAmount  Decimal       @db.Decimal(12, 2) @default(0)
-  paidAmount      Decimal       @db.Decimal(12, 2) @default(0)
-  balanceAmount   Decimal       @db.Decimal(12, 2) // totalAmount - discountAmount - paidAmount
-  dueDate         DateTime?
-  notes           String?
-  issuedAt        DateTime      @default(now())
-  createdAt       DateTime      @default(now())
-  updatedAt       DateTime      @updatedAt
+  id             String        @id @default(uuid())
+  invoiceNo      String        @unique // auto-generated: INV/2025/000001
+  studentId      String
+  feeStructureId String
+  academicYearId String
+  termId         String?
+  schoolId       String
+  status         InvoiceStatus @default(UNPAID)
+  totalAmount    Decimal       @db.Decimal(12, 2)
+  discountAmount Decimal       @default(0) @db.Decimal(12, 2)
+  paidAmount     Decimal       @default(0) @db.Decimal(12, 2)
+  balanceAmount  Decimal       @db.Decimal(12, 2) // totalAmount - discountAmount - paidAmount
+  dueDate        DateTime?
+  notes          String?
+  issuedAt       DateTime      @default(now())
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
 
-  student         Student       @relation(fields: [studentId], references: [id])
-  feeStructure    FeeStructure  @relation(fields: [feeStructureId], references: [id])
-  academicYear    AcademicYear  @relation(fields: [academicYearId], references: [id])
-  term            Term?         @relation(fields: [termId], references: [id])
-  school          School        @relation(fields: [schoolId], references: [id])
-  items           FeeInvoiceItem[]
-  payments        FeePayment[]
-  paymentPlan     PaymentPlan?
-  reminders       PaymentReminder[]
+  student      Student           @relation(fields: [studentId], references: [id])
+  feeStructure FeeStructure      @relation(fields: [feeStructureId], references: [id])
+  academicYear AcademicYear      @relation(fields: [academicYearId], references: [id])
+  term         Term?             @relation(fields: [termId], references: [id])
+  school       School            @relation(fields: [schoolId], references: [id])
+  items        FeeInvoiceItem[]
+  payments     FeePayment[]
+  paymentPlan  PaymentPlan?
+  reminders    PaymentReminder[]
+  feeRefunds   FeeRefund[]
 
   @@index([schoolId])
   @@index([studentId])
@@ -977,18 +978,18 @@ model FeeInvoice {
 // Snapshot of a FeeItem at invoice-generation time (amount may differ if waived).
 
 model FeeInvoiceItem {
-  id          String     @id @default(uuid())
-  invoiceId   String
-  feeItemId   String
-  name        String                           // snapshot of FeeItem.name
-  category    FeeCategory
-  amount      Decimal    @db.Decimal(12, 2)   // may differ from FeeItem.amount (waived)
-  isWaived    Boolean    @default(false)
-  waiverNote  String?
-  createdAt   DateTime   @default(now())
+  id         String      @id @default(uuid())
+  invoiceId  String
+  feeItemId  String
+  name       String // snapshot of FeeItem.name
+  category   FeeCategory
+  amount     Decimal     @db.Decimal(12, 2) // may differ from FeeItem.amount (waived)
+  isWaived   Boolean     @default(false)
+  waiverNote String?
+  createdAt  DateTime    @default(now())
 
-  invoice     FeeInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  feeItem     FeeItem    @relation(fields: [feeItemId], references: [id])
+  invoice FeeInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  feeItem FeeItem    @relation(fields: [feeItemId], references: [id])
 
   @@index([invoiceId])
 }
@@ -999,28 +1000,29 @@ model FeeInvoiceItem {
 
 model FeePayment {
   id             String        @id @default(uuid())
-  receiptNo      String        @unique          // auto-generated: RCT/2025/000001
+  receiptNo      String        @unique // auto-generated: RCT/2025/000001
   invoiceId      String
   studentId      String
   schoolId       String
   amount         Decimal       @db.Decimal(12, 2)
   method         PaymentMethod
   status         PaymentStatus @default(COMPLETED)
-  transactionRef String?                        // M-Pesa code, cheque no., etc.
-  mpesaCode      String?                        // specific M-Pesa confirmation code
+  transactionRef String? // M-Pesa code, cheque no., etc.
+  mpesaCode      String? // specific M-Pesa confirmation code
   bankName       String?
   chequeNo       String?
   paidAt         DateTime      @default(now())
   reversedAt     DateTime?
   reversalReason String?
-  receivedById   String?                        // User.id who accepted the cash
+  receivedById   String? // User.id who accepted the cash
   notes          String?
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  invoice        FeeInvoice    @relation(fields: [invoiceId], references: [id])
-  student        Student       @relation(fields: [studentId], references: [id])
-  school         School        @relation(fields: [schoolId], references: [id])
+  invoice    FeeInvoice  @relation(fields: [invoiceId], references: [id])
+  student    Student     @relation(fields: [studentId], references: [id])
+  school     School      @relation(fields: [schoolId], references: [id])
+  feeRefunds FeeRefund[]
 
   @@index([schoolId])
   @@index([studentId])
@@ -1036,14 +1038,14 @@ model FeePayment {
 
 model PaymentProviderConfig {
   id            String   @id @default(uuid())
-  tenantId      String                               // schoolId
-  provider      String                               // "MPESA", "FLUTTERWAVE", "STRIPE"
-  apiKey        String                               // encrypted at rest in production
-  secretKey     String                               // encrypted at rest in production
+  tenantId      String // schoolId
+  provider      String // "MPESA", "FLUTTERWAVE", "STRIPE"
+  apiKey        String // encrypted at rest in production
+  secretKey     String // encrypted at rest in production
   callbackUrl   String?
   webhookSecret String?
   isActive      Boolean  @default(true)
-  extraConfig   Json?                                // provider-specific settings (passkey, shortcode, env)
+  extraConfig   Json? // provider-specific settings (passkey, shortcode, env)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   tenant        Tenant   @relation(fields: [tenantId], references: [id])
@@ -1057,19 +1059,19 @@ model PaymentProviderConfig {
 // Captures all incoming webhook events for audit, replay, and debugging.
 
 model WebhookLog {
-  id            String    @id @default(uuid())
-  tenantId      String?
-  provider      String                             // "MPESA", "FLUTTERWAVE", "STRIPE"
-  event         String?
-  payload       Json
-  headers       Json?
-  signature     String?
-  ipAddress     String?
-  processed     Boolean   @default(false)
-  processedAt   DateTime?
-  error         String?
-  createdAt     DateTime  @default(now())
-  tenant        Tenant?   @relation(fields: [tenantId], references: [id])
+  id          String    @id @default(uuid())
+  tenantId    String?
+  provider    String // "MPESA", "FLUTTERWAVE", "STRIPE"
+  event       String?
+  payload     Json
+  headers     Json?
+  signature   String?
+  ipAddress   String?
+  processed   Boolean   @default(false)
+  processedAt DateTime?
+  error       String?
+  createdAt   DateTime  @default(now())
+  tenant      Tenant?   @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([provider])
@@ -1081,19 +1083,19 @@ model WebhookLog {
 // Per-school configuration for late payment penalties.
 
 model LateFeesConfig {
-  id              String   @id @default(uuid())
-  schoolId        String   @unique
-  tenantId        String?                              // Optional link to Tenant
-  tenant          Tenant?  @relation(fields: [tenantId], references: [id])
-  penaltyType     String                            // "FLAT", "PERCENTAGE", "COMPOUND"
-  penaltyAmount   Decimal  @db.Decimal(12, 2)       // e.g. 500 KES or 5.00 for 5%
-  graceDays       Int      @default(7)               // Days before penalty applies
-  maxPenalty      Decimal? @db.Decimal(12, 2)       // Cap penalty at this amount
-  applyRecurring  Boolean  @default(false)           // Apply penalty periodically
-  recurrenceDays  Int?                              // If recurring, how often
-  isActive        Boolean  @default(true)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id             String   @id @default(uuid())
+  schoolId       String   @unique
+  tenantId       String? // Optional link to Tenant
+  tenant         Tenant?  @relation(fields: [tenantId], references: [id])
+  penaltyType    String // "FLAT", "PERCENTAGE", "COMPOUND"
+  penaltyAmount  Decimal  @db.Decimal(12, 2) // e.g. 500 KES or 5.00 for 5%
+  graceDays      Int      @default(7) // Days before penalty applies
+  maxPenalty     Decimal? @db.Decimal(12, 2) // Cap penalty at this amount
+  applyRecurring Boolean  @default(false) // Apply penalty periodically
+  recurrenceDays Int? // If recurring, how often
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   @@index([schoolId])
 }
@@ -1102,18 +1104,18 @@ model LateFeesConfig {
 // Installment plan for an invoice, allowing split payments over time.
 
 model PaymentPlan {
-  id              String                    @id @default(uuid())
-  invoiceId       String                    @unique
-  totalAmount     Decimal                   @db.Decimal(12, 2)
-  installments    Int                       // Number of installments (e.g., 3)
-  frequency       String                    // "MONTHLY", "WEEKLY", "BIWEEKLY", "CUSTOM"
-  firstDueDate    DateTime
-  notes           String?
-  isActive        Boolean                   @default(true)
-  createdAt       DateTime                  @default(now())
-  updatedAt       DateTime                  @updatedAt
-  invoice         FeeInvoice                @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  schedule        PaymentPlanInstallment[]
+  id           String                   @id @default(uuid())
+  invoiceId    String                   @unique
+  totalAmount  Decimal                  @db.Decimal(12, 2)
+  installments Int // Number of installments (e.g., 3)
+  frequency    String // "MONTHLY", "WEEKLY", "BIWEEKLY", "CUSTOM"
+  firstDueDate DateTime
+  notes        String?
+  isActive     Boolean                  @default(true)
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  invoice      FeeInvoice               @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  schedule     PaymentPlanInstallment[]
 
   @@index([invoiceId])
 }
@@ -1122,18 +1124,18 @@ model PaymentPlan {
 // Individual installment within a payment plan.
 
 model PaymentPlanInstallment {
-  id              String      @id @default(uuid())
-  planId          String
-  installmentNo   Int                           // 1, 2, 3...
-  dueDate         DateTime
-  amount          Decimal     @db.Decimal(12, 2)
-  status          String      @default("PENDING") // "PENDING", "PAID", "OVERDUE", "SKIPPED"
-  paidAmount      Decimal?    @db.Decimal(12, 2)
-  paidAt          DateTime?
-  paymentId       String?                        // FeePayment.id when paid
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  plan            PaymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  id            String      @id @default(uuid())
+  planId        String
+  installmentNo Int // 1, 2, 3...
+  dueDate       DateTime
+  amount        Decimal     @db.Decimal(12, 2)
+  status        String      @default("PENDING") // "PENDING", "PAID", "OVERDUE", "SKIPPED"
+  paidAmount    Decimal?    @db.Decimal(12, 2)
+  paidAt        DateTime?
+  paymentId     String? // FeePayment.id when paid
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  plan          PaymentPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
 
   @@unique([planId, installmentNo])
   @@index([planId])
@@ -1146,28 +1148,28 @@ model PaymentPlanInstallment {
 // Supports partial and full refunds with provider integration.
 
 model FeeRefund {
-  id              String      @id @default(uuid())
-  paymentId       String
-  invoiceId       String
-  studentId       String
-  schoolId        String
-  amount          Decimal     @db.Decimal(12, 2)
-  reason          String
-  status          String      @default("PENDING") // "PENDING", "COMPLETED", "FAILED"
-  paymentMethod   PaymentMethod
+  id               String        @id @default(uuid())
+  paymentId        String
+  invoiceId        String
+  studentId        String
+  schoolId         String
+  amount           Decimal       @db.Decimal(12, 2)
+  reason           String
+  status           String        @default("PENDING") // "PENDING", "COMPLETED", "FAILED"
+  paymentMethod    PaymentMethod
   providerRefundId String?
-  initiatedBy     String
-  completedAt     DateTime?
-  errorMessage    String?
-  notes           String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  initiatedBy      String
+  completedAt      DateTime?
+  errorMessage     String?
+  notes            String?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
 
-  payment         FeePayment  @relation(fields: [paymentId], references: [id])
-  invoice         FeeInvoice  @relation(fields: [invoiceId], references: [id])
-  student         Student     @relation(fields: [studentId], references: [id])
-  school          School      @relation(fields: [schoolId], references: [id])
-  initiator       User        @relation(fields: [initiatedBy], references: [id])
+  payment   FeePayment @relation(fields: [paymentId], references: [id])
+  invoice   FeeInvoice @relation(fields: [invoiceId], references: [id])
+  student   Student    @relation(fields: [studentId], references: [id])
+  school    School     @relation(fields: [schoolId], references: [id])
+  initiator User       @relation(fields: [initiatedBy], references: [id])
 
   @@index([paymentId])
   @@index([invoiceId])
@@ -1180,17 +1182,17 @@ model FeeRefund {
 // Tracks payment reminders sent for invoices.
 
 model PaymentReminder {
-  id              String    @id @default(uuid())
-  invoiceId       String
-  reminderType    String                           // "PAYMENT_DUE", "OVERDUE_3DAYS", "OVERDUE_7DAYS", "FINAL_NOTICE"
-  method          String                           // "SMS", "EMAIL", "PUSH", "SYSTEM"
-  recipientId     String?                          // User or Guardian ID
-  recipientContact String?                         // Phone or email used
-  status          String    @default("PENDING")    // "PENDING", "SENT", "FAILED", "BOUNCED"
-  sentAt          DateTime?
-  errorMessage    String?
-  createdAt       DateTime  @default(now())
-  invoice         FeeInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  id               String     @id @default(uuid())
+  invoiceId        String
+  reminderType     String // "PAYMENT_DUE", "OVERDUE_3DAYS", "OVERDUE_7DAYS", "FINAL_NOTICE"
+  method           String // "SMS", "EMAIL", "PUSH", "SYSTEM"
+  recipientId      String? // User or Guardian ID
+  recipientContact String? // Phone or email used
+  status           String     @default("PENDING") // "PENDING", "SENT", "FAILED", "BOUNCED"
+  sentAt           DateTime?
+  errorMessage     String?
+  createdAt        DateTime   @default(now())
+  invoice          FeeInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
 
   @@index([invoiceId])
   @@index([status])
@@ -1220,7 +1222,7 @@ enum InvoiceStatus {
   PAID
   OVERDUE
   CANCELLED
-  WAIVED        // fully waived (scholarship etc.)
+  WAIVED // fully waived (scholarship etc.)
 }
 
 enum PaymentMethod {
@@ -1229,13 +1231,13 @@ enum PaymentMethod {
   BANK_TRANSFER
   CHEQUE
   CARD
-  SCHOLARSHIP   // fee covered by scholarship fund
+  SCHOLARSHIP // fee covered by scholarship fund
 }
 
 enum PaymentStatus {
-  PENDING       // awaiting confirmation (e.g. bank transfer)
+  PENDING // awaiting confirmation (e.g. bank transfer)
   COMPLETED
-  REVERSED      // payment reversed / bounced
+  REVERSED // payment reversed / bounced
   FAILED
 }
 

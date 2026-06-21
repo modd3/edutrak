@@ -4,12 +4,14 @@ import { Router } from 'express';
 import { AssessmentController } from '../controllers/assessment.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const controller = new AssessmentController();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 
 /**
  * Assessment Definition Routes

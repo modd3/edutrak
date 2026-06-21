@@ -12,11 +12,16 @@ export const schoolKeys = {
   schoolStudents: (id: string, filters: StudentFilters) => [...schoolKeys.all, 'students', id, filters] as const,
 };
 
+interface UseSchoolOptions {
+  enabled?: boolean;
+}
+
 // Get all schools
-export function useSchools(filters?: SchoolFilters) {
+export function useSchools(filters?: SchoolFilters, options?: UseSchoolOptions) {
   return useQuery({
     queryKey: schoolKeys.list(filters || {}),
     queryFn: () => schoolService.getAll(filters),
+    enabled: options?.enabled ?? true,
   });
 }
 
