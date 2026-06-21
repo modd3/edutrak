@@ -11,6 +11,13 @@ export interface PlansResponse {
   };
 }
 
+export interface PlanFeatureInput {
+  featureKey: string;
+  enabled: boolean;
+  limitType: 'BOOLEAN' | 'COUNT';
+  limitValue?: number | null;
+}
+
 export interface CreatePlanInput {
   key: string;
   name: string;
@@ -19,6 +26,7 @@ export interface CreatePlanInput {
   currency?: string;
   billingInterval: string;
   isActive?: boolean;
+  features?: PlanFeatureInput[];
 }
 
 export interface UpdatePlanInput {
@@ -28,6 +36,7 @@ export interface UpdatePlanInput {
   currency?: string;
   billingInterval?: string;
   isActive?: boolean;
+  features?: PlanFeatureInput[];
 }
 
 export const plansApi = {

@@ -230,6 +230,17 @@ export interface School {
   }
 }
 
+export interface PlanFeature {
+  id: string;
+  planId: string;
+  featureKey: string;
+  limitType: 'BOOLEAN' | 'COUNT';
+  limitValue?: number | null;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Plan {
   id: string;
   key: string;
@@ -239,7 +250,7 @@ export interface Plan {
   currency: string;
   billingInterval: string;
   isActive: boolean;
-  features?: string[];
+  features?: PlanFeature[];
   createdAt: string;
   updatedAt: string;
 }

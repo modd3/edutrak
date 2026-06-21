@@ -43,8 +43,7 @@ export async function enforceSchoolContext(
       message: 'User not authenticated',
     });
   }
-console.log("Userschool Subscription: ", JSON.stringify(subscription, null, 2))
-console.log("Req: ", req)
+
   if (!subscription) {
     logger.error(`School ${user.schoolId} has no active subscription ${req.subscription}`, user.schoolId);
     return res.status(403).json({
