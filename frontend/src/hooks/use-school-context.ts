@@ -6,7 +6,7 @@ export function useSchoolContext() {
 
     const user = auth.user;
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-    const overrideSchool = auth.overrideSchool;
+   // const overrideSchool = auth.overrideSchool;
     const schoolId = isSuperAdmin ? overrideSchool?.id : user?.schoolId;
     const schoolName = isSuperAdmin ? overrideSchool?.name : user?.school?.name;
 
@@ -17,7 +17,6 @@ export function useSchoolContext() {
         schoolId,
         schoolName,
         isSuperAdmin,
-        isOverrideActive,
         canAccessAllSchools,
         needsSchoolFilter,
         user,

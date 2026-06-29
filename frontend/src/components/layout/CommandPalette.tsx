@@ -42,7 +42,7 @@ export function CommandPalette() {
   const filteredActions = useMemo(() => {
     const normalized = query.toLowerCase().trim();
     const roleAwareActions = actions.filter((action) => {
-      const isRoleAllowed = !('roles' in action) || action.roles.includes(user?.role || '');
+      const isRoleAllowed = !('roles' in action) || action.roles?.includes(user?.role || '');
       const isSchoolScoped = 'scope' in action && action.scope === 'school';
       const isBlockedSuperAdminSchoolAction = user?.role === 'SUPER_ADMIN' && isSchoolScoped && !overrideSchool;
       return isRoleAllowed && !isBlockedSuperAdminSchoolAction;

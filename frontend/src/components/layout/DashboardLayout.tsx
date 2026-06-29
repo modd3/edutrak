@@ -5,7 +5,6 @@ import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 import { useAuthStore } from '../../store/auth-store';
 import { Bell, Moon, Sun, Zap } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
-import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 
 interface DashboardLayoutProps {
   children: ReactNode;
