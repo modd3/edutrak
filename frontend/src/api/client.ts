@@ -14,9 +14,15 @@ const api: AxiosInstance = axios.create({
 // Request interceptor - Add auth token to requests
 api.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const { token, user, overrideSchool } = useAuthStore.getState();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (user?.role === 'SUPER_ADMIN' && overrideSchool?.id) {
+      config.headers['X-School-Override'] = overrideSchool.id;
+    } else if (config.headers) {
+      delete config.headers['X-School-Override'];
     }
 
     return config;

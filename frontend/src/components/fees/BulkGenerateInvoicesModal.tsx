@@ -142,7 +142,7 @@ export function BulkGenerateInvoicesModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bulk Generate Invoices</DialogTitle>
+            <DialogTitle>Bulk invoice drawer</DialogTitle>
           </DialogHeader>
           <div className="flex justify-center items-center h-40">
             <p className="text-gray-500">Loading fee structure...</p>
@@ -157,7 +157,7 @@ export function BulkGenerateInvoicesModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Bulk Generate Invoices</DialogTitle>
+            <DialogTitle>Bulk invoice drawer</DialogTitle>
           </DialogHeader>
           <div className="flex justify-center items-center h-40">
             <p className="text-red-500">Fee structure not found</p>
@@ -169,9 +169,9 @@ export function BulkGenerateInvoicesModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="right-0 left-auto top-0 h-screen max-w-xl translate-x-0 translate-y-0 rounded-l-3xl rounded-r-none border-l bg-white/95 shadow-2xl backdrop-blur-xl data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right sm:rounded-l-3xl">
         <DialogHeader>
-          <DialogTitle>Bulk Generate Invoices</DialogTitle>
+          <DialogTitle>Bulk invoice drawer</DialogTitle>
           <DialogDescription>
             Create invoices for multiple students from {structure.name}
           </DialogDescription>

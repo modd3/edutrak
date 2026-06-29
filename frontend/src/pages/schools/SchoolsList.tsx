@@ -35,6 +35,8 @@ import { SCHOOL_TYPES } from '@/lib/constants';
 import { SchoolFormModal } from '@/components/schools/SchoolFormModal';
 import { SchoolDetailsModal } from '@/components/schools/SchoolDetailsModal';
 import { toast } from 'sonner';
+import { useAuthStore } from '@/store/auth-store';
+import { useNavigate } from 'react-router-dom';
 
 export default function SchoolsList() {
   const [page, setPage] = useState(1);
@@ -45,6 +47,8 @@ export default function SchoolsList() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedSchool, setSelectedSchool] = useState<School | null>(null);
+  const { setOverrideSchool } = useAuthStore();
+  const navigate = useNavigate();
 
   // Fetch schools with filters
   const { data: response, isLoading, isError,  } = useSchools({
@@ -72,6 +76,12 @@ export default function SchoolsList() {
   const handleSchoolNameClick = (school: School) => {
     setSelectedSchool(school);
     setShowDetailsModal(true);
+  };
+
+  const handleInspectOverride = (school: School) => {
+    setOverrideSchool({ id: school.id, name: school.name });
+    toast.success(`Override mode active for ${school.name}`);
+    navigate('/students');
   };
 
   const confirmDelete = () => {
@@ -169,6 +179,10 @@ export default function SchoolsList() {
               <DropdownMenuItem onClick={() => handleSchoolNameClick(school)}>
                 <Eye className="mr-2 h-4 w-4" />
                 View Details
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleInspectOverride(school)}>
+                <Eye className="mr-2 h-4 w-4" />
+                Inspect / Override
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleEditClick(school)}>
                 <Edit className="mr-2 h-4 w-4" />

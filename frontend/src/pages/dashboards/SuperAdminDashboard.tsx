@@ -8,12 +8,18 @@ import { RecentActivities } from '@/components/shared/RecentActivities';
 import type { ActivityItem } from '@/components/shared/RecentActivities';
 
 export function SuperAdminDashboard() {
-  const { user } = useAuthStore();
+  const { user, setOverrideSchool } = useAuthStore();
   const navigate = useNavigate();
 
   const { data: schoolsData } = useSchools();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const schools: any[] = (schoolsData as any)?.data || [];
+
+
+  const inspectSchool = (school: any) => {
+    setOverrideSchool({ id: school.id, name: school.name });
+    navigate('/students');
+  };
 
   const { data: plansData } = usePlans();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -181,20 +187,24 @@ export function SuperAdminDashboard() {
                   <th className="pb-2 font-medium">Type</th>
                   <th className="pb-2 font-medium">County</th>
                   <th className="pb-2 font-medium">Students</th>
+                  <th className="pb-2 font-medium text-right">Override</th>
                 </tr>
               </thead>
               <tbody>
                 {schools.slice(0, 5).map((school: any) => (
-                  <tr key={school.id} className="border-b last:border-0 cursor-pointer hover:bg-gray-50" onClick={() => navigate(`/schools`)}>
+                  <tr key={school.id} className="border-b last:border-0 hover:bg-gray-50 dark:hover:bg-slate-900">
                     <td className="py-2 font-medium text-gray-900">{school.name}</td>
                     <td className="py-2 text-gray-600">{school.type?.replace('_', ' ')}</td>
                     <td className="py-2 text-gray-600">{school.county}</td>
                     <td className="py-2 text-gray-600">{school._count?.students || 0}</td>
+                    <td className="py-2 text-right">
+                      <Button variant="outline" size="sm" onClick={() => inspectSchool(school)}>Inspect & Override</Button>
+                    </td>
                   </tr>
                 ))}
                 {schools.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-4 text-center text-gray-500">
+                    <td colSpan={5} className="py-4 text-center text-gray-500">
                       No schools registered yet.
                     </td>
                   </tr>

@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -116,4 +117,39 @@
 
   /* No orphans/widows */
   p, h2, h3 { orphans: 3; widows: 3; }
+}
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 162 73% 46%;
+    --accent-foreground: 164 86% 16%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 239 84% 67%;
+    --radius: 0.875rem;
+    --brand-font-family: Inter, Outfit, ui-sans-serif, system-ui, sans-serif;
+  }
+}
+
+@layer base {
+  .dark body {
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
 }
