@@ -17,7 +17,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, ArrowUpDown } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ArrowUpDown, Rows3 } from 'lucide-react';
 
 interface DataTableProps<TData> {
   columns: ColumnDef<TData>[];
@@ -31,6 +31,7 @@ export function DataTable<TData>({
   pageSize = 10,
 }: DataTableProps<TData>) {
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [density, setDensity] = useState<'compact' | 'roomy'>('roomy');
 
   const table = useReactTable({
     data,
@@ -51,13 +52,31 @@ export function DataTable<TData>({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-md border">
+      <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 shadow-sm backdrop-blur-sm">
+        <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+          <Rows3 className="h-4 w-4 text-indigo-500" />
+          Table density
+        </div>
+        <div className="flex rounded-xl bg-slate-100 p-1 text-xs font-medium">
+          {(['compact', 'roomy'] as const).map((option) => (
+            <button
+              key={option}
+              type="button"
+              onClick={() => setDensity(option)}
+              className={`rounded-lg px-3 py-1.5 capitalize transition ${density === option ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white/90 shadow-sm">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id}>
+                  <TableHead key={header.id} className="bg-slate-50/80 text-xs uppercase tracking-wide text-slate-500">
                     {header.isPlaceholder ? null : (
                       <div
                         {...{
@@ -84,9 +103,9 @@ export function DataTable<TData>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow key={row.id} className="transition hover:bg-indigo-50/50">
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className={density === 'compact' ? 'py-2' : 'py-4'}>
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()

@@ -44,6 +44,19 @@ export function CompetencyBasedForm({ onSubmit, defaultValues, isLoading }: Comp
   const maxMarks = watch('maxMarks');
   const [cbcResult, setCbcResult] = useState<ReturnType<typeof calculateCBCGrade> | null>(null);
 
+  const rubricLevels = [
+    { code: 'EE', label: 'Exceeding Expectations', percent: 92, tone: 'bg-emerald-50 text-emerald-700 ring-emerald-200' },
+    { code: 'ME', label: 'Meeting Expectations', percent: 76, tone: 'bg-indigo-50 text-indigo-700 ring-indigo-200' },
+    { code: 'AE', label: 'Approaching Expectations', percent: 58, tone: 'bg-amber-50 text-amber-700 ring-amber-200' },
+    { code: 'BE', label: 'Below Expectations', percent: 38, tone: 'bg-rose-50 text-rose-700 ring-rose-200' },
+  ];
+
+  const applyRubricLevel = (percent: number, label: string) => {
+    const computedMarks = Math.round(((maxMarks || 100) * percent) / 100);
+    setValue('marksObtained', computedMarks, { shouldDirty: true, shouldValidate: true });
+    setValue('remarks', `${label}: learner evidence captured against the CBC rubric.`, { shouldDirty: true, shouldValidate: true });
+  };
+
   useEffect(() => {
     if (marksObtained && maxMarks && maxMarks > 0) {
       const result = calculateCBCGrade(marksObtained, maxMarks);
@@ -53,6 +66,27 @@ export function CompetencyBasedForm({ onSubmit, defaultValues, isLoading }: Comp
 
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+      <div className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
+        <div className="mb-3">
+          <h3 className="font-semibold text-slate-900">CBC rubric matrix</h3>
+          <p className="text-sm text-slate-500">One-tap grading for EE, ME, AE and BE competency levels.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {rubricLevels.map((level) => (
+            <button
+              key={level.code}
+              type="button"
+              onClick={() => applyRubricLevel(level.percent, level.label)}
+              className={`rounded-2xl p-4 text-left ring-1 transition hover:-translate-y-0.5 hover:shadow-md ${level.tone}`}
+            >
+              <span className="text-2xl font-black">{level.code}</span>
+              <span className="mt-2 block text-sm font-semibold">{level.label}</span>
+              <span className="mt-1 block text-xs opacity-80">Sets marks to ~{level.percent}%</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="grid gap-4 md:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="marksObtained">Marks Obtained</Label>

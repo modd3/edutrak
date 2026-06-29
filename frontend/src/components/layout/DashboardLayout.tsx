@@ -2,7 +2,8 @@ import { ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { useAuthStore } from '../../store/auth-store';
-import { Bell, Search } from 'lucide-react';
+import { Bell } from 'lucide-react';
+import { CommandPalette } from './CommandPalette';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -37,25 +38,16 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(239_84%_67%_/_0.12),transparent_32rem),linear-gradient(180deg,#f8fafc,#eef2ff)]">
       <Sidebar />
 
       {/* Main Content */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="sticky top-0 z-30 border-b border-white/60 bg-white/75 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             {/* Search Bar */}
-            <div className="flex-1 max-w-lg">
-            <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                <input
-                  type="text"
-                  placeholder="Search students, classes, reports..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+<div className="flex-1 max-w-2xl"><CommandPalette /></div>
 
             {/* Right Section */}
             <div className="flex items-center space-x-4 ml-4">
