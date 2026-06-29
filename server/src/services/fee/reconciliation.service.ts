@@ -147,20 +147,19 @@ export class ReconciliationService extends BaseService {
   /**
    * Confirm matches and create payments for auto-confirmed transactions.
    * Called by admin after reviewing the reconciliation results.
+   * Each match entry must supply the actual bank deposit amount so we never
+   * over-pay or under-pay an invoice from a partial bank transfer.
    */
   async confirmMatches(
-    matchIds: string[],
+    matches: Array<{ invoiceId: string; amount: number }>,
     schoolId: string
   ): Promise<{ confirmed: number; payments: any[] }> {
-    const { schoolId: ctxSchoolId, isSuperAdmin, userId } = this.getSchoolContext();
+    const { schoolId: ctxSchoolId, userId } = this.getSchoolContext();
     const sid = ctxSchoolId || schoolId;
 
-    // We need to re-run the matching for the specified transactions.
-    // In a full implementation, we'd store the parsed statement temporarily.
-    // For now, this accepts payment creation directly for matched invoices.
     const payments = [];
 
-    for (const invoiceId of matchIds) {
+    for (const { invoiceId, amount } of matches) {
       const invoice = await this.prisma.feeInvoice.findUnique({
         where: { id: invoiceId },
       });
@@ -175,10 +174,23 @@ export class ReconciliationService extends BaseService {
 
       if (balance <= 0) continue;
 
+      // Use the actual bank deposit amount, capped at the outstanding balance
+      const applyAmount = Math.min(amount, balance);
+      if (applyAmount <= 0) continue;
+
       const receiptNo = await sequenceGenerator.generateNext(
         SequenceType.RECEIPT_NUMBER,
         sid
       );
+
+      const newPaid = Number(invoice.paidAmount) + applyAmount;
+      const newBalance = balance - applyAmount;
+      const newStatus: string =
+        newBalance <= 0
+          ? 'PAID'
+          : newPaid > 0
+          ? 'PARTIAL'
+          : 'UNPAID';
 
       const payment = await this.prisma.$transaction(async (tx) => {
         const p = await tx.feePayment.create({
@@ -188,21 +200,21 @@ export class ReconciliationService extends BaseService {
             invoiceId: invoice.id,
             studentId: invoice.studentId,
             schoolId: sid,
-            amount: new Decimal(balance),
+            amount: new Decimal(applyAmount),
             method: 'BANK_TRANSFER',
-            status: 'PENDING',
+            status: 'COMPLETED',
             notes: 'Auto-matched via bank reconciliation',
             receivedById: userId ?? null,
+            paidAt: new Date(),
           },
         });
 
-        const newPaid = Number(invoice.paidAmount) + balance;
         await tx.feeInvoice.update({
           where: { id: invoice.id },
           data: {
             paidAmount: new Decimal(newPaid),
-            balanceAmount: new Decimal(0),
-            status: 'PAID',
+            balanceAmount: new Decimal(Math.max(0, newBalance)),
+            status: newStatus as any,
           },
         });
 
@@ -213,7 +225,7 @@ export class ReconciliationService extends BaseService {
       logger.info('Reconciliation payment created', {
         invoiceId: invoice.id,
         receiptNo,
-        amount: balance,
+        amount: applyAmount,
       });
     }
 

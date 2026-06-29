@@ -7,6 +7,7 @@ import { authenticate,
          checkOwnershipOrAdmin 
         } from '../middleware/auth.middleware';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const schoolController = new SchoolController();
@@ -23,7 +24,7 @@ router.get('/', validatePagination, authorize('SUPER_ADMIN'), schoolController.g
 router.get('/:id', validateUUIDParam, authorize('SUPER_ADMIN'), schoolController.getSchoolById);
 router.get('/:id/branding', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolBranding);
 router.put('/:id/branding', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.upsertSchoolBranding);
-router.get('/:id/statistics', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolStatistics);
-router.get('/:id/performance', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), schoolController.getSchoolPerformance);
+router.get('/:id/statistics', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), enforceSubscription, schoolController.getSchoolStatistics);
+router.get('/:id/performance', validateUUIDParam, authorize('ADMIN', 'SUPER_ADMIN'), enforceSubscription, schoolController.getSchoolPerformance);
 
 export default router;

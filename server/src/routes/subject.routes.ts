@@ -2,11 +2,15 @@ import { Router } from 'express';
 import { SubjectController } from '../controllers/subject.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
+import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const subjectController = new SubjectController();
 
 router.use(authenticate);
+router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 
 // Subject management (Admin only)
 router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), subjectController.createSubject);

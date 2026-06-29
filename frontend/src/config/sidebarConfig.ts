@@ -25,14 +25,16 @@ import {
   Receipt,
   DollarSignIcon,
   Building2,
+  Tag,
+  CalendarCheck,
 } from 'lucide-react';
-import { UserRole } from '../store/auth-store';
+import { Role } from '@/types';
 
 export interface NavItem {
   title: string;
   href: string;
   icon: LucideIcon;
-  roles: UserRole[];
+  roles: string[];
   badge?: string;
   children?: NavItem[];
 }
@@ -86,6 +88,36 @@ export const sidebarConfig: NavItem[] = [
     href: '/billing-admin',
     icon: Receipt,
     roles: ['SUPER_ADMIN'],
+  },
+
+  // ============================================================
+  // SUPER_ADMIN & ADMIN — Billing (customer-facing)
+  // ============================================================
+  {
+    title: 'Billing',
+    href: '/billing/plans',
+    icon: Tag,
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+    children: [
+      {
+        title: 'Plans & Pricing',
+        href: '/billing/plans',
+        icon: Tag,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'My Subscription',
+        href: '/billing/my-subscription',
+        icon: CalendarCheck,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+      {
+        title: 'Invoices',
+        href: '/billing/invoices',
+        icon: FileText,
+        roles: ['SUPER_ADMIN', 'ADMIN'],
+      },
+    ],
   },
 
   // ============================================================
@@ -399,7 +431,7 @@ export const sidebarConfig: NavItem[] = [
 ];
 
 // Filter navigation items based on user role
-export const getNavigationForRole = (role: UserRole): NavItem[] => {
+export const getNavigationForRole = (role: string): NavItem[] => {
   return sidebarConfig
     .filter((item) => item.roles.includes(role))
     .map((item) => ({

@@ -14,6 +14,7 @@ import { RoleGuard } from '@/components/RoleGuard';
 import { Login } from './pages/Login';
 import { Dashboard } from './pages/Dashboard';
 import { Unauthorized } from './pages/Unauthorized';
+import { SubscriptionExpired } from './pages/subscriptions/SubscriptionExpired';
 import { YearEndWizard } from './pages/academic/YearEndWizard';
 import ClassesList from '@/pages/classes/ClassesList';
 import StudentsList from '@/pages/students/StudentsList';
@@ -40,6 +41,8 @@ import { ProvidersPage } from '@/pages/fees/ProvidersPage';
 import BillingAdminPage from '@/pages/billing/BillingAdminPage';
 import SubscriptionsPage from '@/pages/subscriptions/SubscriptionsPage';
 import { PlansPage } from './pages/subscriptions/PlansPage';
+import { PricingPage } from './pages/billing/PricingPage';
+import { MySubscriptionPage } from './pages/billing/MySubscriptionPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -107,6 +110,7 @@ function App() {
 
           {/* Auth Error Pages */}
           <Route path="/unauthorized" element={<Unauthorized />} />
+          <Route path="/subscription-expired" element={<SubscriptionExpired />} />
 
           {/* Dashboard - All authenticated users */}
           <Route
@@ -126,6 +130,30 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <BillingAdminPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* SUPER_ADMIN & ADMIN: Plans & Pricing (customer-facing) */}
+          <Route
+            path="/billing/plans"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <PricingPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* SUPER_ADMIN & ADMIN: My Subscription */}
+          <Route
+            path="/billing/my-subscription"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <MySubscriptionPage />
                 </DashboardLayout>
               </RoleGuard>
             }

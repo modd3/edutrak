@@ -9,6 +9,7 @@ import {
 } from '../middleware/auth.middleware';
 import { enforceSchoolContext, validateResourceOwnership } from '../middleware/school-context';
 import { validateUUIDParam } from '../middleware/validation';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const userCreationController = new UserCreationController();
@@ -17,6 +18,7 @@ const userCreationController = new UserCreationController();
 router.use(authenticate);
 router.use(validateResourceOwnership);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 router.use(requestLogger);
 
 

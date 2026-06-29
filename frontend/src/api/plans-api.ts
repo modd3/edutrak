@@ -1,5 +1,5 @@
 import api from './index';
-import {Plan, PaginatedResponse, ApiResponse} from '@/types';
+import {Plan, PlanFeature, PaginatedResponse, ApiResponse} from '@/types';
 
 export interface PlansResponse {
   data: Plan[];
@@ -18,26 +18,9 @@ export interface PlanFeatureInput {
   limitValue?: number | null;
 }
 
-export interface CreatePlanInput {
-  key: string;
-  name: string;
-  description?: string;
-  priceMinor: number;
-  currency?: string;
-  billingInterval: string;
-  isActive?: boolean;
-  features?: PlanFeatureInput[];
-}
+type CreatePlanInput  = Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>>
 
-export interface UpdatePlanInput {
-  name?: string;
-  description?: string;
-  priceMinor?: number;
-  currency?: string;
-  billingInterval?: string;
-  isActive?: boolean;
-  features?: PlanFeatureInput[];
-}
+type UpdatePlanInput = Partial<Omit<CreatePlanInput, 'key'>>
 
 export const plansApi = {
   list: (params?: { page?: number; limit?: number; isActive?: boolean }) =>

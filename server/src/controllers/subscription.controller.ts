@@ -51,4 +51,25 @@ export class SubscriptionController {
       return ResponseUtil.error(res, error.message, 400);
     }
   }
+
+  /**
+   * Get the subscription for the authenticated admin's school.
+   * GET /subscriptions/my
+   */
+  async getMySubscription(req: Request, res: Response): Promise<Response> {
+    try {
+      const schoolId = (req as any).user?.schoolId;
+      if (!schoolId) {
+        return ResponseUtil.error(res, 'School context required', 400);
+      }
+
+      const subscription = await subscriptionService.getSubscriptionBySchool(schoolId);
+      if (!subscription) {
+        return ResponseUtil.notFound(res, 'Active subscription');
+      }
+      return ResponseUtil.success(res, 'Subscription retrieved successfully', subscription);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
 }

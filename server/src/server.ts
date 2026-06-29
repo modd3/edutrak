@@ -1,6 +1,7 @@
 import app from './app';
 import dotenv from 'dotenv';
 import logger from './utils/logger';
+import { initializeScheduler } from './scheduler';
 
 dotenv.config();
 
@@ -14,4 +15,7 @@ app.listen(PORT, () => {
   logger.info(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
   logger.info(`🔗 Health check: http://localhost:${PORT}/health`);
   logger.info(`📚 Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
+
+  // Initialize background job scheduler for subscription lifecycle
+  initializeScheduler();
 });

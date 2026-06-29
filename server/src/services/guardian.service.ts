@@ -147,21 +147,52 @@ export class GuardianService extends BaseService {
         where,
         include: {
           user: {
-            include: {
-              school: {
-                select: { name: true },
-              },
+            select: {
+              firstName: true,
+              middleName: true,
+              lastName: true,
+              email: true,
+              phone: true,
+              idNumber: true,
             },
           },
           students: {
-            include: {
+            select: {
+              relationship: true,
+              isPrimary: true,
+              isVerified: true,
               student: {
-                include: {
-                  user: true,
+                select: {
+                  id: true,
+                  school: {
+                    select: {
+                      name: true,
+                      id: true,
+                    }
+                  },
+                  admissionNo: true,
+                  user: {
+                    select: {
+                      firstName: true,
+                      middleName: true,
+                      lastName: true,
+                      email: true,
+                      idNumber: true,
+                      isActive: true
+                    }
+                  },
                   enrollments: {
                     where: { status: 'ACTIVE' },
-                    include: {
-                      class: true,
+                    select: {
+                      class: {
+                        select: {
+                          name: true,
+                          level: true, 
+                          curriculum: true,
+                          pathway: true, 
+                          isFinal: true
+                        }
+                      },
                     },
                   },
                 },
@@ -404,5 +435,11 @@ export class GuardianService extends BaseService {
       notifications: notifications.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
       unreadCount: notifications.length,
     };
+  }
+
+  // ── Static factory ────────────────────────────────────────────────────────
+
+  static withRequest(req: RequestWithUser): GuardianService {
+    return new GuardianService(req);
   }
 }

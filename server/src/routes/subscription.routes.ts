@@ -9,6 +9,7 @@ router.use(authenticate);
 
 router.post('/', authorize('SUPER_ADMIN'), controller.create.bind(controller));
 router.get('/', authorize('ADMIN', 'SUPER_ADMIN'), controller.list.bind(controller));
+router.get('/my', authorize('ADMIN', 'SUPER_ADMIN'), controller.getMySubscription.bind(controller));
 router.get('/:id', authorize('ADMIN', 'SUPER_ADMIN'), controller.getById.bind(controller));
 router.patch('/:id/status', authorize('SUPER_ADMIN'), controller.transitionStatus.bind(controller));
 

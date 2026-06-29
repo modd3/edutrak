@@ -19,6 +19,7 @@ import {
 } from '../../types/payment-provider.types';
 import { DarajaProvider } from './DarajaProvider';
 import { FlutterwaveProvider } from './FlutterwaveProvider';
+import { decrypt, isEncrypted } from '../../utils/crypto';
 
 export class PaymentProviderFactory {
   private static prisma: PrismaClient = prisma;
@@ -146,8 +147,8 @@ export class PaymentProviderFactory {
       id: r.id,
       tenantId: r.tenantId,
       provider: r.provider,
-      apiKey: r.apiKey,
-      secretKey: r.secretKey,
+      apiKey: isEncrypted(r.apiKey) ? decrypt(r.apiKey) : r.apiKey,
+      secretKey: isEncrypted(r.secretKey) ? decrypt(r.secretKey) : r.secretKey,
       callbackUrl: r.callbackUrl || undefined,
       webhookSecret: r.webhookSecret || undefined,
       isActive: r.isActive,

@@ -180,6 +180,8 @@ export enum TermName {
   TERM_2 = 'TERM_2',
   TERM_3 = 'TERM_3'
 };
+ export type LimitType = 'BOOLEAN' | 'COUNT';
+ export type  BillingInterval = 'MONTHLY' | 'QUARTERLY' | 'YEARLY';
 
 export interface User {
   id: string;
@@ -234,7 +236,7 @@ export interface PlanFeature {
   id: string;
   planId: string;
   featureKey: string;
-  limitType: 'BOOLEAN' | 'COUNT';
+  limitType: LimitType;
   limitValue?: number | null;
   enabled: boolean;
   createdAt: string;
@@ -248,12 +250,19 @@ export interface Plan {
   description?: string;
   priceMinor: number;
   currency: string;
-  billingInterval: string;
+  billingInterval: BillingInterval;
   isActive: boolean;
   features?: PlanFeature[];
   createdAt: string;
   updatedAt: string;
 }
+
+export interface FeatureRegistryEntry {
+  name: string; 
+  limitType: LimitType;
+}
+
+export type FeatureRegistry = Record<string, FeatureRegistryEntry>;
 
 export interface BillingAccount {
   id: string;
@@ -272,6 +281,48 @@ export interface BillingAccount {
   school?: { id: string; name: string };
 }
 
+export type BillingInvoiceStatus = 'DRAFT' | 'OPEN' | 'PAID' | 'VOID' | 'UNCOLLECTIBLE';
+export type BillingPaymentStatus = 'PENDING' | 'COMPLETED' | 'FAILED' | 'REFUNDED' | 'PARTIALLY_REFUNDED';
+
+export interface BillingInvoice {
+  id: string;
+  schoolId: string;
+  subscriptionId: string;
+  invoiceNumber: string;
+  status: BillingInvoiceStatus;
+  subtotalMinor: number;
+  taxMinor: number;
+  totalMinor: number;
+  amountPaidMinor: number;
+  currency: string;
+  issuedAt: string;
+  dueAt: string;
+  paidAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  school?: { id: string; name: string };
+  subscription?: Subscription;
+  payments?: BillingPayment[];
+}
+
+export interface BillingPayment {
+  id: string;
+  schoolId: string;
+  subscriptionId: string;
+  billingInvoiceId?: string;
+  provider: string;
+  providerReference?: string;
+  amountMinor: number;
+  currency: string;
+  status: BillingPaymentStatus;
+  paidAt?: string;
+  metadata?: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
+  school?: { id: string; name: string };
+  invoice?: BillingInvoice;
+}
+
 export interface Subscription {
   id: string;
   schoolId: string;
@@ -284,11 +335,15 @@ export interface Subscription {
   graceEndsAt?: string;
   cancelAt?: string;
   canceledAt?: string;
+  lastBillingDate?: string;
+  renewalCount?: number;
   metadata?: Record<string, any>;
   createdAt: string;
   updatedAt: string;
   plan?: Plan;
   school?: { id: string; name: string };
+  invoices?: BillingInvoice[];
+  payments?: BillingPayment[];
 }
 
 export interface FeeStructure {

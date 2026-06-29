@@ -156,6 +156,12 @@ import { formatDate } from '@/lib/utils';
                     <span>{formatDate(school.updatedAt)}</span>
                   </div>
                 )}
+                {school.id && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID:</span>
+                    <span>{school.id}</span>
+                  </div>
+                )}
               </div>
             </div>
           )}

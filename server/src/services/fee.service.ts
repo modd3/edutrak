@@ -27,6 +27,8 @@ import {
 import { PaymentProviderFactory } from './payment-provider/PaymentProviderFactory';
 import { IdempotencyService } from './payment-provider/idempotency.service';
 import { OnlinePaymentResponse } from '../types/payment-provider.types';
+import { encrypt } from '../utils/crypto';
+import { auditService } from './audit.service';
 
 /**
  * FeeService
@@ -298,8 +300,9 @@ export class FeeService extends BaseService {
    */
   async generateInvoice(data: GenerateInvoiceInput) {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
-    const sid = this.assertSchool(isSuperAdmin ? data.feeStructureId : schoolId);
-    const effectiveSchoolId = isSuperAdmin ? sid : schoolId!;
+    // Super admin must pass schoolId explicitly in the request body; fall back to token school
+    const sid = this.assertSchool(isSuperAdmin ? data.schoolId ?? schoolId : schoolId);
+    const effectiveSchoolId = sid;
 
     // Load the fee structure with its items
     const structure = await this.prisma.feeStructure.findFirst({
@@ -383,6 +386,21 @@ export class FeeService extends BaseService {
       });
 
       logger.info('Invoice generated', { invoiceNo, studentId: data.studentId, schoolId: effectiveSchoolId });
+      
+      const { userId, isSuperAdmin: isAdmin } = this.getSchoolContext();
+      if (userId) {
+        auditService.log({
+          schoolId: effectiveSchoolId,
+          actorId: userId,
+          actorRole: isAdmin ? 'SUPER_ADMIN' : 'ADMIN',
+          action: 'GENERATE_INVOICE',
+          entityType: 'FeeInvoice',
+          entityId: invoice.id,
+          entityName: invoiceNo,
+          details: `Invoice generated for student ${data.studentId} from structure ${data.feeStructureId}`,
+        }).catch(() => {}); // non-blocking
+      }
+
       return invoice;
     });
   }
@@ -690,6 +708,30 @@ export class FeeService extends BaseService {
         },
       });
 
+      // Wire payment into payment plan: mark the earliest PENDING installment paid
+      const plan = await tx.paymentPlan.findUnique({
+        where: { invoiceId: data.invoiceId },
+        include: {
+          schedule: {
+            where: { status: 'PENDING' },
+            orderBy: { installmentNo: 'asc' },
+            take: 1,
+          },
+        },
+      });
+      if (plan?.schedule[0]) {
+        const installment = plan.schedule[0];
+        await tx.paymentPlanInstallment.update({
+          where: { id: installment.id },
+          data: {
+            status: 'PAID',
+            paidAmount: new Decimal(data.amount),
+            paidAt: new Date(),
+            paymentId: payment.id,
+          },
+        });
+      }
+
       logger.info('Payment recorded', {
         receiptNo,
         invoiceId: data.invoiceId,
@@ -697,6 +739,20 @@ export class FeeService extends BaseService {
         method: data.method,
         schoolId: invoice.schoolId,
       });
+
+      const { userId, isSuperAdmin: isAdmin } = this.getSchoolContext();
+      if (userId) {
+        auditService.log({
+          schoolId: invoice.schoolId,
+          actorId: userId,
+          actorRole: isAdmin ? 'SUPER_ADMIN' : 'ADMIN',
+          action: 'RECORD_PAYMENT',
+          entityType: 'FeePayment',
+          entityId: payment.id,
+          entityName: receiptNo,
+          details: `${data.method} payment of ${data.amount} against invoice ${data.invoiceId}`,
+        }).catch(() => {}); // non-blocking
+      }
 
       return payment;
     });
@@ -806,6 +862,19 @@ export class FeeService extends BaseService {
         invoiceId: payment.invoiceId,
         reason: data.reason,
       });
+
+      const { userId, isSuperAdmin: isAdmin } = this.getSchoolContext();
+      if (userId) {
+        auditService.log({
+          schoolId: payment.schoolId,
+          actorId: userId,
+          actorRole: isAdmin ? 'SUPER_ADMIN' : 'ADMIN',
+          action: 'REVERSE_PAYMENT',
+          entityType: 'FeePayment',
+          entityId: paymentId,
+          details: `Payment reversed: ${data.reason}`,
+        }).catch(() => {});
+      }
 
       return reversed;
     });
@@ -1137,8 +1206,8 @@ export class FeeService extends BaseService {
         id: uuidv4(),
         tenantId: effectiveSchoolId,
         provider: data.provider.toUpperCase(),
-        apiKey: data.apiKey,
-        secretKey: data.secretKey,
+        apiKey: encrypt(data.apiKey),
+        secretKey: encrypt(data.secretKey),
         callbackUrl: data.callbackUrl || null,
         webhookSecret: data.webhookSecret || null,
         isActive: data.isActive,
@@ -1174,8 +1243,8 @@ export class FeeService extends BaseService {
     const config = await this.prisma.paymentProviderConfig.update({
       where: { id: providerId },
       data: {
-        ...(data.apiKey !== undefined && { apiKey: data.apiKey }),
-        ...(data.secretKey !== undefined && { secretKey: data.secretKey }),
+        ...(data.apiKey !== undefined && { apiKey: encrypt(data.apiKey) }),
+        ...(data.secretKey !== undefined && { secretKey: encrypt(data.secretKey) }),
         ...(data.callbackUrl !== undefined && { callbackUrl: data.callbackUrl }),
         ...(data.webhookSecret !== undefined && { webhookSecret: data.webhookSecret }),
         ...(data.isActive !== undefined && { isActive: data.isActive }),

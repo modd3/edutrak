@@ -173,9 +173,11 @@ export const feesApi = {
     mpesaCode?: string;
     bankName?: string;
     chequeNo?: string;
-    paidAt?: string; // ISO datetime
+    paidAt?: string;
     notes?: string;
-  }) => api.post('/fees/payments', data),
+  }) => api.post('/fees/payments', data, {
+    headers: { 'Idempotency-Key': `${data.invoiceId}-${data.method}-${data.amount}-${Date.now()}` },
+  }),
 
   /**
    * Get list of payments with filters
@@ -240,8 +242,9 @@ export const feesApi = {
   initiateOnlinePayment: (invoiceId: string, data: {
     provider: 'MPESA' | 'FLUTTERWAVE';
     callbackUrl?: string;
-    idempotencyKey?: string;
-  }) => api.post(`/fees/invoices/${invoiceId}/pay-online`, data),
+  }) => api.post(`/fees/invoices/${invoiceId}/pay-online`, data, {
+    headers: { 'Idempotency-Key': `${invoiceId}-${data.provider}-${Date.now()}` },
+  }),
 
   /**
    * Check payment status for an invoice

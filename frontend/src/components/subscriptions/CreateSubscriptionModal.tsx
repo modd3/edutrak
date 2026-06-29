@@ -23,10 +23,11 @@ import { Loader2 } from 'lucide-react';
 import { useCreateSubscription } from '@/hooks/use-subscriptions';
 import { useSchoolContext, } from '@/hooks/use-school-context';
 import { useSchools } from '@/hooks/use-schools';
+import { School } from '@/types';
 
 const createSubscriptionSchema = z.object({
   planId: z.string().min(1, 'Plan is required'),
-  schoolId: z.string().optional(),
+  schoolId: z.string().min(1, 'School is required'),
   startsAt: z.string().min(1, 'Start date is required'),
   currentPeriodStart: z.string().min(1, 'Period start date is required'),
   currentPeriodEnd: z.string().min(1, 'Period end date is required'),
@@ -122,7 +123,7 @@ export function CreateSubscriptionModal({
                 <SelectValue placeholder="Select a School" />
               </SelectTrigger>
               <SelectContent>
-                {schools?.map((school) => (
+                {schools?.map((school: School) => (
                   <SelectItem key={school.id} value={school.id}>
                     {school.name} 
                   </SelectItem>

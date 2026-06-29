@@ -34,6 +34,18 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
+    // If error is 402 (subscription inactive), redirect to the expired page
+    if (error.response?.status === 402) {
+      const data = error.response.data as { status?: string };
+      if (data?.status) {
+        sessionStorage.setItem('subscription_status', data.status);
+      }
+      if (window.location.pathname !== '/subscription-expired') {
+        window.location.href = '/subscription-expired';
+      }
+      return Promise.reject(error);
+    }
+
     // If error is 401 and we haven't retried yet
     if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;

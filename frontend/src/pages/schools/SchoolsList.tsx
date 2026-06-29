@@ -56,7 +56,7 @@ export default function SchoolsList() {
   const { mutate: deleteSchool, isPending: isDeleting, error} = useDeleteSchool();
 
   // Extract schools array from response
-  const schools = response?.data?.data || [];
+  const schools = response?.data || [];
   const pagination = response?.data?.pagination;
 
   const handleDeleteClick = (school: School) => {

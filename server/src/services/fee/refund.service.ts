@@ -1,6 +1,8 @@
-import { Prisma } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
+import { InvoiceStatus, Prisma } from '@prisma/client';
 import prisma from '../../database/client';
 import { PaymentProviderFactory } from '../payment-provider/PaymentProviderFactory';
+import { auditService } from '../audit.service';
 
 export interface RefundRequest {
   paymentId: string;
@@ -72,7 +74,7 @@ class RefundService {
       return { success: false, refundId: '', amountRefunded: 0, status: 'FAILED', message: 'Payment not found' };
     }
 
-    return await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       const refund = await tx.feeRefund.create({
         data: {
           paymentId,
@@ -124,16 +126,47 @@ class RefundService {
         });
       }
 
+      // Recompute invoice balance and derive status (mirrors reversePayment logic)
+      const inv = payment.invoice;
+      const newPaid = Math.max(0, Number(inv.paidAmount) - amount);
+      const newBalance = Number(inv.totalAmount) - Number(inv.discountAmount) - newPaid;
+
+      let newStatus: InvoiceStatus;
+      if (inv.status === 'CANCELLED' || inv.status === 'WAIVED') {
+        newStatus = inv.status as InvoiceStatus;
+      } else if (newPaid >= Number(inv.totalAmount) - Number(inv.discountAmount)) {
+        newStatus = 'PAID';
+      } else if (newPaid > 0) {
+        newStatus = 'PARTIAL';
+      } else if (inv.dueDate && inv.dueDate < new Date()) {
+        newStatus = 'OVERDUE';
+      } else {
+        newStatus = 'UNPAID';
+      }
+
       await tx.feeInvoice.update({
         where: { id: payment.invoiceId },
         data: {
-          balanceAmount: { increment: Prisma.Decimal(amount) },
-          paidAmount: { decrement: Prisma.Decimal(amount) },
+          paidAmount: new Decimal(newPaid),
+          balanceAmount: new Decimal(Math.max(0, newBalance)),
+          status: newStatus,
         },
       });
 
       return { success: true, refundId: refund.id, amountRefunded: amount, providerRefundId, status: 'COMPLETED' as const, message: 'Refund processed' };
     });
+
+    auditService.log({
+      schoolId: payment.schoolId,
+      actorId: initiatedBy,
+      actorRole: 'ADMIN',
+      action: 'PROCESS_REFUND',
+      entityType: 'FeePayment',
+      entityId: paymentId,
+      details: `Refund of ${amount} processed. Reason: ${reason}`,
+    }).catch(() => {});
+
+    return result;
   }
 
   async getRefundHistory(paymentId: string) {

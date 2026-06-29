@@ -17,10 +17,13 @@ model Tenant {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  school                 School?
-  paymentProviderConfigs PaymentProviderConfig[]
-  webhookLogs            WebhookLog[]
-  lateFeesConfigs        LateFeesConfig[]
+  school                  School?
+  invoices                FeeInvoice[]
+  feePayments             FeePayment[]
+  feeRefunds              FeeRefund[]
+  paymentProviderConfigs  PaymentProviderConfig[]
+  webhookLogs             WebhookLog[]
+  lateFeesConfigs         LateFeesConfig[]
 
   @@index([slug])
   @@index([type])
@@ -138,6 +141,8 @@ model TenantSubscription {
   graceEndsAt        DateTime?
   cancelAt           DateTime?
   canceledAt         DateTime?
+  lastBillingDate    DateTime?
+  renewalCount       Int                @default(0)
   metadata           Json?
   createdAt          DateTime           @default(now())
   updatedAt          DateTime           @updatedAt
@@ -938,6 +943,7 @@ model FeeItem {
 
 model FeeInvoice {
   id             String        @id @default(uuid())
+  tenantId       String?
   invoiceNo      String        @unique // auto-generated: INV/2025/000001
   studentId      String
   feeStructureId String
@@ -960,6 +966,7 @@ model FeeInvoice {
   academicYear AcademicYear      @relation(fields: [academicYearId], references: [id])
   term         Term?             @relation(fields: [termId], references: [id])
   school       School            @relation(fields: [schoolId], references: [id])
+  tenant       Tenant?            @relation(fields: [tenantId], references: [id])
   items        FeeInvoiceItem[]
   payments     FeePayment[]
   paymentPlan  PaymentPlan?
@@ -1000,6 +1007,7 @@ model FeeInvoiceItem {
 
 model FeePayment {
   id             String        @id @default(uuid())
+  tenantId       String?
   receiptNo      String        @unique // auto-generated: RCT/2025/000001
   invoiceId      String
   studentId      String
@@ -1022,6 +1030,7 @@ model FeePayment {
   invoice    FeeInvoice  @relation(fields: [invoiceId], references: [id])
   student    Student     @relation(fields: [studentId], references: [id])
   school     School      @relation(fields: [schoolId], references: [id])
+  tenant     Tenant?      @relation(fields: [tenantId], references: [id])
   feeRefunds FeeRefund[]
 
   @@index([schoolId])
@@ -1149,6 +1158,7 @@ model PaymentPlanInstallment {
 
 model FeeRefund {
   id               String        @id @default(uuid())
+  tenantId         String
   paymentId        String
   invoiceId        String
   studentId        String
@@ -1169,6 +1179,7 @@ model FeeRefund {
   invoice   FeeInvoice @relation(fields: [invoiceId], references: [id])
   student   Student    @relation(fields: [studentId], references: [id])
   school    School     @relation(fields: [schoolId], references: [id])
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
   initiator User       @relation(fields: [initiatedBy], references: [id])
 
   @@index([paymentId])

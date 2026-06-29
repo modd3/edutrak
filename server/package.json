@@ -7,7 +7,6 @@
     "dev": "nodemon --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-        
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -16,28 +15,22 @@
     "db:studio": "prisma studio",
     "db:validate": "prisma validate",
     "db:format": "prisma format",
-    
     "test": "jest --coverage --detectOpenHandles",
     "test:unit": "jest --testPathPattern=unit --coverage",
     "test:integration": "jest --testPathPattern=integration --runInBand",
     "test:e2e": "jest --testPathPattern=e2e --runInBand",
     "test:watch": "jest --watch",
     "test:ci": "jest --ci --coverage --maxWorkers=2",
-    
-    
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
     "format": "prettier --write \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "format:check": "prettier --check \"src/**/*.{ts,json}\" \"prisma/**/*.prisma\"",
     "type-check": "npm run type-check --workspace=server",
-    
     "security:audit": "npm audit --audit-level=moderate",
     "security:fix": "npm audit fix",
-    
     "docker:build": "docker build -t edutrak-api .",
     "docker:run": "docker-compose up -d",
     "docker:stop": "docker-compose down",
-    
     "precommit": "lint-staged",
     "prepush": "npm run type-check && npm run test:unit"
   },
@@ -52,6 +45,7 @@
   "license": "GPL-3.0",
   "dependencies": {
     "@prisma/client": "^6.19.0",
+    "@types/node-cron": "^3.0.11",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "bull": "^4.12.0",
@@ -69,6 +63,7 @@
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "multer": "^2.0.2",
+    "node-cron": "^4.5.0",
     "nodemailer": "^6.9.7",
     "pdfkit": "^0.14.0",
     "uuid": "^9.0.1",
@@ -126,8 +121,8 @@
       "prisma format"
     ],
     "workspaces": [
-    "server",
-    "frontend"
-  ]
+      "server",
+      "frontend"
+    ]
   }
 }

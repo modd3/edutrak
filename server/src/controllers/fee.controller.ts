@@ -573,14 +573,20 @@ export class FeeController {
    */
   async confirmReconciliation(req: RequestWithUser, res: Response) {
     try {
-      const { matchIds } = req.body;
-      if (!matchIds || !Array.isArray(matchIds) || matchIds.length === 0) {
-        return ResponseUtil.validationError(res, 'matchIds array is required');
+      // Accepts: { matches: Array<{ invoiceId: string; amount: number }> }
+      const { matches } = req.body;
+      if (!matches || !Array.isArray(matches) || matches.length === 0) {
+        return ResponseUtil.validationError(res, 'matches array is required');
+      }
+      for (const m of matches) {
+        if (!m.invoiceId || typeof m.amount !== 'number' || m.amount <= 0) {
+          return ResponseUtil.validationError(res, 'Each match must have invoiceId and a positive amount');
+        }
       }
       const service = ReconciliationService.withRequest(req);
       const { schoolId } = req;
       if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
-      const result = await service.confirmMatches(matchIds, schoolId);
+      const result = await service.confirmMatches(matches, schoolId);
       return ResponseUtil.success(res, `Confirmed ${result.confirmed} payments`, result);
     } catch (error: any) {
       logger.error('Error confirming reconciliation', { error: error.message });

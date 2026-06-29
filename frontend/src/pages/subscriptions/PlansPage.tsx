@@ -1,249 +1,313 @@
 import { useState } from 'react';
-import { usePlans, useDeletePlan } from '@/hooks/use-plans';
-import { PlanFormModal } from '@/components/subscriptions/PlanFormModal';
-import { Plan } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { ColumnDef } from '@tanstack/react-table';
+import { MoreHorizontal, PlusCircle, Edit, Trash } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { DataTable } from '@/components/shared/DataTable';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Badge } from '@/components/ui/badge';
+import { usePlans, useDeletePlan } from '@/hooks/use-plans';
+import { Plan } from '@/types';
+import { PlanFormModal } from '@/components/subscriptions/PlanFormModal';
 import { toast } from 'sonner';
+
+// Mirrors the server-side FEATURE_REGISTRY for displaying feature labels in the table
+const FEATURE_REGISTRY: Record<string, { name: string; limitType: 'BOOLEAN' | 'COUNT' }> = {
+  'fees.core': { name: 'Fee Management', limitType: 'BOOLEAN' },
+  'fees.mpesa': { name: 'M-PESA Integration', limitType: 'BOOLEAN' },
+  'fees.report': { name: 'Fee Reports', limitType: 'BOOLEAN' },
+  'fees.reconciliation': { name: 'Bank Reconciliation', limitType: 'BOOLEAN' },
+  'fees.late_fees': { name: 'Late Fees', limitType: 'BOOLEAN' },
+  'academic.core': { name: 'Academic Management', limitType: 'BOOLEAN' },
+  'assessments.bulk': { name: 'Bulk Grade Entry', limitType: 'BOOLEAN' },
+  'students.max': { name: 'Student Limit', limitType: 'COUNT' },
+  'teachers.max': { name: 'Teacher Limit', limitType: 'COUNT' },
+  'sms.monthly_quota': { name: 'SMS Quota', limitType: 'COUNT' },
+  'lms.core': { name: 'Learning Management', limitType: 'BOOLEAN' },
+};
+
+const BILLING_INTERVAL_LABELS: Record<string, string> = {
+  MONTHLY: 'Monthly',
+  QUARTERLY: 'Quarterly',
+  YEARLY: 'Annually',
+};
+
+function formatPrice(minor: number, currency: string) {
+  return `${(minor / 100).toLocaleString('en-KE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
+}
 
 export function PlansPage() {
   const [page, setPage] = useState(1);
-  const [showFormModal, setShowFormModal] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState<Plan | undefined>();
-  const [isEditing, setIsEditing] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [planToDelete, setPlanToDelete] = useState<Plan | undefined>();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [selectedPlan, setSelectedPlan] = useState<Plan | null>(null);
 
-  const { data, isLoading, isError } = usePlans({
+  const { data: response, isLoading, isError } = usePlans({
     page,
     limit: 20,
   });
-  const deleteMutation = useDeletePlan();
+  const { mutate: deletePlan, isPending: isDeleting } = useDeletePlan();
 
-  const plans = data?.data || [];
-  const pagination = data?.pagination;
-
-  const handleCreateClick = () => {
-    setSelectedPlan(undefined);
-    setIsEditing(false);
-    setShowFormModal(true);
-  };
+  const plans = response?.data || [];
+  const pagination = response?.pagination;
 
   const handleEditClick = (plan: Plan) => {
     setSelectedPlan(plan);
-    setIsEditing(true);
-    setShowFormModal(true);
+    setShowEditModal(true);
   };
 
   const handleDeleteClick = (plan: Plan) => {
-    setPlanToDelete(plan);
-    setDeleteDialogOpen(true);
+    setSelectedPlan(plan);
+    setShowDeleteDialog(true);
   };
 
-  const confirmDelete = async () => {
-    if (!planToDelete) return;
-    try {
-      await deleteMutation.mutateAsync(planToDelete.id);
-      toast.success('Plan deleted successfully');
-      setDeleteDialogOpen(false);
-      setPlanToDelete(undefined);
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to delete plan');
+  const confirmDelete = () => {
+    if (selectedPlan) {
+      deletePlan(selectedPlan.id, {
+        onSuccess: () => {
+          toast.success('Plan deleted successfully');
+          setShowDeleteDialog(false);
+          setSelectedPlan(null);
+        },
+        onError: (error: any) => {
+          toast.error(error?.response?.data?.message || 'Failed to delete plan');
+        },
+      });
     }
   };
 
-  const formatPrice = (priceMinor: number, currency: string) => {
-    return `${(priceMinor / 100).toFixed(2)} ${currency}`;
-  };
+  const columns: ColumnDef<Plan>[] = [
+    {
+      accessorKey: 'name',
+      header: 'Name',
+      cell: ({ row }) => {
+        const plan = row.original;
+        return (
+          <Button
+            variant="ghost"
+            className="p-0 h-auto font-medium text-wrap hover:shadow hover:bg-green-50 text-left justify-start"
+            onClick={() => handleEditClick(plan)}
+          >
+            {plan.name}
+          </Button>
+        );
+      },
+    },
+    {
+      accessorKey: 'key',
+      header: 'Key',
+      cell: ({ row }) => {
+        const key = row.getValue('key') as string;
+        return (
+          <Badge variant="secondary" className="font-mono text-xs">
+            {key}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'price',
+      header: 'Price',
+      cell: ({ row }) => {
+        const plan = row.original;
+        return (
+          <span className="whitespace-nowrap font-medium">
+            {formatPrice(plan.priceMinor, plan.currency)}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'billingInterval',
+      header: 'Billing',
+      cell: ({ row }) => {
+        const interval = row.original.billingInterval;
+        return (
+          <span className="text-muted-foreground">
+            {BILLING_INTERVAL_LABELS[interval] || interval}
+          </span>
+        );
+      },
+    },
+    {
+      id: 'isActive',
+      header: 'Status',
+      cell: ({ row }) => {
+        const isActive = row.original.isActive;
+        return (
+          <Badge variant={isActive ? 'default' : 'secondary'}>
+            {isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        );
+      },
+    },
+    {
+      id: 'features',
+      header: 'Features',
+      cell: ({ row }) => {
+        const features = row.original.features;
+        if (!features || features.length === 0) {
+          return <span className="text-muted-foreground text-sm">None</span>;
+        }
+        const enabled = features.filter(f => f.enabled);
+        if (enabled.length === 0) {
+          return <span className="text-muted-foreground text-sm">None enabled</span>;
+        }
+        return (
+          <div className="flex flex-wrap gap-1">
+            {enabled.map(f => {
+              const label = FEATURE_REGISTRY[f.featureKey]?.name ?? f.featureKey;
+              const suffix = f.limitType === 'COUNT' && f.limitValue != null ? ` (${f.limitValue})` : '';
+              return (
+                <Badge key={f.id} variant="outline" className="text-xs">
+                  {label}{suffix}
+                </Badge>
+              );
+            })}
+          </div>
+        );
+      },
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const plan = row.original;
+        return (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-8 w-8 p-0">
+                <span className="sr-only">Open menu</span>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => handleEditClick(plan)}>
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Plan
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={() => handleDeleteClick(plan)}
+              >
+                <Trash className="mr-2 h-4 w-4" />
+                Delete Plan
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        );
+      },
+    },
+  ];
 
-  const formatBillingInterval = (interval: string) => {
-    const map: Record<string, string> = {
-      MONTHLY: 'Monthly',
-      QUARTERLY: 'Quarterly',
-      ANNUALLY: 'Annually',
-    };
-    return map[interval] || interval;
-  };
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <Skeleton className="h-10 w-48" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="h-64 w-full" />
+      </div>
+    );
+  }
 
   if (isError) {
     return (
-      <div className="space-y-6 p-6">
-        <h1 className="text-3xl font-bold">Billing Plans</h1>
-        <Card className="border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <p className="text-red-800">Failed to load plans. Please try again.</p>
-          </CardContent>
-        </Card>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-destructive text-lg mb-2">Failed to load plans</p>
+          <Button onClick={() => window.location.reload()}>Retry</Button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Billing Plans</h1>
-          <p className="text-gray-600">Create and manage subscription billing plans</p>
+          <p className="text-muted-foreground">Create and manage subscription billing plans</p>
         </div>
-        <Button onClick={handleCreateClick} className="gap-2">
-          <Plus className="h-4 w-4" />
+        <Button onClick={() => setShowCreateModal(true)}>
+          <PlusCircle className="mr-2 h-4 w-4" />
           New Plan
         </Button>
       </div>
 
-      {/* Plans Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {isLoading ? 'Loading...' : `Plans (${pagination?.total || 0})`}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Name</TableHead>
-                  <TableHead>Key</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Billing Interval</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      Loading plans...
-                    </TableCell>
-                  </TableRow>
-                ) : plans.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      No plans found. Create your first plan to get started.
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  plans.map((plan) => (
-                    <TableRow key={plan.id}>
-                      <TableCell className="font-medium">{plan.name}</TableCell>
-                      <TableCell className="font-mono text-sm">{plan.key}</TableCell>
-                      <TableCell>{formatPrice(plan.priceMinor, plan.currency)}</TableCell>
-                      <TableCell>{formatBillingInterval(plan.billingInterval)}</TableCell>
-                      <TableCell>
-                        <Badge variant={plan.isActive ? 'default' : 'secondary'}>
-                          {plan.isActive ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleEditClick(plan)}
-                          className="gap-1"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteClick(plan)}
-                          className="gap-1 text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                          Delete
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+      <DataTable columns={columns} data={plans} pageSize={20} />
 
-          {/* Pagination */}
-          {pagination && pagination.pages > 1 && (
-            <div className="flex items-center justify-between mt-6 pt-6 border-t">
-              <div className="text-sm text-gray-600">
-                Page {pagination.page} of {pagination.pages} ({pagination.total} total)
-              </div>
-              <div className="space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(Math.max(1, page - 1))}
-                  disabled={page === 1 || isLoading}
-                >
-                  Previous
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setPage(Math.min(pagination.pages, page + 1))}
-                  disabled={page === pagination.pages || isLoading}
-                >
-                  Next
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {pagination && (
+        <div className="text-sm text-muted-foreground text-center">
+          Showing {plans.length} of {pagination.total} plans
+        </div>
+      )}
 
-      {/* Form Modal */}
+      {/* Create Plan Modal */}
       <PlanFormModal
-        open={showFormModal}
-        onOpenChange={setShowFormModal}
-        initialData={selectedPlan}
-        isEditing={isEditing}
+        open={showCreateModal}
+        onOpenChange={setShowCreateModal}
+        isEditing={false}
       />
 
+      {/* Edit Plan Modal */}
+      {selectedPlan && (
+        <PlanFormModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
+          initialData={selectedPlan}
+          isEditing={true}
+        />
+      )}
+
       {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Plan</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete the plan <strong>{planToDelete?.name}</strong>? This action cannot be undone.
-              {planToDelete?.features && planToDelete.features.length > 0 && (
-                <p className="mt-2 text-sm">This plan has features configured. Deleting it may affect associated data.</p>
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Plan</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "<strong>{selectedPlan?.name}</strong>"? This action cannot
+              be undone.
+              {selectedPlan?.features && selectedPlan.features.length > 0 && (
+                <p className="mt-2 text-sm">
+                  This plan has features configured. Deleting it may affect associated data.
+                </p>
               )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogAction asChild>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
             <Button
-              variant="destructive"
-              onClick={confirmDelete}
-              disabled={deleteMutation.isPending}
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
             >
-              Delete
+              Cancel
             </Button>
-          </AlertDialogAction>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-        </AlertDialogContent>
-      </AlertDialog>
+            <Button variant="destructive" onClick={confirmDelete} disabled={isDeleting}>
+              {isDeleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

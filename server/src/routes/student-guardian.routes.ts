@@ -4,12 +4,14 @@ import { Router } from 'express';
 import { StudentGuardianController } from '../controllers/student-guardian.controller';
 import { authenticate, authorize } from '../middleware/auth.middleware';
 import { enforceSchoolContext } from '../middleware/school-context';
+import { enforceSubscription } from '../middleware/subscription.middleware';
 
 const router = Router();
 const controller = new StudentGuardianController();
 
 router.use(authenticate);
 router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 
 // Link existing guardian to student
 router.post(

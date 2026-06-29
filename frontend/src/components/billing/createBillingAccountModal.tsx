@@ -25,9 +25,10 @@ import { useCreateBillingAccount} from '@/hooks/use-billing-account';
 import { useSchoolContext, } from '@/hooks/use-school-context';
 import { useSchools } from '@/hooks/use-schools';
 import { ScrollArea } from '../ui/scroll-area';
+import { School } from '@/types';
 
 const billingAccountSchema = z.object({
-  schoolId: z.string().uuid("School ID is Required!"),
+  schoolId: z.string().min(1, 'School is required'),
   legalName: z.string().min(2, 'Legal name is required'),
   email: z.string().email("Please provide an Email!").optional(),
   Phone: z.string().min(2).optional(),
@@ -56,9 +57,8 @@ export function CreateBillingAccountModal({
   const schoolsData = useSchools();
   const createMutation = useCreateBillingAccount();
 
-  const schools = schoolsData.data?.data.data
-  console.log("Schools data: ", schoolsData);
-  
+  const schools = schoolsData.data?.data
+ 
   const {
     watch, 
     handleSubmit, 
@@ -82,7 +82,7 @@ export function CreateBillingAccountModal({
     }
 
     await createMutation.mutateAsync({
-      schoolId: finalSchoolId,
+      schoolId:finalSchoolId,
       legalName: data.legalName,
       email: data.email,
       phone: data.Phone,
@@ -125,7 +125,7 @@ export function CreateBillingAccountModal({
                 <SelectValue placeholder="Select a School" />
               </SelectTrigger>
               <SelectContent>
-                {schools?.map((school) => (
+                {schools?.map((school: School) => (
                   <SelectItem key={school.id} value={school.id}>
                     {school.name} 
                   </SelectItem>

@@ -76,6 +76,21 @@ export class SubscriptionService {
     });
   }
 
+  async getSubscriptionBySchool(schoolId: string) {
+    return await (prisma as any).tenantSubscription.findFirst({
+      where: { schoolId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        plan: { include: { features: true } },
+        school: true,
+        invoices: {
+          orderBy: { createdAt: 'desc' },
+          take: 10,
+        },
+      },
+    });
+  }
+
   async transitionSubscriptionStatus(id: string, nextStatus: string, graceEndsAt?: string) {
     const subscription = await (prisma as any).tenantSubscription.findUnique({ where: { id } });
     if (!subscription) throw new Error('Subscription not found');

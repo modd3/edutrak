@@ -1,19 +1,9 @@
-/**
- * Webhook Controller
- *
- * Handles incoming webhook notifications from payment providers.
- * Each provider (Daraja, Flutterwave, Stripe) sends payment confirmations
- * to these endpoints. The controller:
- * 1. Logs the raw payload for audit
- * 2. Validates the provider signature
- * 3. Routes to the appropriate provider handler
- * 4. Updates the invoice status on successful payment
- */
+import { createHmac, timingSafeEqual } from 'crypto';
 import { Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { Decimal } from '@prisma/client/runtime/library';
 import prisma from '../database/client';
 import logger from '../utils/logger';
-import { ResponseUtil } from '../utils/response';
 import { RequestWithUser } from '../middleware/school-context';
 import { PaymentProviderFactory } from '../services/payment-provider/PaymentProviderFactory';
 import { WebhookPayload } from '../types/payment-provider.types';
@@ -26,30 +16,21 @@ export class WebhookController {
     this.prisma = prisma;
   }
 
-  /**
-   * Generic webhook receiver for all providers.
-   * Logs the payload first, then routes to the specific provider handler.
-   *
-   * POST /api/v1/webhooks/payments/:provider
-   */
+  // ─── Generic webhook (POST /api/v1/webhooks/payments/:provider) ──────────────
+
   async handlePaymentWebhook(req: RequestWithUser, res: Response) {
     const provider = (req.params.provider || '').toUpperCase();
     const rawBody = req.body;
-    const signature = req.headers['x-signature'] as string || req.headers['authorization'] as string;
+    const signature = (req.headers['x-signature'] as string) || (req.headers['authorization'] as string);
     const ipAddress = req.ip || req.socket.remoteAddress;
 
-    logger.info('Received payment webhook', {
-      provider,
-      ipAddress,
-      contentType: req.headers['content-type'],
-    });
+    logger.info('Received payment webhook', { provider, ipAddress });
 
     try {
-      // 1. Log the incoming webhook for audit trail
       const webhookLog = await this.prisma.webhookLog.create({
         data: {
           provider,
-          event: req.headers['x-event-name'] as string || 'payment.notification',
+          event: (req.headers['x-event-name'] as string) || 'payment.notification',
           payload: rawBody,
           headers: req.headers as Record<string, InputJsonArray>,
           signature: signature || null,
@@ -58,72 +39,63 @@ export class WebhookController {
         },
       });
 
-      // 2. Find which tenant this webhook belongs to
-      //    This is determined by the provider's configuration (shortcode, account, etc.)
       const tenantId = await this.resolveTenantFromWebhook(provider, rawBody);
 
       if (!tenantId) {
         logger.warn('Could not resolve tenant from webhook', { provider, webhookLogId: webhookLog.id });
-        // Still acknowledge to prevent provider from retrying
         return res.status(200).json({ status: 'received' });
       }
 
-      // 3. Get the provider instance and let it handle the webhook
-      const paymentProvider = await PaymentProviderFactory.getProvider(tenantId, provider);
+      // Verify signature against the tenant's webhookSecret
+      const verified = await this.verifySignature(provider, tenantId, signature, req.body);
+      if (!verified) {
+        logger.warn('Webhook signature verification failed', { provider, tenantId, webhookLogId: webhookLog.id });
+        await this.prisma.webhookLog.update({
+          where: { id: webhookLog.id },
+          data: { error: 'Signature verification failed' },
+        });
+        // Return 200 to avoid leaking info to attackers, but do NOT process
+        return res.status(200).json({ status: 'received' });
+      }
 
+      const paymentProvider = await PaymentProviderFactory.getProvider(tenantId, provider);
       const webhookPayload: WebhookPayload = {
         provider,
-        event: req.headers['x-event-name'] as string || 'payment.notification',
+        event: (req.headers['x-event-name'] as string) || 'payment.notification',
         rawBody,
         signature: signature || undefined,
-        timestamp: req.headers['x-timestamp'] as string || undefined,
+        timestamp: req.headers['x-timestamp'] as string | undefined,
       };
-
       await paymentProvider.handleWebhook(webhookPayload);
 
-      // 4. Process the payment confirmation (update invoice + create payment record)
       await this.processPaymentConfirmation(provider, rawBody, webhookLog.id);
 
-      // 5. Mark webhook as processed
       await this.prisma.webhookLog.update({
         where: { id: webhookLog.id },
-        data: {
-          processed: true,
-          processedAt: new Date(),
-        },
+        data: { processed: true, processedAt: new Date() },
       });
 
-      // Always respond 200 to prevent provider from retrying
       return res.status(200).json({ status: 'success' });
     } catch (error: any) {
-      logger.error('Error processing webhook', {
-        provider,
-        error: error.message,
-      });
-
-      // Still respond 200 for known providers to prevent retry storms
+      logger.error('Error processing webhook', { provider, error: error.message });
       return res.status(200).json({ status: 'received' });
     }
   }
 
-  /**
-   * M-Pesa specific callback endpoint.
-   * Safaricom sends callbacks to this URL.
-   *
-   * POST /api/v1/webhooks/payments/mpesa/callback
-   */
+  // ─── M-Pesa specific callback (POST /api/v1/webhooks/payments/mpesa/callback) ─
+
   async handleMpesaCallback(req: RequestWithUser, res: Response) {
     const rawBody = req.body;
     const ipAddress = req.ip || req.socket.remoteAddress;
+    const callback = rawBody.Body?.stkCallback;
 
     logger.info('Received M-Pesa callback', {
       ipAddress,
-      checkoutRequestId: rawBody.Body?.stkCallback?.CheckoutRequestID,
+      checkoutRequestId: callback?.CheckoutRequestID,
     });
 
     try {
-      // Log the callback
-      await this.prisma.webhookLog.create({
+      const webhookLog = await this.prisma.webhookLog.create({
         data: {
           provider: 'MPESA',
           event: 'mpesa.callback',
@@ -134,67 +106,52 @@ export class WebhookController {
         },
       });
 
-      const callback = rawBody.Body?.stkCallback;
       if (!callback) {
         logger.warn('Invalid M-Pesa callback body');
         return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
       }
 
-      const success = callback.ResultCode === 0;
-
-      if (success) {
-        const metadata = this.extractMpesaMetadata(callback.CallbackMetadata?.Item || []);
-        logger.info('M-Pesa payment successful', {
-          checkoutRequestId: callback.CheckoutRequestID,
-          receiptNumber: metadata.MpesaReceiptNumber,
-          amount: metadata.Amount,
-          phoneNumber: metadata.PhoneNumber,
+      if (callback.ResultCode === 0) {
+        await this.processPaymentConfirmation('MPESA', rawBody, webhookLog.id);
+        await this.prisma.webhookLog.update({
+          where: { id: webhookLog.id },
+          data: { processed: true, processedAt: new Date() },
         });
-
-        // TODO: Find the pending payment record by CheckoutRequestID and update it
-        // This will be fully implemented when we add the online payment flow
-        // to the fee service. For now we log it successfully.
       } else {
         logger.warn('M-Pesa payment failed', {
           checkoutRequestId: callback.CheckoutRequestID,
           resultCode: callback.ResultCode,
           reason: callback.ResultDesc,
         });
+        // Mark the pending payment as failed
+        await this.prisma.feePayment.updateMany({
+          where: { transactionRef: callback.CheckoutRequestID, status: 'PENDING' },
+          data: { status: 'FAILED' },
+        });
       }
 
-      // M-Pesa expects ResultCode 0 to acknowledge receipt
-      return res.status(200).json({
-        ResultCode: 0,
-        ResultDesc: 'Success',
-      });
+      return res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
     } catch (error: any) {
       logger.error('Error processing M-Pesa callback', { error: error.message });
-      // Still return success to M-Pesa
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
     }
   }
 
-  /**
-   * Safaricom B2C (refund) timeout URL.
-   */
   async handleMpesaTimeout(req: RequestWithUser, res: Response) {
     logger.warn('M-Pesa B2C timeout', { body: req.body });
     return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
   }
 
-  /**
-   * Safaricom B2C (refund) result URL.
-   */
   async handleMpesaResult(req: RequestWithUser, res: Response) {
     logger.info('M-Pesa B2C result', { body: req.body });
     return res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
   }
 
-  // ─── Private Helpers ─────────────────────────────────────────────────────────
+  // ─── Private helpers ──────────────────────────────────────────────────────────
 
   /**
-   * Try to resolve which tenant (school) a webhook belongs to.
-   * For M-Pesa, this is based on the BusinessShortCode in the callback.
+   * Resolve which school owns this webhook by looking up the pending payment
+   * (M-Pesa: by CheckoutRequestID) or the provider config (Flutterwave: by tx_ref).
    */
   private async resolveTenantFromWebhook(
     provider: string,
@@ -202,22 +159,36 @@ export class WebhookController {
   ): Promise<string | null> {
     try {
       if (provider === 'MPESA') {
-        // For M-Pesa, the callback may not contain the tenant ID directly.
-        // We need to look it up from the CheckoutRequestID or MerchantRequestID.
-        const checkoutRequestId =
-          (rawBody as any)?.Body?.stkCallback?.CheckoutRequestID;
-
+        const checkoutRequestId = (rawBody as any)?.Body?.stkCallback?.CheckoutRequestID;
         if (checkoutRequestId) {
-          // Look up the pending payment record
-          // This will work once we store CheckoutRequestID on payments
-          // For now, return null and log
-          logger.info('M-Pesa webhook needs CheckoutRequestID mapping', {
-            checkoutRequestId,
+          const payment = await this.prisma.feePayment.findFirst({
+            where: { transactionRef: checkoutRequestId },
+            select: { schoolId: true },
           });
+          if (payment) return payment.schoolId;
         }
       }
 
-      // TODO: For Flutterwave/Stripe, use the webhook secret to find the config
+      if (provider === 'FLUTTERWAVE') {
+        // Flutterwave sends tx_ref which we set to our transactionRef
+        const txRef = (rawBody as any)?.data?.tx_ref as string | undefined;
+        if (txRef) {
+          const payment = await this.prisma.feePayment.findFirst({
+            where: { transactionRef: txRef },
+            select: { schoolId: true },
+          });
+          if (payment) return payment.schoolId;
+        }
+        // Fall back: match by first active Flutterwave config that has the right secret
+        // (handled during signature verification — here we return the first active one
+        // so verifySignature can run; if it fails we discard)
+        const config = await this.prisma.paymentProviderConfig.findFirst({
+          where: { provider: 'FLUTTERWAVE', isActive: true },
+          select: { tenantId: true },
+        });
+        return config?.tenantId ?? null;
+      }
+
       return null;
     } catch (error: any) {
       logger.error('Error resolving tenant from webhook', { error: error.message });
@@ -226,8 +197,66 @@ export class WebhookController {
   }
 
   /**
-   * Process a payment confirmation from a webhook.
-   * Updates the invoice status and creates a FeePayment record.
+   * Verify the webhook signature against the stored webhookSecret for the tenant.
+   *
+   * M-Pesa (Daraja): Safaricom does not sign STK Push callbacks — we accept
+   *   them if we can match the CheckoutRequestID to a known pending payment (done
+   *   above in resolveTenantFromWebhook), which is sufficient for this flow.
+   *
+   * Flutterwave: Sends `verif-hash` header matching the webhook secret configured
+   *   in the Flutterwave dashboard.
+   */
+  private async verifySignature(
+    provider: string,
+    tenantId: string,
+    signature: string | undefined,
+    body: unknown
+  ): Promise<boolean> {
+    // M-Pesa STK Push callbacks are not HMAC-signed by Safaricom;
+    // tenant resolution via CheckoutRequestID is our security check.
+    if (provider === 'MPESA') return true;
+
+    if (!signature) {
+      logger.warn('Missing signature for provider', { provider, tenantId });
+      return false;
+    }
+
+    const config = await this.prisma.paymentProviderConfig.findFirst({
+      where: { tenantId, provider, isActive: true },
+      select: { webhookSecret: true },
+    });
+
+    if (!config?.webhookSecret) {
+      // No secret configured — allow but warn
+      logger.warn('No webhookSecret configured for provider, skipping signature check', { provider, tenantId });
+      return true;
+    }
+
+    try {
+      if (provider === 'FLUTTERWAVE') {
+        // Flutterwave sends the raw secret as the header value
+        const expected = Buffer.from(config.webhookSecret);
+        const received = Buffer.from(signature);
+        if (expected.length !== received.length) return false;
+        return timingSafeEqual(expected, received);
+      }
+
+      // Generic HMAC-SHA256 (future providers)
+      const bodyStr = typeof body === 'string' ? body : JSON.stringify(body);
+      const expected = createHmac('sha256', config.webhookSecret).update(bodyStr).digest('hex');
+      const received = signature.replace(/^sha256=/, '');
+      const expectedBuf = Buffer.from(expected, 'hex');
+      const receivedBuf = Buffer.from(received, 'hex');
+      if (expectedBuf.length !== receivedBuf.length) return false;
+      return timingSafeEqual(expectedBuf, receivedBuf);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Apply a confirmed payment to the invoice — shared by the generic handler
+   * and the M-Pesa dedicated callback.
    */
   private async processPaymentConfirmation(
     provider: string,
@@ -235,71 +264,138 @@ export class WebhookController {
     webhookLogId: string
   ): Promise<void> {
     try {
+      let checkoutRequestId: string | undefined;
+      let mpesaReceiptCode: string | undefined;
+      let txRef: string | undefined;
+
       if (provider === 'MPESA') {
         const callback = (rawBody as any)?.Body?.stkCallback;
         if (!callback || callback.ResultCode !== 0) return;
+        const meta = this.extractMpesaMetadata(callback.CallbackMetadata?.Item || []);
+        checkoutRequestId = callback.CheckoutRequestID as string;
+        mpesaReceiptCode = meta.MpesaReceiptNumber as string;
+      } else if (provider === 'FLUTTERWAVE') {
+        const data = (rawBody as any)?.data;
+        if (!data || data.status !== 'successful') return;
+        txRef = data.tx_ref as string;
+      } else {
+        return;
+      }
 
-        const metadata = this.extractMpesaMetadata(
-          callback.CallbackMetadata?.Item || []
-        );
+      const lookupRef = checkoutRequestId ?? txRef;
+      if (!lookupRef) return;
 
-        const transactionRef = metadata.MpesaReceiptNumber as string;
-        const amount = Number(metadata.Amount || 0);
-        const phoneNumber = (metadata.PhoneNumber as string) || '';
-        const checkoutRequestId = callback.CheckoutRequestID;
+      // First try to match a FeePayment (student fees)
+      const feePayment = await this.prisma.feePayment.findFirst({
+        where: { transactionRef: lookupRef, status: 'PENDING' },
+        include: { invoice: true },
+      });
 
-        // Find the invoice associated with this CheckoutRequestID
-        // This requires storing CheckoutRequestID on FeePayment during initiation
-        const payment = await this.prisma.feePayment.findFirst({
-          where: { transactionRef: checkoutRequestId },
-          include: { invoice: true },
+      if (feePayment) {
+        const invoice = feePayment.invoice;
+        const newPaid = Number(invoice.paidAmount) + Number(feePayment.amount);
+        const net = Number(invoice.totalAmount) - Number(invoice.discountAmount);
+        const newBalance = Math.max(0, net - newPaid);
+        const newStatus = newPaid >= net ? 'PAID' : 'PARTIAL';
+
+        await this.prisma.$transaction(async (tx) => {
+          await tx.feePayment.update({
+            where: { id: feePayment.id },
+            data: {
+              status: 'COMPLETED',
+              paidAt: new Date(),
+              ...(mpesaReceiptCode && { mpesaCode: mpesaReceiptCode, transactionRef: mpesaReceiptCode }),
+            },
+          });
+          await tx.feeInvoice.update({
+            where: { id: invoice.id },
+            data: {
+              paidAmount: new Decimal(newPaid),
+              balanceAmount: new Decimal(newBalance),
+              status: newStatus,
+            },
+          });
         });
 
-        if (payment) {
-          if (payment.status === 'COMPLETED') {
-            logger.warn('Payment already completed, skipping webhook processing', {
-              paymentId: payment.id,
-              transactionRef,
-            });
-            return;
-          }
-
-          // Update the payment record
-          await this.prisma.$transaction(async (tx) => {
-            await tx.feePayment.update({
-              where: { id: payment.id },
-              data: {
-                status: 'COMPLETED',
-                mpesaCode: transactionRef,
-                transactionRef,
-                paidAt: new Date(),
-              },
-            });
-
-            // Update the invoice balance
-            const invoice = payment.invoice;
-            const newPaid = Number(invoice.paidAmount) + Number(payment.amount);
-            const newBalance = Number(invoice.totalAmount) - Number(invoice.discountAmount) - newPaid;
-
-            await tx.feeInvoice.update({
-              where: { id: invoice.id },
-              data: {
-                paidAmount: newPaid,
-                balanceAmount: Math.max(0, newBalance),
-                status: newPaid >= Number(invoice.totalAmount) - Number(invoice.discountAmount)
-                  ? 'PAID'
-                  : 'PARTIAL',
-              },
-            });
-          });
-
-          logger.info('Payment confirmed via webhook', {
-            paymentId: payment.id,
-            invoiceId: payment.invoiceId,
-            mpesaCode: transactionRef,
-          });
-        }
+        logger.info('Fee payment confirmed via webhook', {
+          paymentId: feePayment.id,
+          invoiceId: invoice.id,
+          provider,
+          newStatus,
+        });
+        return;
       }
+
+      // If no fee payment found, try BillingPayment (subscription invoices)
+      const billingPayment = await this.prisma.billingPayment.findFirst({
+        where: {
+          providerReference: lookupRef,
+          status: 'PENDING',
+        },
+        include: { invoice: true },
+      });
+
+      if (billingPayment) {
+        await this.prisma.$transaction(async (tx: any) => {
+          // Mark payment as completed
+          await tx.billingPayment.update({
+            where: { id: billingPayment.id },
+            data: {
+              status: 'COMPLETED',
+              paidAt: new Date(),
+              providerReference: mpesaReceiptCode || billingPayment.providerReference,
+            },
+          });
+
+          // Update invoice
+          if (billingPayment.billingInvoiceId) {
+            const billInvoice = await tx.billingInvoice.findUnique({
+              where: { id: billingPayment.billingInvoiceId },
+            });
+
+            if (billInvoice) {
+              const nextPaid = billInvoice.amountPaidMinor + billingPayment.amountMinor;
+              const nextStatus = nextPaid >= billInvoice.totalMinor ? 'PAID' : 'OPEN';
+
+              await tx.billingInvoice.update({
+                where: { id: billingPayment.billingInvoiceId },
+                data: {
+                  amountPaidMinor: nextPaid,
+                  status: nextStatus,
+                  paidAt: nextStatus === 'PAID' ? new Date() : null,
+                },
+              });
+
+              // If invoice is fully paid, transition subscription back to ACTIVE
+              // if it was in PAST_DUE, GRACE, or SUSPENDED
+              if (nextStatus === 'PAID') {
+                const subscription = await tx.tenantSubscription.findUnique({
+                  where: { id: billingPayment.subscriptionId },
+                });
+
+                if (subscription && ['PAST_DUE', 'GRACE', 'SUSPENDED'].includes(subscription.status)) {
+                  await tx.tenantSubscription.update({
+                    where: { id: subscription.id },
+                    data: { status: 'ACTIVE' },
+                  });
+                  logger.info('Subscription reactivated after payment', {
+                    subscriptionId: subscription.id,
+                  });
+                }
+              }
+            }
+          }
+        });
+
+        logger.info('Billing payment confirmed via webhook', {
+          paymentId: billingPayment.id,
+          invoiceId: billingPayment.billingInvoiceId,
+          provider,
+        });
+        return;
+      }
+
+      logger.warn('No pending payment found for webhook', { lookupRef, provider, webhookLogId });
     } catch (error: any) {
       logger.error('Error processing payment confirmation from webhook', {
         error: error.message,
@@ -313,9 +409,7 @@ export class WebhookController {
   ): Record<string, string | number> {
     const metadata: Record<string, string | number> = {};
     for (const item of items) {
-      if (item.Value !== undefined) {
-        metadata[item.Name] = item.Value;
-      }
+      if (item.Value !== undefined) metadata[item.Name] = item.Value;
     }
     return metadata;
   }

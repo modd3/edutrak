@@ -6,10 +6,10 @@ import { Role } from '@prisma/client';
 import { RequestWithUser } from '@/middleware/school-context';
 
 export class GuardianController {
-  private getService(req: RequestWithUser) {
+ /* private getService(req: RequestWithUser) {
     return new GuardianService(req);
   }
-
+*/
   async createGuardian(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { userId, relationship } = req.body;
@@ -18,7 +18,7 @@ export class GuardianController {
         return ResponseUtil.validationError(res, 'Required fields: userId, relationship');
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.createGuardian(req.body);
       return ResponseUtil.created(res, 'Guardian created successfully', guardian);
     } catch (error: any) {
@@ -38,7 +38,7 @@ export class GuardianController {
         return ResponseUtil.validationError(res, 'Required fields: email, password, firstName, lastName, relationship');
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.createGuardianWithUser(
         { ...req.body, schoolId: req.schoolId },
         {
@@ -58,14 +58,14 @@ export class GuardianController {
   async getGuardians(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const filters = req.query;
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const result = await guardianService.getGuardians({
         schoolId: req.schoolId,
         page: filters.page ? parseInt(filters.page as string) : undefined,
         limit: filters.limit ? parseInt(filters.limit as string) : undefined,
         search: filters.search as string,
       });
-
+console.log("Guardians: ", result)
       return ResponseUtil.paginated(res, 'Guardians retrieved successfully', result.guardians, result.pagination);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
@@ -80,7 +80,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Guardian ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.getGuardianById(id);
 
       if (!guardian) {
@@ -101,7 +101,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'User ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.getGuardianByUserId(userId);
 
       if (!guardian) {
@@ -122,7 +122,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Guardian ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.updateGuardian(id, req.body);
 
       return ResponseUtil.success(res, 'Guardian updated successfully', guardian);
@@ -142,7 +142,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Guardian ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const students = await guardianService.getGuardianStudents(guardianId);
 
       return ResponseUtil.success(res, 'Guardian students retrieved successfully', students, students.length);
@@ -159,7 +159,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Student ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const guardians = await guardianService.getStudentGuardians(studentId);
 
       return ResponseUtil.success(res, 'Student guardians retrieved successfully', guardians, guardians.length);
@@ -176,7 +176,7 @@ export class GuardianController {
         return ResponseUtil.validationError(res, 'Required fields: studentId, guardianId');
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       await guardianService.setPrimaryGuardian({ studentId, guardianId });
       return ResponseUtil.success(res, 'Primary guardian set successfully');
     } catch (error: any) {
@@ -195,7 +195,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Student ID and Guardian ID are required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       await guardianService.removeGuardianFromStudent(studentId, guardianId);
       return ResponseUtil.success(res, 'Guardian removed from student successfully');
     } catch (error: any) {
@@ -214,7 +214,7 @@ export class GuardianController {
         return ResponseUtil.error(res, 'Guardian ID is required', 400);
       }
 
-      const guardianService = this.getService(req);
+      const guardianService = GuardianService.withRequest(req);
       const notifications = await guardianService.getGuardianNotifications(guardianId);
 
       return ResponseUtil.success(res, 'Guardian notifications retrieved successfully', notifications);

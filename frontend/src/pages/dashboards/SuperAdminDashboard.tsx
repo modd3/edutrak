@@ -13,7 +13,7 @@ export function SuperAdminDashboard() {
 
   const { data: schoolsData } = useSchools();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const schools: any[] = (schoolsData as any)?.data.data || [];
+  const schools: any[] = (schoolsData as any)?.data || [];
 
   const { data: plansData } = usePlans();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

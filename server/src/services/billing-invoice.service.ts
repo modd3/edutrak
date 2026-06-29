@@ -42,11 +42,21 @@ export class BillingInvoiceService {
     if (filters.status) where.status = filters.status;
 
     const [invoices, total] = await Promise.all([
-      (prisma as any).billingInvoice.findMany({ where, orderBy: { createdAt: 'desc' }, skip, take: limit }),
+      (prisma as any).billingInvoice.findMany({
+        where,
+        include: { subscription: { include: { plan: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
       (prisma as any).billingInvoice.count({ where }),
     ]);
 
     return { invoices, pagination: { page, limit, total, pages: Math.ceil(total / limit) } };
+  }
+
+  async getMyInvoices(schoolId: string, filters: { status?: string; page?: number; limit?: number }) {
+    return this.listInvoices({ ...filters, schoolId });
   }
 
   async recordPayment(data: {

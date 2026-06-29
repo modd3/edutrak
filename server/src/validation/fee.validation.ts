@@ -72,6 +72,8 @@ export const updateFeeItemSchema = z.object({
 export const generateInvoiceSchema = z.object({
   studentId: z.uuid('Invalid student ID'),
   feeStructureId: z.uuid('Invalid fee structure ID'),
+  /** Required when called as SUPER_ADMIN — identifies the target school */
+  schoolId: z.uuid('Invalid school ID').optional(),
   dueDate: z.iso.datetime({ offset: true }).optional(),
   notes: z.string().max(500).optional(),
   // Optional per-item overrides — e.g. waive boarding for a day student

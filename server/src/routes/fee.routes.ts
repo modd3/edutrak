@@ -7,8 +7,6 @@ import { enforceSchoolContext } from '../middleware/school-context';
 import { enforceSubscription } from '../middleware/subscription.middleware';
 import { requireFeature } from '../middleware/entitlement.middleware';
 import { idempotencyMiddleware } from '../middleware/idempotency.middleware';
-import logger from '@/utils/logger';
-import { request } from 'http';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } });
 
@@ -175,6 +173,7 @@ router.patch(
 router.post(
   '/payments',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  idempotencyMiddleware(),
   feeController.recordPayment.bind(feeController)
 );
 
@@ -218,6 +217,7 @@ router.patch(
 router.get(
   '/reports/collection',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.report'),
   feeController.getFeeCollectionReport.bind(feeController)
 );
 
@@ -228,6 +228,7 @@ router.get(
 router.get(
   '/reports/defaulters',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.report'),
   feeController.getDefaultersReport.bind(feeController)
 );
 
@@ -241,6 +242,7 @@ router.get(
 router.post(
   '/invoices/:id/pay-online',
   authorize('ADMIN', 'SUPER_ADMIN', 'PARENT'),
+  requireFeature('fees.mpesa'),
   idempotencyMiddleware(),
   feeController.initiateOnlinePayment.bind(feeController)
 );
@@ -296,6 +298,7 @@ router.delete(
 router.get(
   '/late-fees/config',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.late_fees'),
   feeController.getLateFeesConfig.bind(feeController)
 );
 
@@ -306,6 +309,7 @@ router.get(
 router.put(
   '/late-fees/config',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.late_fees'),
   feeController.upsertLateFeesConfig.bind(feeController)
 );
 
@@ -316,6 +320,7 @@ router.put(
 router.post(
   '/late-fees/apply',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.late_fees'),
   feeController.applyLateFees.bind(feeController)
 );
 
@@ -413,6 +418,7 @@ router.get(
 router.post(
   '/reconciliation/upload',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.reconciliation'),
   upload.single('statement'),
   feeController.uploadStatement.bind(feeController)
 );
@@ -424,6 +430,7 @@ router.post(
 router.post(
   '/reconciliation/confirm',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.reconciliation'),
   feeController.confirmReconciliation.bind(feeController)
 );
 
@@ -435,6 +442,7 @@ router.post(
 router.get(
   '/reconciliation/report',
   authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.reconciliation'),
   feeController.getReconciliationReport.bind(feeController)
 );
 
