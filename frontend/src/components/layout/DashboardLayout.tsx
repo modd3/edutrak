@@ -47,7 +47,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         <header className="sticky top-0 z-30 border-b border-white/60 bg-white/75 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
             {/* Search Bar */}
-<div className="flex-1 max-w-2xl"><CommandPalette /></div>
+            <div className="flex-1 max-w-2xl">
+              <CommandPalette />
+            </div>
 
             {/* Right Section */}
             <div className="flex items-center space-x-4 ml-4">

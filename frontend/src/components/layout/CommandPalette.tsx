@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, CreditCard, GraduationCap, Search, Settings, Users } from 'lucide-react';
+import { useAuthStore } from '@/store/auth-store';
+import { BookOpen, CreditCard, GraduationCap, Search, Settings, Users, ShieldCheck } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 
@@ -11,12 +12,15 @@ const actions = [
   { label: 'CBC Assessments', description: 'Enter rubric scores and marksheets', path: '/assessments', keywords: 'cbc rubric marksheet exam', icon: Settings },
   { label: 'Fee Center', description: 'Invoices, M-Pesa payments and arrears', path: '/fees', keywords: 'fees invoice mpesa payment arrears', icon: CreditCard },
   { label: 'Reports', description: 'Download performance and report cards', path: '/reports', keywords: 'report card pdf analytics', icon: Search },
+  { label: 'My Subscription', description: 'Review your school plan, billing and entitlements', path: '/billing/my-subscription', keywords: 'subscription plan billing entitlement', icon: ShieldCheck, roles: ['SUPER_ADMIN', 'ADMIN'] },
+  { label: 'Billing Admin', description: 'Manage SaaS subscriptions across schools', path: '/billing-admin', keywords: 'billing admin subscription plans', icon: ShieldCheck, roles: ['SUPER_ADMIN'] },
 ];
 
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
+  const { user } = useAuthStore();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -31,9 +35,10 @@ export function CommandPalette() {
 
   const filteredActions = useMemo(() => {
     const normalized = query.toLowerCase().trim();
-    if (!normalized) return actions;
-    return actions.filter((action) => `${action.label} ${action.description} ${action.keywords}`.toLowerCase().includes(normalized));
-  }, [query]);
+    const roleAwareActions = actions.filter((action) => !('roles' in action) || action.roles.includes(user?.role || ''));
+    if (!normalized) return roleAwareActions;
+    return roleAwareActions.filter((action) => `${action.label} ${action.description} ${action.keywords}`.toLowerCase().includes(normalized));
+  }, [query, user?.role]);
 
   const runAction = (path: string) => {
     navigate(path);

@@ -143,28 +143,6 @@ export function AdminDashboard() {
         <p className="text-blue-100">Here's what's happening in {user?.school?.name || 'your school'} today</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {[
-          ['Attendance rate', '94.8%', '+2.1% this week', 'from-emerald-500 to-teal-500'],
-          ['Fee collection', 'KES 2.4M', '78% of term target', 'from-indigo-500 to-blue-500'],
-          ['Subscription health', 'Active', 'Enterprise plan in good standing', 'from-violet-500 to-fuchsia-500'],
-        ].map(([label, value, detail, gradient]) => (
-          <div key={label} className="overflow-hidden rounded-3xl border border-white/70 bg-white/80 p-5 shadow-sm backdrop-blur-md">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-slate-500">{label}</p>
-                <p className="mt-2 text-3xl font-black text-slate-900">{value}</p>
-                <p className="mt-1 text-sm text-emerald-600">{detail}</p>
-              </div>
-              <div className={`h-12 w-12 rounded-2xl bg-gradient-to-br ${gradient}`} />
-            </div>
-            <svg viewBox="0 0 120 32" className="mt-4 h-10 w-full text-indigo-500" fill="none">
-              <path d="M2 26 C18 10, 28 18, 42 12 S66 4, 82 11 S102 24, 118 8" stroke="currentColor" strokeWidth="4" strokeLinecap="round" />
-            </svg>
-          </div>
-        ))}
-      </div>
-
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => (

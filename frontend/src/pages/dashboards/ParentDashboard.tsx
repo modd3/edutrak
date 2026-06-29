@@ -86,26 +86,6 @@ export function ParentDashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
-        <div className="rounded-3xl bg-gradient-to-br from-emerald-500 to-teal-600 p-6 text-white shadow-lg">
-          <p className="text-sm font-semibold uppercase tracking-wide text-emerald-100">M-Pesa fee payment</p>
-          <h2 className="mt-2 text-3xl font-black">Pay KES 18,450 securely</h2>
-          <p className="mt-2 text-emerald-50">Instant STK push, automatic receipting and ledger reconciliation.</p>
-          <button className="mt-5 rounded-2xl bg-white px-5 py-3 font-semibold text-emerald-700 shadow-sm">Pay with M-Pesa</button>
-        </div>
-        <div className="rounded-3xl border border-slate-200 bg-white/85 p-5 shadow-sm backdrop-blur-md">
-          <p className="text-sm font-semibold text-slate-500">Multi-child switcher</p>
-          <div className="mt-3 space-y-2">
-            {children.map((child) => (
-              <button key={child.admissionNo} className="flex w-full items-center justify-between rounded-2xl bg-slate-50 px-4 py-3 text-left transition hover:bg-indigo-50">
-                <span><span className="block font-semibold text-slate-900">{child.name}</span><span className="text-xs text-slate-500">{child.class}</span></span>
-                <span className="text-sm font-bold text-indigo-600">{child.averageGrade}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Children Overview */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {children.map((child, index) => (
@@ -132,7 +112,7 @@ export function ParentDashboard() {
             </div>
 
             <button className="w-full mt-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium transition-colors">
-              Download Report PDF
+              View Full Report Card
             </button>
           </div>
         ))}

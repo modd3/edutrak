@@ -70,20 +70,6 @@ export function TeacherDashboard() {
         </p>
       </div>
 
-      <div className="rounded-3xl border border-emerald-100 bg-white/85 p-6 shadow-sm backdrop-blur-md">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">Daily Teaching Command Center</p>
-            <h2 className="mt-1 text-2xl font-bold text-slate-900">Prioritise attendance, lessons and marksheets</h2>
-          </div>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            {['3 lessons today', '2 attendance check-ins', '2 unsubmitted marksheets'].map((item) => (
-              <div key={item} className="rounded-2xl bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700">{item}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-
       {/* Quick Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
