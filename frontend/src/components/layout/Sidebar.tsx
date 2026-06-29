@@ -17,7 +17,9 @@ export function Sidebar({ className }: SidebarProps) {
 
   if (!user) return null;
 
-  const navigation = getNavigationForRole(user.role);
+  const { overrideSchool } = useAuthStore();
+  const isOverrideActive = user.role === 'SUPER_ADMIN' && !!overrideSchool;
+  const navigation = getNavigationForRole(user.role, isOverrideActive);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) =>

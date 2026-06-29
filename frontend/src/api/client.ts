@@ -11,12 +11,17 @@ const api: AxiosInstance = axios.create({
   timeout: 60000, // 60 seconds (increased from 30s to account for email sending)
 });
 
-// Request interceptor - Add auth token to requests
+// Request interceptor - Add auth token and override headers to requests
 api.interceptors.request.use(
   (config) => {
-    const token = useAuthStore.getState().token;
+    const { token, overrideSchool, user } = useAuthStore.getState();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // Attach X-School-Override header when Super Admin has an active school override
+    if (overrideSchool && user?.role === 'SUPER_ADMIN') {
+      config.headers['X-School-Override'] = overrideSchool.id;
     }
 
     return config;

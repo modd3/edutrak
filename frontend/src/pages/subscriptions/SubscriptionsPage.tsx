@@ -4,6 +4,7 @@ import { usePlans } from '@/hooks/use-plans';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { CreateSubscriptionModal } from '@/components/subscriptions/CreateSubscriptionModal';
 import { ManageSubscriptionStatusModal } from '@/components/subscriptions/ManageSubscriptionStatusModal';
+import { SubscriptionDetailModal } from '@/components/subscriptions/SubscriptionDetailModal';
 import { Subscription } from '@/types';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -39,8 +40,9 @@ export function SubscriptionsPage() {
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | undefined>();
+  const [selectedSubscription, setSelectedSubscription] = useState<Subscription | null>(null);
   const [showStatusModal, setShowStatusModal] = useState(false);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   const planQuery = usePlans({ isActive: true, limit: 50 });
   const plans = planQuery.data?.data || [];
@@ -131,7 +133,7 @@ export function SubscriptionsPage() {
                   </TableHead>
                   <TableHead>Trial Ends</TableHead>
                   {isSuperAdmin && 
-                  <TableHead>Actions</TableHead>}
+                  <TableHead className="w-[180px]">Actions</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -176,18 +178,32 @@ export function SubscriptionsPage() {
                           : '—'}
                       </TableCell>
                      {isSuperAdmin && <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSelectedSubscription(subscription);
-                            setShowStatusModal(true);
-                          }}
-                          className="gap-1"
-                        >
-                          <Settings2 className="h-4 w-4" />
-                          Manage
-                        </Button>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSubscription(subscription);
+                              setShowDetailModal(true);
+                            }}
+                            className="gap-1"
+                          >
+                            <Calendar className="h-4 w-4" />
+                            Details
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedSubscription(subscription);
+                              setShowStatusModal(true);
+                            }}
+                            className="gap-1"
+                          >
+                            <Settings2 className="h-4 w-4" />
+                            Manage
+                          </Button>
+                        </div>
                       </TableCell>}
                     </TableRow>
                   ))
@@ -231,6 +247,11 @@ export function SubscriptionsPage() {
         onOpenChange={setShowCreateModal}
         plans={plans}
         isLoadingPlans={isLoadingPlans}
+      />
+      <SubscriptionDetailModal
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        subscription={selectedSubscription}
       />
       <ManageSubscriptionStatusModal
         open={showStatusModal}

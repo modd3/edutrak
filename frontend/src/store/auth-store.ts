@@ -2,16 +2,24 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {User, Role} from '@/types'
 
+interface OverrideSchool {
+  id: string;
+  name: string;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;
+  overrideSchool: OverrideSchool | null;
 
   // Actions
   setAuth: (user: User, token: string, refreshToken?: string) => void;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
+  setOverrideSchool: (school: OverrideSchool) => void;
+  clearOverrideSchool: () => void;
   hasRole: (roles: Role | Role[]) => boolean;
   hasPermission: (permission: string) => boolean;
 }
@@ -23,6 +31,7 @@ export const useAuthStore = create<AuthState>()(
       token: null,
       refreshToken: null,
       isAuthenticated: false,
+      overrideSchool: null,
 
       setAuth: (user, token, refreshToken) => {
         set({
@@ -39,6 +48,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           refreshToken: null,
           isAuthenticated: false,
+          overrideSchool: null,
         });
       },
       updateUser: (userData) => {
@@ -48,6 +58,14 @@ export const useAuthStore = create<AuthState>()(
             user: { ...currentUser, ...userData },
           });
         }
+      },
+
+      setOverrideSchool: (school) => {
+        set({ overrideSchool: school });
+      },
+
+      clearOverrideSchool: () => {
+        set({ overrideSchool: null });
       },
 
       hasRole: (roles) => {
