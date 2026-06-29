@@ -43,6 +43,8 @@ import SubscriptionsPage from '@/pages/subscriptions/SubscriptionsPage';
 import { PlansPage } from './pages/subscriptions/PlansPage';
 import { PricingPage } from './pages/billing/PricingPage';
 import { MySubscriptionPage } from './pages/billing/MySubscriptionPage';
+import { InvoicesPage } from './pages/billing/InvoicesPage';
+import AuditLogsPage from './pages/audit/AuditLogsPage';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -135,11 +137,11 @@ function App() {
             }
           />
 
-          {/* SUPER_ADMIN & ADMIN: Plans & Pricing (customer-facing) */}
+          {/* ADMIN & SUPER_ADMIN: Plans & Pricing (customer-facing) */}
           <Route
             path="/billing/plans"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['ADMIN', 'SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <PricingPage />
                 </DashboardLayout>
@@ -147,13 +149,25 @@ function App() {
             }
           />
 
-          {/* SUPER_ADMIN & ADMIN: My Subscription */}
+          {/* ADMIN ONLY: My Subscription (own school) */}
           <Route
             path="/billing/my-subscription"
             element={
-              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <MySubscriptionPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN ONLY: Invoices (own school) */}
+          <Route
+            path="/billing/invoices"
+            element={
+              <RoleGuard roles={['ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <InvoicesPage />
                 </DashboardLayout>
               </RoleGuard>
             }
@@ -177,6 +191,18 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <PlansPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* Audit Logs */}
+          <Route
+            path="/audit-logs"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <AuditLogsPage />
                 </DashboardLayout>
               </RoleGuard>
             }

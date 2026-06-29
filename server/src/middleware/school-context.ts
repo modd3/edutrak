@@ -12,6 +12,7 @@ export interface RequestWithUser extends Request {
   };
   schoolId?: string;
   isSuperAdmin?: boolean;
+  isInOverrideMode?: boolean;
   subscription?: any;
 }
 
@@ -90,8 +91,9 @@ export async function enforceSchoolContext(
     });
   }
 
-  // Add schoolId (and subscription?) to request for filtering ALL queries
+  // Add schoolId to request for filtering ALL queries
   req.schoolId = user.schoolId;
+  req.isInOverrideMode = false;
   next();
 }
 

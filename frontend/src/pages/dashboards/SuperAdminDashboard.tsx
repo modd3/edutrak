@@ -1,4 +1,4 @@
-import { School, CreditCard, DollarSign, Users, TrendingUp, Building2 } from 'lucide-react';
+import { School, CreditCard, DollarSign, Users, TrendingUp, Building2, Eye } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useNavigate } from 'react-router-dom';
 import { useSchools } from '@/hooks/use-schools';

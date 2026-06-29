@@ -1,6 +1,7 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 import { useAuthStore } from '../../store/auth-store';
 import { Bell, Moon, Sun, Zap } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';

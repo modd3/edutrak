@@ -68,6 +68,14 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
+      setOverrideSchool: (school) => {
+        set({ overrideSchool: school });
+      },
+
+      clearOverrideSchool: () => {
+        set({ overrideSchool: null });
+      },
+
       hasRole: (roles) => {
         const user = get().user;
         if (!user) return false;

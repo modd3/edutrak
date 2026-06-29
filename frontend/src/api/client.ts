@@ -11,7 +11,7 @@ const api: AxiosInstance = axios.create({
   timeout: 60000, // 60 seconds (increased from 30s to account for email sending)
 });
 
-// Request interceptor - Add auth token to requests
+// Request interceptor - Add auth token and override headers to requests
 api.interceptors.request.use(
   (config) => {
     const { token, user, overrideSchool } = useAuthStore.getState();

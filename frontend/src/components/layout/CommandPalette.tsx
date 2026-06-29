@@ -12,6 +12,12 @@ const actions = [
   { label: 'CBC Assessments', scope: 'school', description: 'Enter rubric scores and marksheets', path: '/assessments', keywords: 'cbc rubric marksheet exam', icon: Settings },
   { label: 'Fee Center', scope: 'school', description: 'Invoices, M-Pesa payments and arrears', path: '/fees', keywords: 'fees invoice mpesa payment arrears', icon: CreditCard },
   { label: 'Reports', scope: 'school', description: 'Download performance and report cards', path: '/reports', keywords: 'report card pdf analytics', icon: Search },
+  { label: 'Students', description: 'Find learners by name or admission number', path: '/students', keywords: 'student admission learner', icon: GraduationCap },
+  { label: 'Classes', description: 'Open class streams and enrollment tools', path: '/classes', keywords: 'class stream enrollment', icon: BookOpen },
+  { label: 'Teachers', description: 'Manage staff and subject assignments', path: '/teachers', keywords: 'teacher staff subject', icon: Users },
+  { label: 'CBC Assessments', description: 'Enter rubric scores and marksheets', path: '/assessments', keywords: 'cbc rubric marksheet exam', icon: Settings },
+  { label: 'Fee Center', description: 'Invoices, M-Pesa payments and arrears', path: '/fees', keywords: 'fees invoice mpesa payment arrears', icon: CreditCard },
+  { label: 'Reports', description: 'Download performance and report cards', path: '/reports', keywords: 'report card pdf analytics', icon: Search },
   { label: 'My Subscription', description: 'Review your school plan, billing and entitlements', path: '/billing/my-subscription', keywords: 'subscription plan billing entitlement', icon: ShieldCheck, roles: ['SUPER_ADMIN', 'ADMIN'] },
   { label: 'Billing Admin', description: 'Manage SaaS subscriptions across schools', path: '/billing-admin', keywords: 'billing admin subscription plans', icon: ShieldCheck, roles: ['SUPER_ADMIN'] },
 ];
