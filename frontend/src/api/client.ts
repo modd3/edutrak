@@ -14,14 +14,15 @@ const api: AxiosInstance = axios.create({
 // Request interceptor - Add auth token and override headers to requests
 api.interceptors.request.use(
   (config) => {
-    const { token, overrideSchool, user } = useAuthStore.getState();
+    const { token, user, overrideSchool } = useAuthStore.getState();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    // Attach X-School-Override header when Super Admin has an active school override
-    if (overrideSchool && user?.role === 'SUPER_ADMIN') {
+    if (user?.role === 'SUPER_ADMIN' && overrideSchool?.id) {
       config.headers['X-School-Override'] = overrideSchool.id;
+    } else if (config.headers) {
+      delete config.headers['X-School-Override'];
     }
 
     return config;

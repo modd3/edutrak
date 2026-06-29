@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import {User, Role} from '@/types'
 
-interface OverrideSchool {
+export interface OverrideSchool {
   id: string;
   name: string;
 }
@@ -51,6 +51,14 @@ export const useAuthStore = create<AuthState>()(
           overrideSchool: null,
         });
       },
+      setOverrideSchool: (school) => {
+        set({ overrideSchool: school });
+      },
+
+      clearOverrideSchool: () => {
+        set({ overrideSchool: null });
+      },
+
       updateUser: (userData) => {
         const currentUser = get().user;
         if (currentUser) {

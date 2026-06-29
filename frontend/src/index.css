@@ -140,3 +140,16 @@
     --brand-font-family: Inter, Outfit, ui-sans-serif, system-ui, sans-serif;
   }
 }
+
+@layer base {
+  .dark body {
+    color-scheme: dark;
+  }
+}
+
+@layer utilities {
+  .animate-in {
+    animation-duration: 220ms;
+    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+  }
+}

@@ -6,11 +6,11 @@ export function useSchoolContext() {
 
     const user = auth.user;
     const isSuperAdmin = user?.role === 'SUPER_ADMIN';
-    const isOverrideActive = isSuperAdmin && !!overrideSchool;
-    const schoolId = overrideSchool?.id ?? user?.schoolId;
-    const schoolName = overrideSchool?.name ?? user?.school?.name;
+    const overrideSchool = auth.overrideSchool;
+    const schoolId = isSuperAdmin ? overrideSchool?.id : user?.schoolId;
+    const schoolName = isSuperAdmin ? overrideSchool?.name : user?.school?.name;
 
-    const canAccessAllSchools = isSuperAdmin && !overrideSchool;
+    const canAccessAllSchools  = isSuperAdmin && !overrideSchool;
     const needsSchoolFilter = !isSuperAdmin || !!overrideSchool;
 
     return {
@@ -22,8 +22,9 @@ export function useSchoolContext() {
         needsSchoolFilter,
         user,
         overrideSchool,
-        setOverrideSchool,
-        clearOverrideSchool,
+        setOverrideSchool: auth.setOverrideSchool,
+        clearOverrideSchool: auth.clearOverrideSchool,
+        isOverrideActive: !!overrideSchool
     }
 }
 

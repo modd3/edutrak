@@ -3,7 +3,6 @@ import { Request, Response, NextFunction } from 'express';
 import { JwtPayload } from '../utils/jwt';
 import logger from '../utils/logger';
 import { SubscriptionService } from '../services/subscription.service';
-import { TenantSubscription } from '@prisma/client';
 import prisma from '../database/client';
 
 export interface RequestWithUser extends Request {
@@ -37,42 +36,35 @@ export async function enforceSchoolContext(
     });
   }
 
-  // Super admin check FIRST — before subscription enforcement
+  // Super admins can operate at platform level or explicitly override into a school tenant.
   const isSuperAdmin = user.role === 'SUPER_ADMIN';
   req.isSuperAdmin = isSuperAdmin;
 
   if (isSuperAdmin) {
-    // Check for X-School-Override header
-    const overrideSchoolId = req.headers['x-school-override'] as string | undefined;
-    
+    const overrideHeader = req.headers['x-school-override'];
+    const overrideSchoolId = Array.isArray(overrideHeader) ? overrideHeader[0] : overrideHeader;
+
     if (overrideSchoolId) {
-      // Validate the school exists
       const school = await prisma.school.findUnique({
         where: { id: overrideSchoolId },
-        select: { id: true, name: true },
+        select: { id: true },
       });
 
       if (!school) {
         return res.status(404).json({
-          error: 'SCHOOL_NOT_FOUND',
-          message: `School with ID "${overrideSchoolId}" not found`,
+          error: 'SCHOOL_OVERRIDE_NOT_FOUND',
+          message: 'The requested school override context was not found',
         });
       }
 
-      req.schoolId = overrideSchoolId;
-      req.isInOverrideMode = true;
-      req.subscription = undefined; // No subscription enforcement in override mode
-      logger.info(`Super Admin ${user.userId} accessing school ${school.name} (${overrideSchoolId}) in override mode`);
+      req.schoolId = school.id;
     } else {
-      req.schoolId = undefined; // No school filter for super admin
-      req.isInOverrideMode = false;
-      req.subscription = undefined;
+      req.schoolId = undefined;
     }
 
     return next();
   }
 
-  // Non-Super Admin: enforce subscription and school context
   const subscriptionService = new SubscriptionService();
   const userSchoolSubscriptions = await subscriptionService.getSubscriptions({
     schoolId: user.schoolId,
@@ -84,7 +76,7 @@ export async function enforceSchoolContext(
   req.subscription = subscription;
 
   if (!subscription) {
-    logger.error(`School ${user.schoolId} has no active subscription`, user.schoolId);
+    logger.error(`School ${user.schoolId} has no active subscription ${req.subscription}`, user.schoolId);
     return res.status(403).json({
       error: 'NO_ACTIVE_SUBSCRIPTION',
       message: 'An Active Subscription is required!',
@@ -114,8 +106,15 @@ export function validateResourceOwnership(
   res: Response,
   next: NextFunction
 ) {
-  // Super admin bypasses check
+  // Super admin bypasses cross-school ownership checks, but override mode should
+  // still stamp writes with the selected tenant so create/update flows behave
+  // exactly like a school admin operating inside that school.
   if (req.isSuperAdmin) {
+    if (req.schoolId && ['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      if (req.body && typeof req.body === 'object') {
+        req.body.schoolId = req.schoolId;
+      }
+    }
     return next();
   }
 
@@ -152,7 +151,7 @@ export function buildSchoolWhereClause(
   isSuperAdmin: boolean = false
 ): any {
   if (isSuperAdmin) {
-    return baseWhere;
+    return schoolId ? { ...baseWhere, schoolId } : baseWhere;
   }
 
   if (!schoolId) {

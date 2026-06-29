@@ -6,6 +6,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 
 const actions = [
+  { label: 'Students', scope: 'school', description: 'Find learners by name or admission number', path: '/students', keywords: 'student admission learner', icon: GraduationCap },
+  { label: 'Classes', scope: 'school', description: 'Open class streams and enrollment tools', path: '/classes', keywords: 'class stream enrollment', icon: BookOpen },
+  { label: 'Teachers', scope: 'school', description: 'Manage staff and subject assignments', path: '/teachers', keywords: 'teacher staff subject', icon: Users },
+  { label: 'CBC Assessments', scope: 'school', description: 'Enter rubric scores and marksheets', path: '/assessments', keywords: 'cbc rubric marksheet exam', icon: Settings },
+  { label: 'Fee Center', scope: 'school', description: 'Invoices, M-Pesa payments and arrears', path: '/fees', keywords: 'fees invoice mpesa payment arrears', icon: CreditCard },
+  { label: 'Reports', scope: 'school', description: 'Download performance and report cards', path: '/reports', keywords: 'report card pdf analytics', icon: Search },
   { label: 'Students', description: 'Find learners by name or admission number', path: '/students', keywords: 'student admission learner', icon: GraduationCap },
   { label: 'Classes', description: 'Open class streams and enrollment tools', path: '/classes', keywords: 'class stream enrollment', icon: BookOpen },
   { label: 'Teachers', description: 'Manage staff and subject assignments', path: '/teachers', keywords: 'teacher staff subject', icon: Users },
@@ -20,7 +26,7 @@ export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, overrideSchool } = useAuthStore();
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -35,10 +41,15 @@ export function CommandPalette() {
 
   const filteredActions = useMemo(() => {
     const normalized = query.toLowerCase().trim();
-    const roleAwareActions = actions.filter((action) => !('roles' in action) || action.roles.includes(user?.role || ''));
+    const roleAwareActions = actions.filter((action) => {
+      const isRoleAllowed = !('roles' in action) || action.roles.includes(user?.role || '');
+      const isSchoolScoped = 'scope' in action && action.scope === 'school';
+      const isBlockedSuperAdminSchoolAction = user?.role === 'SUPER_ADMIN' && isSchoolScoped && !overrideSchool;
+      return isRoleAllowed && !isBlockedSuperAdminSchoolAction;
+    });
     if (!normalized) return roleAwareActions;
     return roleAwareActions.filter((action) => `${action.label} ${action.description} ${action.keywords}`.toLowerCase().includes(normalized));
-  }, [query, user?.role]);
+  }, [query, user?.role, overrideSchool]);
 
   const runAction = (path: string) => {
     navigate(path);

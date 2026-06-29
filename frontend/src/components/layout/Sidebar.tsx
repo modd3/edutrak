@@ -13,13 +13,11 @@ export function Sidebar({ className }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
-  const { user, logout } = useAuthStore();
+  const { user, logout, overrideSchool } = useAuthStore();
 
   if (!user) return null;
 
-  const { overrideSchool } = useAuthStore();
-  const isOverrideActive = user.role === 'SUPER_ADMIN' && !!overrideSchool;
-  const navigation = getNavigationForRole(user.role, isOverrideActive);
+  const navigation = getNavigationForRole(user.role, !!overrideSchool);
 
   const toggleExpanded = (title: string) => {
     setExpandedItems((prev) =>
@@ -43,7 +41,7 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Mobile Toggle */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-md"
+        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-md"
       >
         {collapsed ? <Menu size={24} /> : <X size={24} />}
       </button>
@@ -51,20 +49,20 @@ export function Sidebar({ className }: SidebarProps) {
       {/* Sidebar */}
       <aside
         className={cn(
-          'fixed left-0 top-0 h-screen bg-white border-r border-gray-200 transition-all duration-300 z-40',
+          'fixed left-0 top-0 h-screen border-r border-white/70 bg-white/85 shadow-xl backdrop-blur-xl transition-all duration-300 z-40 dark:border-slate-800 dark:bg-slate-950/90',
           collapsed ? '-translate-x-full lg:translate-x-0 lg:w-20' : 'translate-x-0 w-64',
           className
         )}
       >
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-800">
             {!collapsed && (
               <div className="flex items-center space-x-2">
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">ET</span>
                 </div>
-                <span className="font-bold text-lg">EduTrak</span>
+                <span className="font-bold text-lg text-slate-950 dark:text-slate-50">EduTrak</span>
               </div>
             )}
             <button
@@ -77,7 +75,7 @@ export function Sidebar({ className }: SidebarProps) {
 
           {/* User Info */}
           {!collapsed && (
-            <div className="p-4 border-b border-gray-200">
+            <div className="p-4 border-b border-slate-200 dark:border-slate-800">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 font-semibold">
@@ -85,10 +83,10 @@ export function Sidebar({ className }: SidebarProps) {
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate">
                     {user.firstName} {user.lastName}
                   </p>
-                  <p className="text-xs text-gray-500 truncate">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                     {user.role.replace('_', ' ')}
                   </p>
                 </div>
@@ -111,7 +109,7 @@ export function Sidebar({ className }: SidebarProps) {
           </nav>
 
           {/* Footer */}
-          <div className="p-4 border-t border-gray-200">
+          <div className="p-4 border-t border-slate-200 dark:border-slate-800">
             <button
               onClick={handleLogout}
               className={cn(
@@ -164,7 +162,7 @@ function NavItemComponent({
             'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
             active
               ? 'bg-blue-50 text-blue-600'
-              : 'text-gray-700 hover:bg-gray-100',
+              : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
             collapsed && 'justify-center'
           )}
         >
@@ -196,7 +194,7 @@ function NavItemComponent({
                 'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors',
                 isActive(child.href)
                   ? 'bg-blue-50 text-blue-600'
-                  : 'text-gray-600 hover:bg-gray-100'
+                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
               )}
             >
               <child.icon size={16} />
@@ -216,7 +214,7 @@ return (
         'flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
         active
           ? 'bg-blue-50 text-blue-600'
-          : 'text-gray-700 hover:bg-gray-100',
+          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
         collapsed && 'justify-center'
       )}
     >

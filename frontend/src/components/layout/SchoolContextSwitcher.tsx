@@ -1,143 +1,71 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/auth-store';
+import { useMemo, useState } from 'react';
+import { Building2, Check, Search, X } from 'lucide-react';
 import { useSchools } from '@/hooks/use-schools';
-import { Building2, Search, Check, X } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-interface School {
-  id: string;
-  name: string;
-  type?: string;
-  county?: string;
-}
+import { useAuthStore } from '@/store/auth-store';
+import { Button } from '@/components/ui/button';
 
 export function SchoolContextSwitcher() {
-  const navigate = useNavigate();
   const { user, overrideSchool, setOverrideSchool, clearOverrideSchool } = useAuthStore();
-  const { data: schoolsData } = useSchools();
-  const [isOpen, setIsOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [query, setQuery] = useState('');
+  const { data: schoolsData, isLoading } = useSchools(undefined, { enabled: user?.role === 'SUPER_ADMIN' });
 
-  // Only render for SUPER_ADMIN
+  const schools = useMemo(() => {
+    const data = (schoolsData as any)?.data || [];
+    const normalized = query.toLowerCase().trim();
+    if (!normalized) return data.slice(0, 8);
+    return data
+      .filter((school: any) => `${school.name} ${school.county || ''} ${school.registrationNo || ''}`.toLowerCase().includes(normalized))
+      .slice(0, 8);
+  }, [query, schoolsData]);
+
   if (user?.role !== 'SUPER_ADMIN') return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const schools: School[] = (schoolsData as any)?.data || [];
-
-  const filteredSchools = schools.filter((school) =>
-    school.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  // Close dropdown on outside click
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  const handleSelectSchool = (school: School) => {
-    setOverrideSchool({ id: school.id, name: school.name });
-    setIsOpen(false);
-    setSearchQuery('');
-    navigate('/dashboard');
-  };
-
-  const handleExitOverride = () => {
-    clearOverrideSchool();
-    navigate('/dashboard');
-  };
-
   return (
-    <div className="relative" ref={dropdownRef}>
-      {overrideSchool ? (
-        <div className="flex items-center gap-2">
-          <div className="px-3 py-1 bg-amber-50 text-amber-700 font-medium rounded-lg text-xs flex items-center gap-1.5 border border-amber-200">
-            <Building2 size={14} />
-            <span>{overrideSchool.name}</span>
-          </div>
-          <button
-            onClick={handleExitOverride}
-            title="Exit Override Mode"
-            className="p-1.5 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
-          >
-            <X size={14} />
+    <div className="group relative hidden min-w-72 lg:block">
+      <div className="flex items-center gap-2 rounded-2xl border border-slate-200/80 bg-white/75 px-3 py-2 shadow-sm backdrop-blur-md dark:border-slate-700 dark:bg-slate-900/75">
+        <Building2 className="h-4 w-4 text-indigo-500" />
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">School override</p>
+          <p className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100">
+            {overrideSchool ? overrideSchool.name : 'Platform mode'}
+          </p>
+        </div>
+        {overrideSchool && (
+          <button type="button" onClick={clearOverrideSchool} className="rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-100">
+            <X className="h-4 w-4" />
           </button>
+        )}
+      </div>
+
+      <div className="invisible absolute right-0 top-full z-50 mt-2 w-96 translate-y-2 rounded-3xl border border-slate-200 bg-white/95 p-3 opacity-0 shadow-2xl backdrop-blur-xl transition duration-200 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-slate-700 dark:bg-slate-950/95">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search school to inspect..."
+            className="w-full rounded-2xl border border-slate-200 bg-white px-9 py-2 text-sm outline-none ring-indigo-500 transition focus:ring-2 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+          />
         </div>
-      ) : (
-        <button
-          onClick={() => setIsOpen(!isOpen)}
-          className="flex items-center gap-2 px-3 py-1.5 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-colors text-xs font-medium"
-        >
-          <Building2 size={14} />
-          <span>Switch School</span>
-        </button>
-      )}
-
-      {/* Dropdown */}
-      {isOpen && (
-        <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-          <div className="p-2">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search schools..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                autoFocus
-              />
-            </div>
-          </div>
-
-          <div className="max-h-60 overflow-y-auto">
-            {filteredSchools.length === 0 ? (
-              <div className="px-4 py-6 text-center text-sm text-gray-500">
-                {searchQuery ? 'No schools match your search' : 'No schools available'}
-              </div>
-            ) : (
-              filteredSchools.map((school) => (
-                <button
-                  key={school.id}
-                  onClick={() => handleSelectSchool(school)}
-                  className={cn(
-                    'w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-gray-50 transition-colors text-left',
-                    overrideSchool?.id === school.id ? 'bg-indigo-50' : ''
-                  )}
-                >
-                  <Building2 size={16} className="text-gray-400 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-gray-900 truncate">{school.name}</p>
-                    {school.type && (
-                      <p className="text-xs text-gray-500 truncate">
-                        {school.type.replace('_', ' ')}{school.county ? ` · ${school.county}` : ''}
-                      </p>
-                    )}
-                  </div>
-                  {overrideSchool?.id === school.id && (
-                    <Check size={16} className="text-indigo-600 flex-shrink-0" />
-                  )}
-                </button>
-              ))
-            )}
-          </div>
-
-          <div className="border-t border-gray-100 p-2">
+        <div className="mt-3 max-h-80 space-y-1 overflow-y-auto">
+          {isLoading && <p className="px-3 py-2 text-sm text-slate-500">Loading schools...</p>}
+          {schools.map((school: any) => (
             <button
-              onClick={() => setIsOpen(false)}
-              className="w-full px-3 py-1.5 text-xs text-gray-500 hover:text-gray-700 hover:bg-gray-50 rounded transition-colors"
+              key={school.id}
+              type="button"
+              onClick={() => setOverrideSchool({ id: school.id, name: school.name })}
+              className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-left transition hover:bg-indigo-50 dark:hover:bg-indigo-950/50"
             >
-              Cancel
+              <span>
+                <span className="block font-semibold text-slate-900 dark:text-slate-100">{school.name}</span>
+                <span className="text-xs text-slate-500 dark:text-slate-400">{school.county || 'No county'} · {school.type?.replace('_', ' ') || 'School'}</span>
+              </span>
+              {overrideSchool?.id === school.id && <Check className="h-4 w-4 text-emerald-500" />}
             </button>
-          </div>
+          ))}
         </div>
-      )}
+        {overrideSchool && <Button variant="outline" size="sm" onClick={clearOverrideSchool} className="mt-3 w-full">Exit override mode</Button>}
+      </div>
     </div>
   );
 }

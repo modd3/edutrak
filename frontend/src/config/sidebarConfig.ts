@@ -450,23 +450,43 @@ export const sidebarConfig: NavItem[] = [
   },
 ];
 
-// Filter navigation items based on user role and override mode
-export const getNavigationForRole = (role: string, overrideActive: boolean = false): NavItem[] => {
+const SUPER_ADMIN_PLATFORM_HREFS = new Set([
+  '/dashboard',
+  '/schools',
+  '/subscriptions',
+  '/subscriptions/plans',
+  '/billing-admin',
+  '/users',
+  '/billing/plans',
+  '/billing/my-subscription',
+]);
+
+const SUPER_ADMIN_PLATFORM_CHILD_HREFS = new Set([
+  '/schools',
+  '/users',
+  '/users/change-password',
+  '/billing/plans',
+  '/billing/my-subscription',
+]);
+
+const isVisibleForRole = (item: NavItem, role: string, hasSchoolOverride: boolean) => {
+  if (!item.roles.includes(role)) return false;
+  if (role !== 'SUPER_ADMIN' || hasSchoolOverride) return true;
+  return SUPER_ADMIN_PLATFORM_HREFS.has(item.href);
+};
+
+const isChildVisibleForRole = (item: NavItem, role: string, hasSchoolOverride: boolean) => {
+  if (!item.roles.includes(role)) return false;
+  if (role !== 'SUPER_ADMIN' || hasSchoolOverride) return true;
+  return SUPER_ADMIN_PLATFORM_CHILD_HREFS.has(item.href);
+};
+
+// Filter navigation items based on user role and explicit Super Admin school override state.
+export const getNavigationForRole = (role: string, hasSchoolOverride = false): NavItem[] => {
   return sidebarConfig
-    .filter((item) => {
-      if (role === 'SUPER_ADMIN' && item.overridable) {
-        // Overridable items only show for SUPER_ADMIN when override is active
-        return overrideActive;
-      }
-      return item.roles.includes(role);
-    })
+    .filter((item) => isVisibleForRole(item, role, hasSchoolOverride))
     .map((item) => ({
       ...item,
-      children: item.children?.filter((child) => {
-        if (role === 'SUPER_ADMIN' && child.overridable) {
-          return overrideActive;
-        }
-        return child.roles.includes(role);
-      }),
+      children: item.children?.filter((child) => isChildVisibleForRole(child, role, hasSchoolOverride)),
     }));
 };
