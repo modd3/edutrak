@@ -3,10 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 import { useAuthStore } from '../../store/auth-store';
-import { Bell, Search, UserCheck, KeyRound, LogOut, Zap } from 'lucide-react';
+import { Bell } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
-import { ProfileSecurityModal } from '../users/ProfileSecurityModal';
-import { useState } from 'react';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -45,28 +43,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(239_84%_67%_/_0.12),transparent_32rem),linear-gradient(180deg,#f8fafc,#eef2ff)]">
       <Sidebar />
 
       {/* Main Content */}
       <div className="lg:pl-64 flex flex-col min-h-screen">
         {/* Top Header */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200">
+        <header className="sticky top-0 z-30 border-b border-white/60 bg-white/75 shadow-sm backdrop-blur-md">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">
-            {/* Search Bar / Command Palette Trigger */}
-            <div className="flex-1 max-w-lg">
-              <button
-                onClick={() => setCmdOpen(true)}
-                className="w-full flex items-center justify-between pl-3 pr-4 py-2 border border-gray-300 rounded-lg text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <Search size={18} />
-                  <span className="text-sm">Search students, classes, reports...</span>
-                </div>
-                <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-xs font-semibold text-gray-500 bg-white border border-gray-200 rounded shadow-sm">
-                  ⌘K
-                </kbd>
-              </button>
+            {/* Search Bar */}
+            <div className="flex-1 max-w-2xl">
+              <CommandPalette />
             </div>
 
             {/* Right Section */}
