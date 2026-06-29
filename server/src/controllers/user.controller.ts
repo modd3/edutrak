@@ -2,6 +2,7 @@
 import { Response } from 'express';
 import { RequestWithUser } from '../middleware/school-context';
 import { UserService } from '../services/user.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
@@ -255,6 +256,20 @@ export const activateUser = async (req: RequestWithUser, res: Response) => {
       schoolId,
     });
 
+    // Audit log
+    auditService.log({
+      schoolId,
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'ACTIVATE_USER',
+      entityType: 'User',
+      entityId: id,
+      entityName: `${existing.firstName} ${existing.lastName}`,
+      details: `Activated user: ${existing.firstName} ${existing.lastName} (${existing.email})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
@@ -297,6 +312,20 @@ export const deactivateUser = async (req: RequestWithUser, res: Response) => {
       schoolId,
     });
 
+    // Audit log
+    auditService.log({
+      schoolId,
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'DEACTIVATE_USER',
+      entityType: 'User',
+      entityId: id,
+      entityName: `${existing.firstName} ${existing.lastName}`,
+      details: `Deactivated user: ${existing.firstName} ${existing.lastName} (${existing.email})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
 
@@ -334,6 +363,20 @@ export const deleteUser = async (req: RequestWithUser, res: Response) => {
       deletedBy: req.user?.userId,
       schoolId,
     });
+
+    // Audit log
+    auditService.log({
+      schoolId,
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'DELETE_USER',
+      entityType: 'User',
+      entityId: id,
+      entityName: `${existing.firstName} ${existing.lastName}`,
+      details: `Deleted user: ${existing.firstName} ${existing.lastName} (${existing.email})`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
     return ResponseUtil.success(res, 'User deleted successfully');
   } catch (err: any) {
@@ -557,6 +600,19 @@ export const bulkUpdateUsers = async (req: RequestWithUser, res: Response) => {
       count: results.successful.length,
       failed: results.failed.length,
     });
+
+    // Audit log
+    auditService.log({
+      schoolId,
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'BULK_UPDATE_USERS',
+      entityType: 'User',
+      details: `Bulk updated ${results.successful.length} users (${results.failed.length} failed)`,
+      metadata: { successful: results.successful.length, failed: results.failed.length },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
     return ResponseUtil.success(res, 'Bulk update completed', results);
   } catch (err: any) {

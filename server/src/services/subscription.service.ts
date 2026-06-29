@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import prisma from '../database/client';
 import logger from '../utils/logger';
+import { features } from 'process';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   TRIALING: ['ACTIVE', 'CANCELED', 'EXPIRED'],
@@ -55,7 +56,7 @@ export class SubscriptionService {
     const [subscriptions, total] = await Promise.all([
       (prisma as any).tenantSubscription.findMany({
         where,
-        include: { plan: true, school: { select: { id: true, name: true } } },
+        include: { plan: {include: {features: true}}, school: { select: { id: true, name: true } } },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,

@@ -3,12 +3,22 @@ import { useFeatureRegistry } from '@/hooks/use-feature-registry';
 import { PlanCard } from '@/components/subscriptions/PlanCard';
 
 export function PricingPage() {
-  const { data, isLoading, isError } = usePlans({ isActive: true, limit: 50 });
-  const registry = useFeatureRegistry();
+  const { 
+    data: plansData, 
+    isLoading: isPlansLoading, 
+    isError: isPlansError 
+  } = usePlans({ isActive: true, limit: 50 });
+  const { 
+    data: registryData,
+    isLoading: isRegistryLoading,
+    isError: isRegistryError
+  } = useFeatureRegistry();
 
-  const plans = data?.data || [];
-
-  if (isLoading) {
+  const registry = registryData?.data || {};
+  
+  const plans = plansData?.data || [];
+ 
+  if (isPlansLoading) {
     return (
       <div className="space-y-6">
         <div>
@@ -20,7 +30,7 @@ export function PricingPage() {
     );
   }
 
-  if (isError) {
+  if (isPlansError) {
     return (
       <div className="space-y-6">
         <div>

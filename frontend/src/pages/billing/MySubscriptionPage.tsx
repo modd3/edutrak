@@ -22,7 +22,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Subscription, SubscriptionStatus } from '@/types';
+import { BillingInvoice, Subscription, SubscriptionStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 
 function getStatusConfig(status: SubscriptionStatus) {
@@ -112,8 +112,13 @@ function getDaysUntilExpiry(subscription: Subscription): number | null {
 
 export function MySubscriptionPage() {
   const { schoolId } = useSchoolContext();
-  const registry = useFeatureRegistry();
+  const {
+    data: registryData,
+    isLoading: isRegistryLoading,
+    isError: isRegistryError,
+  } = useFeatureRegistry();
 
+const registry = registryData?.data || {};
   const { data: subscriptionsData, isLoading: subsLoading, isError: subsError } = useSubscriptions({
     page: 1,
     limit: 1,
@@ -199,7 +204,7 @@ export function MySubscriptionPage() {
   const sortedFeatures = [...features].sort((a, b) => a.featureKey.localeCompare(b.featureKey));
 
   const needsPayment = ['PAST_DUE', 'GRACE', 'SUSPENDED'].includes(subscription.status);
-  const hasOpenInvoices = invoices.some((inv) => inv.status === 'OPEN');
+  const hasOpenInvoices = invoices.some((inv: BillingInvoice) => inv.status === 'OPEN');
 
   return (
     <div className="space-y-6">

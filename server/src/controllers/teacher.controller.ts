@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { TeacherService } from '../services/teacher.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
@@ -16,6 +17,20 @@ export class TeacherController {
 
       const teacherService = new TeacherService(req);
       const teacher = await teacherService.createTeacher(req.body);
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'CREATE_TEACHER',
+        entityType: 'Teacher',
+        entityId: teacher.id,
+        details: `Created teacher profile for user ${userId}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Teacher created successfully', teacher);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -39,6 +54,21 @@ export class TeacherController {
         userId: currentUser.userId,
         role: currentUser.role as Role
       });
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: currentUser.userId,
+        actorRole: currentUser.role,
+        action: 'CREATE_TEACHER_WITH_USER',
+        entityType: 'Teacher',
+        entityId: teacher.id,
+        entityName: `${firstName} ${lastName}`,
+        details: `Created teacher with user account: ${firstName} ${lastName} (${email})`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Teacher with user account created successfully', teacher);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -139,7 +169,20 @@ export class TeacherController {
       
       const teacherService = new TeacherService(req);
       const teacher = await teacherService.updateTeacher(id, req.body);
-      
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_TEACHER',
+        entityType: 'Teacher',
+        entityId: id,
+        details: `Updated teacher ${id}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Teacher updated successfully', teacher);
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -159,6 +202,21 @@ export class TeacherController {
 
       const teacherService = new TeacherService(req);
       const assignment = await teacherService.assignSubjectToTeacher(req.body);
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'ASSIGN_SUBJECT_TO_TEACHER',
+        entityType: 'TeacherSubjectAssignment',
+        entityId: assignment.id,
+        details: `Assigned subject ${subjectId} to teacher ${teacherId} for term ${termId}`,
+        metadata: { classId, subjectId, teacherId, termId, academicYearId },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Subject assigned to teacher successfully', assignment);
     } catch (error: any) {
       if (error.code === 'P2002') {

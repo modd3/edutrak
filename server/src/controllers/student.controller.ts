@@ -90,6 +90,19 @@ export class StudentController {
       const studentService = this.getService(req);
       const student = await studentService.updateStudent(id, req.body, req.schoolId, req.isSuperAdmin);
 
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_STUDENT',
+        entityType: 'Student',
+        entityId: id,
+        details: `Updated student ${id}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Student updated successfully', student);
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -145,6 +158,20 @@ export class StudentController {
       req.isSuperAdmin || false
     );
 
+    // Audit log
+    auditService.log({
+      schoolId: req.schoolId,
+      actorId: req.user!.userId,
+      actorRole: req.user!.role,
+      action: 'UPDATE_ENROLLMENT',
+      entityType: 'Enrollment',
+      entityId: enrollmentId,
+      details: `Updated enrollment ${enrollmentId}`,
+      metadata: { streamId, classId, selectedSubjectsCount: selectedSubjects?.length || 0 },
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
     return ResponseUtil.success(res, 'Enrollment updated successfully', enrollment);
   } catch (error: any) {
     if (error.code === 'P2025') {
@@ -169,6 +196,21 @@ export class StudentController {
 
       const studentService = this.getService(req);
       const enrollment = await studentService.updateEnrollmentStatus(enrollmentId, status);
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_ENROLLMENT_STATUS',
+        entityType: 'Enrollment',
+        entityId: enrollmentId,
+        details: `Updated enrollment status to ${status}`,
+        metadata: { status },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Enrollment status updated successfully', enrollment);
     } catch (error: any) {
       if (error.code === 'P2025') {

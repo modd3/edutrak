@@ -18,9 +18,9 @@ export interface PlanFeatureInput {
   limitValue?: number | null;
 }
 
-type CreatePlanInput  = Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>>
+export type CreatePlanInput  = Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>>
 
-type UpdatePlanInput = Partial<Omit<CreatePlanInput, 'key'>>
+export type UpdatePlanInput = Partial<Omit<CreatePlanInput, 'key'>>
 
 export const plansApi = {
   list: (params?: { page?: number; limit?: number; isActive?: boolean }) =>

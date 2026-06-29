@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthService } from '../services/auth.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
@@ -25,6 +26,20 @@ export const login = async (req: Request, res: Response) => {
       email: result.user.email,
       role: result.user.role 
     });
+
+    // Audit log
+    auditService.log({
+      schoolId: result.user.schoolId,
+      actorId: result.user.id,
+      actorRole: result.user.role,
+      action: 'LOGIN',
+      entityType: 'User',
+      entityId: result.user.id,
+      entityName: `${result.user.firstName} ${result.user.lastName}`,
+      details: `User logged in: ${result.user.email}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
     return ResponseUtil.success(res, 'Login successful', result);
   } catch (err: any) {
@@ -101,6 +116,20 @@ export const register = async (req: Request, res: Response) => {
       email: result.user.email,
       role: result.user.role 
     });
+
+    // Audit log
+    auditService.log({
+      schoolId: result.user.schoolId,
+      actorId: result.user.id,
+      actorRole: result.user.role,
+      action: 'REGISTER',
+      entityType: 'User',
+      entityId: result.user.id,
+      entityName: `${result.user.firstName} ${result.user.lastName}`,
+      details: `User registered: ${result.user.email} as ${result.user.role}`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
     return ResponseUtil.created(res, 'Registration successful', result);
   } catch (err: any) {
@@ -321,6 +350,19 @@ export const logout = async (req: Request, res: Response) => {
     await authService.logout(userId);
 
     logger.info('User logged out', { userId });
+
+    // Audit log
+    auditService.log({
+      schoolId: req.user?.schoolId,
+      actorId: userId,
+      actorRole: req.user!.role,
+      action: 'LOGOUT',
+      entityType: 'User',
+      entityId: userId,
+      details: `User logged out`,
+      ipAddress: req.ip,
+      userAgent: req.headers['user-agent'],
+    }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
     return ResponseUtil.success(res, 'Logout successful');
   } catch (err: any) {

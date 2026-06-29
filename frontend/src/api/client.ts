@@ -85,7 +85,10 @@ api.interceptors.response.use(
         } catch (refreshError) {
           // Refresh failed - logout user
           useAuthStore.getState().logout();
-          window.location.href = '/login';
+         
+          if (window.location.pathname !== '/login') {
+            window.location.href = '/login';
+          }
           return Promise.reject(refreshError);
       }
     }

@@ -2,6 +2,7 @@
 import { Response } from 'express';
 import { RequestWithUser } from '../middleware/school-context';
 import { userCreationService } from '../services/user-creation.service';
+import { auditService } from '../services/audit.service';
 import logger from '../utils/logger';
 import { ResponseUtil } from '../utils/response';
 
@@ -33,6 +34,20 @@ export class UserCreationController {
         schoolId,
       });
 
+      // Audit log
+      auditService.log({
+        schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'CREATE_USER',
+        entityType: 'User',
+        entityId: user.id,
+        entityName: `${user.firstName} ${user.lastName}`,
+        details: `Created ${user.role} user: ${user.firstName} ${user.lastName} (${user.email})`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       ResponseUtil.created(res, 'User Created Successfully', user);
 
     } catch (error: any) {
@@ -57,6 +72,20 @@ export class UserCreationController {
         req.schoolId,
         req.isSuperAdmin || false
       );
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_USER',
+        entityType: 'User',
+        entityId: id,
+        entityName: `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        details: `Updated user ${id}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
       res.json({
         data: user,
@@ -84,6 +113,19 @@ export class UserCreationController {
         req.isSuperAdmin || false,
         req.user?.userId
       );
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'BULK_CREATE_USERS',
+        entityType: 'User',
+        details: `Bulk created ${results.successful.length} users (${results.failed.length} failed)`,
+        metadata: { successful: results.successful.length, failed: results.failed.length },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
       res.status(201).json({
         data: results,

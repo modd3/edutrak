@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { GuardianService } from '../services/guardian.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
@@ -20,6 +21,20 @@ export class GuardianController {
 
       const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.createGuardian(req.body);
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'CREATE_GUARDIAN',
+        entityType: 'Guardian',
+        entityId: guardian.id,
+        details: `Created guardian profile for user ${userId}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Guardian created successfully', guardian);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -46,6 +61,21 @@ export class GuardianController {
           role: currentUser.role as Role,
         }
       );
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: currentUser.userId,
+        actorRole: currentUser.role,
+        action: 'CREATE_GUARDIAN_WITH_USER',
+        entityType: 'Guardian',
+        entityId: guardian.id,
+        entityName: `${firstName} ${lastName}`,
+        details: `Created guardian with user account: ${firstName} ${lastName} (${email})`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'Guardian with user account created successfully', guardian);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -125,6 +155,19 @@ console.log("Guardians: ", result)
       const guardianService = GuardianService.withRequest(req);
       const guardian = await guardianService.updateGuardian(id, req.body);
 
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_GUARDIAN',
+        entityType: 'Guardian',
+        entityId: id,
+        details: `Updated guardian ${id}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Guardian updated successfully', guardian);
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -178,6 +221,21 @@ console.log("Guardians: ", result)
 
       const guardianService = GuardianService.withRequest(req);
       await guardianService.setPrimaryGuardian({ studentId, guardianId });
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'SET_PRIMARY_GUARDIAN',
+        entityType: 'StudentGuardian',
+        entityId: guardianId,
+        details: `Set guardian ${guardianId} as primary for student ${studentId}`,
+        metadata: { studentId, guardianId },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Primary guardian set successfully');
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -197,6 +255,21 @@ console.log("Guardians: ", result)
 
       const guardianService = GuardianService.withRequest(req);
       await guardianService.removeGuardianFromStudent(studentId, guardianId);
+
+      // Audit log
+      auditService.log({
+        schoolId: req.schoolId,
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'REMOVE_GUARDIAN_FROM_STUDENT',
+        entityType: 'StudentGuardian',
+        entityId: guardianId,
+        details: `Removed guardian ${guardianId} from student ${studentId}`,
+        metadata: { studentId, guardianId },
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'Guardian removed from student successfully');
     } catch (error: any) {
       if (error.code === 'P2025') {

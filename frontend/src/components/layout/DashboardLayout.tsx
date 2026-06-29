@@ -27,7 +27,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         // Re-check after brief delay — if still not authed, redirect
         const { isAuthenticated: stillAuthed } = useAuthStore.getState();
         if (!stillAuthed) {
-          navigate('/login');
+          navigate('/login', { replace: true });
         }
       }, 100);
       return () => clearTimeout(timeout);

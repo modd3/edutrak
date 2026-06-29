@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { SchoolService } from '../services/school.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
@@ -39,6 +40,20 @@ export class SchoolController {
         userId: currentUser.userId,
         role: currentUser.role as Role
       });
+
+      // Audit log
+      auditService.log({
+        actorId: currentUser.userId,
+        actorRole: currentUser.role,
+        action: 'CREATE_SCHOOL',
+        entityType: 'School',
+        entityId: school.id,
+        entityName: school.name,
+        details: `Created school: ${school.name} (${school.registrationNo})`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.created(res, 'School created successfully', school);
     } catch (error: any) {
       if (error.code === 'P2002') {
@@ -97,7 +112,20 @@ export class SchoolController {
       }
       
       const school = await schoolService.updateSchool(id, req.body);
-      
+
+      // Audit log
+      auditService.log({
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'UPDATE_SCHOOL',
+        entityType: 'School',
+        entityId: id,
+        entityName: school.name,
+        details: `Updated school: ${school.name}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'School updated successfully', school);
     } catch (error: any) {
       if (error.code === 'P2025') {
@@ -116,7 +144,19 @@ export class SchoolController {
       }
       
       await schoolService.deleteSchool(id);
-      
+
+      // Audit log
+      auditService.log({
+        actorId: req.user!.userId,
+        actorRole: req.user!.role,
+        action: 'DELETE_SCHOOL',
+        entityType: 'School',
+        entityId: id,
+        details: `Deleted school ${id}`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+
       return ResponseUtil.success(res, 'School deleted successfully');
     } catch (error: any) {
       if (error.code === 'P2025') {

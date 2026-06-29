@@ -2,6 +2,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { FeeService } from '../services/fee.service';
+import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import { RequestWithUser } from '../middleware/school-context';
 import {
@@ -31,6 +32,21 @@ import { PaymentPlanService } from '../services/fee/payment-plan.service';
 import { ReminderService } from '../services/fee/reminder.service';
 import { ReconciliationService } from '../services/fee/reconciliation.service';
 
+const auditLog = (req: RequestWithUser, action: string, entityType: string, entityId: string, details: string, metadata?: Record<string, unknown>) => {
+  auditService.log({
+    schoolId: req.schoolId,
+    actorId: req.user!.userId,
+    actorRole: req.user!.role,
+    action,
+    entityType,
+    entityId,
+    details,
+    metadata,
+    ipAddress: req.ip,
+    userAgent: req.headers['user-agent'],
+  }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+};
+
 export class FeeController {
   // ── Fee Structures ─────────────────────────────────────────────────────────
 
@@ -39,6 +55,9 @@ export class FeeController {
       const data = createFeeStructureSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const structure = await service.createFeeStructure(data);
+
+      auditLog(req, 'CREATE_FEE_STRUCTURE', 'FeeStructure', structure.id, `Created fee structure: ${structure.name}`, { academicYearId: data.academicYearId });
+
       return ResponseUtil.created(res, 'Fee structure created successfully', structure);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -77,6 +96,9 @@ export class FeeController {
       const data = updateFeeStructureSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const structure = await service.updateFeeStructure(id, data);
+
+      auditLog(req, 'UPDATE_FEE_STRUCTURE', 'FeeStructure', id, `Updated fee structure ${id}`);
+
       return ResponseUtil.success(res, 'Fee structure updated', structure);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -92,6 +114,9 @@ export class FeeController {
       const data = addFeeItemSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const item = await service.addFeeItem(structureId, data);
+
+      auditLog(req, 'ADD_FEE_ITEM', 'FeeItem', item.id, `Added fee item to structure ${structureId}`, { structureId, itemName: data.name });
+
       return ResponseUtil.created(res, 'Fee item added', item);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -105,6 +130,9 @@ export class FeeController {
       const data = updateFeeItemSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const item = await service.updateFeeItem(itemId, data);
+
+      auditLog(req, 'UPDATE_FEE_ITEM', 'FeeItem', itemId, `Updated fee item ${itemId}`);
+
       return ResponseUtil.success(res, 'Fee item updated', item);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -117,6 +145,9 @@ export class FeeController {
       const { itemId } = req.params;
       const service = FeeService.withRequest(req);
       await service.deleteFeeItem(itemId);
+
+      auditLog(req, 'DELETE_FEE_ITEM', 'FeeItem', itemId, `Deleted fee item ${itemId}`);
+
       return ResponseUtil.success(res, 'Fee item deleted');
     } catch (error: any) {
       return ResponseUtil.error(res, error.message, 400);
@@ -130,6 +161,9 @@ export class FeeController {
       const data = generateInvoiceSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const invoice = await service.generateInvoice(data);
+
+      auditLog(req, 'GENERATE_INVOICE', 'Invoice', invoice.id, `Generated invoice for student ${data.studentId}`, { studentId: data.studentId, amount: invoice.totalAmount });
+
       return ResponseUtil.created(res, 'Invoice generated successfully', invoice);
     } catch (error: any) {
       if (error instanceof z.ZodError) {
@@ -152,6 +186,9 @@ export class FeeController {
       const data = bulkGenerateInvoicesSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const result = await service.bulkGenerateInvoices(data);
+
+      auditLog(req, 'BULK_GENERATE_INVOICES', 'Invoice', '', `Bulk generated ${result.generated} invoices, skipped ${result.skipped}`, { generated: result.generated, skipped: result.skipped });
+
       return ResponseUtil.created(res, `Generated ${result.generated} invoices, skipped ${result.skipped}`, result);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -192,6 +229,9 @@ export class FeeController {
       const data = updateInvoiceSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const invoice = await service.updateInvoice(id, data);
+
+      auditLog(req, 'UPDATE_INVOICE', 'Invoice', id, `Updated invoice ${id}`);
+
       return ResponseUtil.success(res, 'Invoice updated', invoice);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -204,6 +244,9 @@ export class FeeController {
       const { id } = req.params;
       const service = FeeService.withRequest(req);
       const invoice = await service.cancelInvoice(id);
+
+      auditLog(req, 'CANCEL_INVOICE', 'Invoice', id, `Cancelled invoice ${id}`);
+
       return ResponseUtil.success(res, 'Invoice cancelled', invoice);
     } catch (error: any) {
       return ResponseUtil.error(res, error.message, 400);
@@ -217,6 +260,9 @@ export class FeeController {
       const data = recordPaymentSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const payment = await service.recordPayment(data);
+
+      auditLog(req, 'RECORD_PAYMENT', 'Payment', payment.id, `Recorded payment of ${payment.amount} for invoice ${data.invoiceId}`, { invoiceId: data.invoiceId, amount: payment.amount, method: data.method });
+
       return ResponseUtil.created(res, 'Payment recorded successfully', payment);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
@@ -255,6 +301,9 @@ export class FeeController {
       const data = reversePaymentSchema.parse(req.body);
       const service = FeeService.withRequest(req);
       const payment = await service.reversePayment(id, data);
+
+      auditLog(req, 'REVERSE_PAYMENT', 'Payment', id, `Reversed payment ${id}`, { reason: data.reason });
+
       return ResponseUtil.success(res, 'Payment reversed', payment);
     } catch (error: any) {
       if (error instanceof z.ZodError) return ResponseUtil.validationError(res, JSON.stringify(error.issues));
