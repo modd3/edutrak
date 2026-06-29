@@ -27,6 +27,7 @@ import {
   Building2,
   Tag,
   CalendarCheck,
+  Shield,
 } from 'lucide-react';
 import { Role } from '@/types';
 
@@ -35,6 +36,7 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   roles: string[];
+  overridable?: boolean; // Items that only show for SUPER_ADMIN when override mode is active
   badge?: string;
   children?: NavItem[];
 }
@@ -91,42 +93,43 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // SUPER_ADMIN & ADMIN — Billing (customer-facing)
+  // ADMIN ONLY — Billing (customer-facing)
   // ============================================================
   {
     title: 'Billing',
     href: '/billing/plans',
     icon: Tag,
-    roles: ['SUPER_ADMIN', 'ADMIN'],
+    roles: ['ADMIN'],
     children: [
       {
         title: 'Plans & Pricing',
         href: '/billing/plans',
         icon: Tag,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
+        roles: ['ADMIN'],
       },
       {
         title: 'My Subscription',
         href: '/billing/my-subscription',
         icon: CalendarCheck,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
+        roles: ['ADMIN'],
       },
       {
         title: 'Invoices',
         href: '/billing/invoices',
         icon: FileText,
-        roles: ['SUPER_ADMIN', 'ADMIN'],
+        roles: ['ADMIN'],
       },
     ],
   },
 
   // ============================================================
-  // SCHOOL ADMIN — Students
+  // SCHOOL ADMIN — Students (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Students',
     href: '/students',
     icon: GraduationCap,
+    overridable: true,
     roles: ['ADMIN', 'TEACHER', 'SUPER_ADMIN'],
     children: [
       {
@@ -151,12 +154,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // SCHOOL ADMIN — Teachers
+  // SCHOOL ADMIN — Teachers (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Teachers',
     href: '/teachers',
     icon: UserCog,
+    overridable: true,
     roles: ['ADMIN', 'SUPER_ADMIN'],
     children: [
       {
@@ -175,12 +179,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // SCHOOL ADMIN — Classes
+  // SCHOOL ADMIN — Classes (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Classes',
     href: '/classes',
     icon: Home,
+    overridable: true,
     roles: ['ADMIN', 'TEACHER', 'SUPER_ADMIN'],
     children: [
       {
@@ -217,12 +222,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // Assessments — All instructional roles
+  // Assessments — All instructional roles (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Assessments',
     href: '/assessments',
     icon: ClipboardCheck,
+    overridable: true,
     roles: ['ADMIN', 'TEACHER', 'STUDENT', 'PARENT', 'SUPER_ADMIN'],
     children: [
       {
@@ -259,12 +265,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // Fees — School admin & teacher (limited)
+  // Fees — School admin & teacher (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Fees',
     href: '/fees',
     icon: CreditCard,
+    overridable: true,
     roles: ['ADMIN', 'TEACHER', 'SUPER_ADMIN'],
     children: [
       {
@@ -319,12 +326,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // Reports — All roles
+  // Reports — All roles (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Reports',
     href: '/reports',
     icon: BarChart3,
+    overridable: true,
     roles: ['ADMIN', 'TEACHER', 'PARENT', 'SUPER_ADMIN'],
     children: [
       {
@@ -349,12 +357,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // Academic Year — School admin
+  // Academic Year — School admin (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Academic Year',
     href: '/academic-year',
     icon: Calendar,
+    overridable: true,
     roles: ['ADMIN', 'SUPER_ADMIN'],
     children: [
       {
@@ -373,12 +382,13 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
-  // Users & Guardians — School admin
+  // Users & Guardians — School admin (overridable for SUPER_ADMIN)
   // ============================================================
   {
     title: 'Users',
     href: '/users',
     icon: Users,
+    overridable: true,
     roles: ['ADMIN', 'SUPER_ADMIN'],
     children: [
       {
@@ -420,6 +430,16 @@ export const sidebarConfig: NavItem[] = [
   },
 
   // ============================================================
+  // Audit Logs — Super Admin & Admin
+  // ============================================================
+  {
+    title: 'Audit Logs',
+    href: '/audit-logs',
+    icon: Shield,
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+
+  // ============================================================
   // Settings — All
   // ============================================================
   {
@@ -430,12 +450,23 @@ export const sidebarConfig: NavItem[] = [
   },
 ];
 
-// Filter navigation items based on user role
-export const getNavigationForRole = (role: string): NavItem[] => {
+// Filter navigation items based on user role and override mode
+export const getNavigationForRole = (role: string, overrideActive: boolean = false): NavItem[] => {
   return sidebarConfig
-    .filter((item) => item.roles.includes(role))
+    .filter((item) => {
+      if (role === 'SUPER_ADMIN' && item.overridable) {
+        // Overridable items only show for SUPER_ADMIN when override is active
+        return overrideActive;
+      }
+      return item.roles.includes(role);
+    })
     .map((item) => ({
       ...item,
-      children: item.children?.filter((child) => child.roles.includes(role)),
+      children: item.children?.filter((child) => {
+        if (role === 'SUPER_ADMIN' && child.overridable) {
+          return overrideActive;
+        }
+        return child.roles.includes(role);
+      }),
     }));
 };

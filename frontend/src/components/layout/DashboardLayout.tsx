@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
+import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 import { useAuthStore } from '../../store/auth-store';
 import { Bell } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
@@ -14,7 +15,11 @@ const thisYear = year.getFullYear();
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, user, logout } = useAuthStore();
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [securityOpen, setSecurityOpen] = useState(false);
+  const { overrideSchool, clearOverrideSchool } = useAuthStore();
+  const isOverrideActive = user?.role === 'SUPER_ADMIN' && !!overrideSchool;
 
   // Redirect to login only if auth state is definitively not authenticated
   // (not just still hydrating)
@@ -52,22 +57,60 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center space-x-4 ml-4">
+            <div className="flex items-center space-x-3 ml-4">
+              {/* School Context Switcher (for SUPER_ADMIN) */}
+              <SchoolContextSwitcher />
+
+              {/* Security Settings */}
+              <button
+                onClick={() => setSecurityOpen(true)}
+                title="Account Security Settings"
+                className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+              >
+                <KeyRound size={18} />
+              </button>
+
               {/* Notifications */}
-              <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg">
-                <Bell size={20} />
+              <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
+                <Bell size={18} />
                 <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></span>
               </button>
 
               {/* School Info (for non-super admins) */}
-              {user.school && (
-                <div className="hidden md:block px-3 py-1 bg-blue-50 text-blue-700 rounded-lg text-sm">
+              {user.school && !isOverrideActive && (
+                <div className="hidden md:block px-3 py-1 bg-indigo-50 text-indigo-700 font-medium rounded-lg text-xs">
                   {user.school.name}
                 </div>
               )}
             </div>
           </div>
         </header>
+
+        <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
+        <ProfileSecurityModal open={securityOpen} onOpenChange={setSecurityOpen} />
+
+        {/* Override Active Banner */}
+        {isOverrideActive && (
+          <div className="bg-amber-50 border-b border-amber-200 px-4 lg:px-8 py-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-amber-800">
+                <Zap size={16} className="text-amber-500" />
+                <span>
+                  <strong>Override Mode:</strong> Viewing as <strong>{overrideSchool?.name}</strong>
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  clearOverrideSchool();
+                  navigate('/dashboard');
+                }}
+                className="text-xs font-medium text-amber-700 hover:text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1 rounded transition-colors"
+              >
+                Exit Override
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="flex-1 p-4 lg:p-8">

@@ -43,7 +43,7 @@ type TransitionStatusInput = z.infer<typeof transitionStatusSchema>;
 interface ManageSubscriptionStatusModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  subscription?: Subscription;
+  subscription: Subscription | null;
 }
 
 export function ManageSubscriptionStatusModal({

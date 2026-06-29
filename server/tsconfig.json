@@ -1,5 +1,6 @@
 {
   "compilerOptions": {
+    "types": ["jest"],
     "target": "ES2022",
     "module": "commonjs",
     "lib": ["ES2022"],
@@ -36,11 +37,12 @@
     }
   },
   "include": [
-    "src/**/*"
-, "prisma.config.ts"  ],
+    "src/**/*",
+    "__tests__/**/*",
+    "prisma.config.ts"
+  ],
   "exclude": [
     "node_modules",
-    "dist",
-    "**/*.test.ts"
+    "dist"
   ]
 }

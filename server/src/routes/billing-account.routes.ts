@@ -8,6 +8,6 @@ const controller = new BillingAccountController();
 router.use(authenticate);
 
 router.put('/', authorize('SUPER_ADMIN'), controller.upsert.bind(controller));
-router.get('/school/:schoolId', authorize('ADMIN', 'SUPER_ADMIN'), controller.getBySchool.bind(controller));
+router.get('/school/:schoolId', authorize('SUPER_ADMIN'), controller.getBySchool.bind(controller));
 
 export default router;

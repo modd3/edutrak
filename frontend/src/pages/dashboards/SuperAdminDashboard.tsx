@@ -1,4 +1,4 @@
-import { School, CreditCard, DollarSign, Users, TrendingUp, Building2 } from 'lucide-react';
+import { School, CreditCard, DollarSign, Users, TrendingUp, Building2, Eye } from 'lucide-react';
 import { useAuthStore } from '@/store/auth-store';
 import { useNavigate } from 'react-router-dom';
 import { useSchools } from '@/hooks/use-schools';
@@ -8,7 +8,7 @@ import { RecentActivities } from '@/components/shared/RecentActivities';
 import type { ActivityItem } from '@/components/shared/RecentActivities';
 
 export function SuperAdminDashboard() {
-  const { user } = useAuthStore();
+  const { user, setOverrideSchool } = useAuthStore();
   const navigate = useNavigate();
 
   const { data: schoolsData } = useSchools();
@@ -181,6 +181,7 @@ export function SuperAdminDashboard() {
                   <th className="pb-2 font-medium">Type</th>
                   <th className="pb-2 font-medium">County</th>
                   <th className="pb-2 font-medium">Students</th>
+                  <th className="pb-2 font-medium">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -189,12 +190,26 @@ export function SuperAdminDashboard() {
                     <td className="py-2 font-medium text-gray-900">{school.name}</td>
                     <td className="py-2 text-gray-600">{school.type?.replace('_', ' ')}</td>
                     <td className="py-2 text-gray-600">{school.county}</td>
-                    <td className="py-2 text-gray-600">{school._count?.students || 0}</td>
-                  </tr>
-                ))}
+                  <td className="py-2 text-gray-600">{school._count?.students || 0}</td>
+                  <td className="py-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOverrideSchool({ id: school.id, name: school.name });
+                        navigate('/students');
+                      }}
+                      className="inline-flex items-center gap-1 text-xs font-medium text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-2 py-1 rounded transition-colors"
+                      title="Inspect this school's data"
+                    >
+                      <Eye size={14} />
+                      Inspect
+                    </button>
+                  </td>
+                </tr>
+              ))}
                 {schools.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="py-4 text-center text-gray-500">
+                    <td colSpan={5} className="py-4 text-center text-gray-500">
                       No schools registered yet.
                     </td>
                   </tr>

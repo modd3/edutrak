@@ -4,6 +4,7 @@ import { JwtPayload } from '../utils/jwt';
 import logger from '../utils/logger';
 import { SubscriptionService } from '../services/subscription.service';
 import { TenantSubscription } from '@prisma/client';
+import prisma from '../database/client';
 
 export interface RequestWithUser extends Request {
   user?: JwtPayload & {
@@ -12,6 +13,7 @@ export interface RequestWithUser extends Request {
   };
   schoolId?: string;
   isSuperAdmin?: boolean;
+  isInOverrideMode?: boolean;
   subscription?: any;
 }
 
@@ -27,15 +29,6 @@ export async function enforceSchoolContext(
   next: NextFunction
 ) {
   const user = req.user;
-  const subscriptionService = new SubscriptionService()
-  const userSchoolSubscriptions = await subscriptionService.getSubscriptions({
-    schoolId: user.schoolId
-  });
-
-  const validSubscriptions = userSchoolSubscriptions.subscriptions;
-  const subscription = validSubscriptions.find((s) => SUBSCRIPTION_ACCESS_STATES.includes(s.status)) 
-
-  req.subscription = subscription;
 
   if (!user) {
     return res.status(401).json({
@@ -44,21 +37,58 @@ export async function enforceSchoolContext(
     });
   }
 
-  if (!subscription) {
-    logger.error(`School ${user.schoolId} has no active subscription ${req.subscription}`, user.schoolId);
-    return res.status(403).json({
-      error: 'NO_ACTIVE_SUBSCRIPTION',
-      message: 'An Active Subscription is required!',
-    })
-  }
-
-  // Super admins can access all schools
+  // Super admin check FIRST — before subscription enforcement
   const isSuperAdmin = user.role === 'SUPER_ADMIN';
   req.isSuperAdmin = isSuperAdmin;
 
   if (isSuperAdmin) {
-    req.schoolId = undefined; // No school filter for super admin
+    // Check for X-School-Override header
+    const overrideSchoolId = req.headers['x-school-override'] as string | undefined;
+    
+    if (overrideSchoolId) {
+      // Validate the school exists
+      const school = await prisma.school.findUnique({
+        where: { id: overrideSchoolId },
+        select: { id: true, name: true },
+      });
+
+      if (!school) {
+        return res.status(404).json({
+          error: 'SCHOOL_NOT_FOUND',
+          message: `School with ID "${overrideSchoolId}" not found`,
+        });
+      }
+
+      req.schoolId = overrideSchoolId;
+      req.isInOverrideMode = true;
+      req.subscription = undefined; // No subscription enforcement in override mode
+      logger.info(`Super Admin ${user.userId} accessing school ${school.name} (${overrideSchoolId}) in override mode`);
+    } else {
+      req.schoolId = undefined; // No school filter for super admin
+      req.isInOverrideMode = false;
+      req.subscription = undefined;
+    }
+
     return next();
+  }
+
+  // Non-Super Admin: enforce subscription and school context
+  const subscriptionService = new SubscriptionService();
+  const userSchoolSubscriptions = await subscriptionService.getSubscriptions({
+    schoolId: user.schoolId,
+  });
+
+  const validSubscriptions = userSchoolSubscriptions.subscriptions;
+  const subscription = validSubscriptions.find((s) => SUBSCRIPTION_ACCESS_STATES.includes(s.status));
+
+  req.subscription = subscription;
+
+  if (!subscription) {
+    logger.error(`School ${user.schoolId} has no active subscription`, user.schoolId);
+    return res.status(403).json({
+      error: 'NO_ACTIVE_SUBSCRIPTION',
+      message: 'An Active Subscription is required!',
+    });
   }
 
   // All other roles MUST have a school
@@ -69,8 +99,9 @@ export async function enforceSchoolContext(
     });
   }
 
-  // Add schoolId (and subscription?) to request for filtering ALL queries
+  // Add schoolId to request for filtering ALL queries
   req.schoolId = user.schoolId;
+  req.isInOverrideMode = false;
   next();
 }
 
