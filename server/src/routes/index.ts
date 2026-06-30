@@ -18,6 +18,7 @@ import billingInvoiceRoutes from './billing-invoice.routes';
 import auditRoutes from './audit.routes';
 import studentGuardianRoutes from './student-guardian.routes';
 import entitlementRoutes from './entitlement.routes';
+import timetableRoutes from './timetable.routes';
 
 const router = Router();
 
@@ -45,5 +46,8 @@ router.use('/student-guardians', studentGuardianRoutes);
 
 // Audit logs
 router.use('/audit-logs', auditRoutes);
+
+// Timetable & periods
+router.use('/timetables', timetableRoutes);
 
 export default router;

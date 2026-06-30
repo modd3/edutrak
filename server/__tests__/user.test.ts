@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app';
-import prisma from '../src/prismaClient';
+import prisma from '../src/database/client';
 import { adminToken } from './auth.test';
 
 describe('User Management (Admin only)', () => {

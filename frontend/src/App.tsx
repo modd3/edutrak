@@ -45,6 +45,7 @@ import { PricingPage } from './pages/billing/PricingPage';
 import { MySubscriptionPage } from './pages/billing/MySubscriptionPage';
 import { InvoicesPage } from './pages/billing/InvoicesPage';
 import AuditLogsPage from './pages/audit/AuditLogsPage';
+import TimetablePage from './pages/timetable/TimetablePage';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Create a client
@@ -504,6 +505,30 @@ function App() {
               <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <ProvidersPage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN: Timetables (standalone admin route) */}
+          <Route
+            path="/timetable"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <TimetablePage />
+                </DashboardLayout>
+              </RoleGuard>
+            }
+          />
+
+          {/* ADMIN, SUPER_ADMIN, TEACHER: Timetables (via Classes submenu) */}
+          <Route
+            path="/classes/timetable"
+            element={
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN', 'TEACHER']} fallbackRoute="/dashboard">
+                <DashboardLayout>
+                  <TimetablePage />
                 </DashboardLayout>
               </RoleGuard>
             }

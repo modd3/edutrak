@@ -74,6 +74,7 @@ model School {
   documentTemplates     DocumentTemplate[]
   usageMetrics          UsageMetric[]
   feeRefunds            FeeRefund[]
+  timetables            Timetable[]
 
   @@index([county])
   @@index([type])
@@ -371,6 +372,7 @@ model Teacher {
   classTeacherOf    Class[]            @relation("ClassTeacher")
   teachingSubjects  ClassSubject[]     @relation("TeacherClassSubjects")
   streamTeacherOf   Stream[]           @relation("StreamTeacher")
+  periodSlots       PeriodSlot[]       @relation("TeacherPeriodSlots")
   user              User               @relation(fields: [userId], references: [id])
 }
 
@@ -409,6 +411,7 @@ model AcademicYear {
   terms                 Term[]
   feeStructures         FeeStructure[]
   feeInvoices           FeeInvoice[]
+  timetables            Timetable[]
 
   @@unique([year, schoolId])
   @@index([isActive])
@@ -432,6 +435,7 @@ model Term {
   school                School?                @relation(fields: [schoolId], references: [id])
   feeStructures         FeeStructure[]
   feeInvoices           FeeInvoice[]
+  timetables            Timetable[]
 
   @@unique([academicYearId, termNumber])
   @@index([academicYearId])
@@ -458,6 +462,7 @@ model Class {
   streams          Stream[]
   students         StudentClass[]
   promotedStudents StudentClass[] @relation("Promotion")
+  timetables       Timetable[]
 
   @@unique([name, academicYearId, schoolId])
   @@index([curriculum])
@@ -480,6 +485,7 @@ model Stream {
   streamTeacher   Teacher?       @relation("StreamTeacher", fields: [streamTeacherId], references: [id])
   students        StudentClass[]
   classSubjects   ClassSubject[]
+  timetables      Timetable[]
 
   @@unique([classId, name])
   @@index([classId])
@@ -537,6 +543,7 @@ model ClassSubject {
   term               Term                   @relation("TermClassSubjects", fields: [termId], references: [id])
   strands            ClassSubjectStrand[]
   studentEnrollments StudentClassSubject[]
+  periodSlots        PeriodSlot[]
 
   @@unique([classId, streamId, subjectId, termId, academicYearId])
   @@index([teacherId])
@@ -693,6 +700,89 @@ model AssessmentResult {
   @@index([studentId])
   @@index([assessmentDefId])
   @@index([assessedById])
+}
+
+// ─── Timetable ────────────────────────────────────────────────────────────────
+// A timetable belongs to a school, academic year, and optionally a term.
+// It groups a set of PeriodSlots (scheduled lessons) for a class/stream.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Timetable {
+  id             String       @id @default(uuid())
+  schoolId       String
+  academicYearId String
+  termId         String?
+  classId        String
+  streamId       String?
+  name           String       // e.g. "Form 3 North – Term 2 2025"
+  effectiveFrom  DateTime
+  effectiveTo    DateTime?
+  isActive       Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  school       School        @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  academicYear AcademicYear  @relation(fields: [academicYearId], references: [id])
+  term         Term?         @relation(fields: [termId], references: [id])
+  class        Class         @relation(fields: [classId], references: [id])
+  stream       Stream?       @relation(fields: [streamId], references: [id])
+  periods      Period[]
+  slots        PeriodSlot[]
+
+  @@index([schoolId])
+  @@index([schoolId, academicYearId])
+  @@index([classId])
+  @@index([isActive])
+}
+
+// ─── Period ───────────────────────────────────────────────────────────────────
+// Defines a named time block in the school day (e.g. "Period 1 08:00–08:45").
+// Periods are shared across a timetable and may be reused on multiple days.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model Period {
+  id          String     @id @default(uuid())
+  timetableId String
+  name        String     // e.g. "Period 1", "Break", "Lunch"
+  startTime   String     // HH:MM 24-hr (stored as string for simplicity)
+  endTime     String     // HH:MM 24-hr
+  orderIndex  Int        // display/sort order within the day
+  isBreak     Boolean    @default(false) // non-instructional block
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  timetable   Timetable    @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  slots       PeriodSlot[]
+
+  @@index([timetableId])
+  @@unique([timetableId, orderIndex])
+}
+
+// ─── PeriodSlot ───────────────────────────────────────────────────────────────
+// A single scheduled lesson: which subject/teacher fills a Period on a given day.
+// ─────────────────────────────────────────────────────────────────────────────
+
+model PeriodSlot {
+  id             String     @id @default(uuid())
+  timetableId    String
+  periodId       String
+  dayOfWeek      DayOfWeek
+  classSubjectId String?    // which ClassSubject (and therefore subject+teacher) is taught
+  teacherId      String?    // denormalised for quick lookup / teacher view
+  room           String?    // optional room label
+  notes          String?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+
+  timetable    Timetable    @relation(fields: [timetableId], references: [id], onDelete: Cascade)
+  period       Period       @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  classSubject ClassSubject? @relation(fields: [classSubjectId], references: [id], onDelete: SetNull)
+  teacher      Teacher?     @relation("TeacherPeriodSlots", fields: [teacherId], references: [id], onDelete: SetNull)
+
+  @@unique([timetableId, periodId, dayOfWeek])
+  @@index([timetableId])
+  @@index([teacherId])
+  @@index([classSubjectId])
 }
 
 // ─── AuditLog ─────────────────────────────────────────────────────────────────
@@ -1300,4 +1390,14 @@ enum TemplateStatus {
   DRAFT
   PUBLISHED
   ARCHIVED
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
 }

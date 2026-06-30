@@ -156,9 +156,9 @@ export function Sidebar({
   );
 }
 
-// ============================================
-// NavItemComponent – with popover background fix
-// ============================================
+// =================
+// NavItemComponent
+// =================
 interface NavItemComponentProps {
   item: NavItem;
   collapsed: boolean;

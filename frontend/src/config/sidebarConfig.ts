@@ -467,6 +467,7 @@ const SUPER_ADMIN_PLATFORM_CHILD_HREFS = new Set([
   '/users/change-password',
   '/billing/plans',
   '/billing/my-subscription',
+  '/classes/timetable',
 ]);
 
 const isVisibleForRole = (item: NavItem, role: string, hasSchoolOverride: boolean) => {

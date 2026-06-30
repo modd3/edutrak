@@ -793,3 +793,105 @@ export interface PaginatedResponse<T> extends ApiResponse<T[]> {
     pages: number;
   };
 }
+
+// ─── Timetable Types ──────────────────────────────────────────────────────────
+
+export enum DayOfWeek {
+  MONDAY = 'MONDAY',
+  TUESDAY = 'TUESDAY',
+  WEDNESDAY = 'WEDNESDAY',
+  THURSDAY = 'THURSDAY',
+  FRIDAY = 'FRIDAY',
+  SATURDAY = 'SATURDAY',
+  SUNDAY = 'SUNDAY',
+}
+
+/** Summary of a subject taught in a slot (from ClassSubject include) */
+export interface SlotSubjectInfo {
+  id: string;
+  name: string;
+  code: string;
+}
+
+export interface SlotTeacherInfo {
+  id: string;
+  firstName: string;
+  lastName: string;
+}
+
+/** A ClassSubject with minimal nested info (for slot display) */
+export interface SlotClassSubject {
+  id: string;
+  subject?: SlotSubjectInfo;
+  teacherProfile?: {
+    id: string;
+    user?: SlotTeacherInfo;
+  };
+}
+
+/** A single scheduled lesson cell: day × period → lesson */
+export interface PeriodSlot {
+  id: string;
+  timetableId: string;
+  periodId: string;
+  dayOfWeek: DayOfWeek;
+  classSubjectId?: string | null;
+  teacherId?: string | null;
+  room?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  period?: Period;
+  classSubject?: SlotClassSubject | null;
+  teacher?: {
+    id: string;
+    user?: SlotTeacherInfo;
+  } | null;
+  // Teacher-schedule view extras
+  timetable?: {
+    id: string;
+    name: string;
+    class?: { id: string; name: string; level: string };
+    stream?: { id: string; name: string } | null;
+  };
+}
+
+/** A time block (row) in a timetable */
+export interface Period {
+  id: string;
+  timetableId: string;
+  name: string;
+  startTime: string; // HH:MM
+  endTime: string;   // HH:MM
+  orderIndex: number;
+  isBreak: boolean;
+  createdAt: string;
+  updatedAt: string;
+  slots?: PeriodSlot[];
+}
+
+/** Timetable summary (list view – no periods/slots) */
+export interface Timetable {
+  id: string;
+  schoolId: string;
+  academicYearId: string;
+  termId?: string | null;
+  classId: string;
+  streamId?: string | null;
+  name: string;
+  effectiveFrom: string;
+  effectiveTo?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  class?: { id: string; name: string; level: string };
+  stream?: { id: string; name: string } | null;
+  academicYear?: { id: string; year: number };
+  term?: { id: string; name: string; termNumber: number } | null;
+  _count?: { periods: number; slots: number };
+}
+
+/** Timetable detail (includes periods with nested slots) */
+export interface TimetableDetail extends Timetable {
+  periods: Period[];
+}

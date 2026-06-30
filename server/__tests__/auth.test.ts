@@ -1,6 +1,6 @@
 import request from 'supertest';
 import app from '../src/app';
-import prisma from '../src/prismaClient';
+import prisma from '../src/database/client';
 import { hashPassword } from '../src/utils/hash';
 
 let adminToken: string;

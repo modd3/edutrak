@@ -32,7 +32,6 @@ class RefundService {
   async validateRefund(paymentId: string): Promise<RefundValidation> {
     const payment = await prisma.feePayment.findUnique({
       where: { id: paymentId },
-      include: { refunds: true },
     });
 
     if (!payment) {
@@ -43,7 +42,11 @@ class RefundService {
       return { canRefund: false, reason: 'Payment already reversed', maxRefundAmount: 0, alreadyRefunded: 0 };
     }
 
-    const alreadyRefunded = payment.refunds.reduce((sum, r) => sum + Number(r.amount), 0);
+    const refunds = await prisma.feeRefund.findMany({
+      where: { paymentId },
+      select: { amount: true },
+    });
+    const alreadyRefunded = refunds.reduce((sum, r) => sum + Number(r.amount), 0);
     const maxRefundAmount = Number(payment.amount) - alreadyRefunded;
 
     if (maxRefundAmount <= 0) {
@@ -80,13 +83,14 @@ class RefundService {
           paymentId,
           invoiceId: payment.invoiceId,
           studentId: payment.studentId,
-          schoolId: payment.schoolId,
+          tenantId: payment.tenantId ?? undefined,
           amount,
           reason,
           initiatedBy,
           notes,
           status: 'PENDING',
-        },
+          paymentMethod: payment.method,
+        } as any,
       });
 
       let providerRefundId: string | undefined;
