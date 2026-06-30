@@ -45,6 +45,7 @@ import { PricingPage } from './pages/billing/PricingPage';
 import { MySubscriptionPage } from './pages/billing/MySubscriptionPage';
 import { InvoicesPage } from './pages/billing/InvoicesPage';
 import AuditLogsPage from './pages/audit/AuditLogsPage';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -98,10 +99,11 @@ function App() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route
+      <TooltipProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route
             path="/login"
             element={
               <PublicRoute>
@@ -517,6 +519,7 @@ function App() {
         {/* Toast notifications */}
         <Toaster position="top-right" richColors />
       </BrowserRouter>
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

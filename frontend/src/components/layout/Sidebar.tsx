@@ -1,3 +1,4 @@
+// Sidebar.tsx
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, LogOut, Menu, X } from 'lucide-react';
@@ -5,12 +6,29 @@ import { useAuthStore } from '../../store/auth-store';
 import { getNavigationForRole, NavItem } from '../../config/sidebarConfig';
 import { cn } from '../../lib/utils';
 
+// shadcn/ui components
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+
 interface SidebarProps {
   className?: string;
+  collapsed: boolean;
+  onToggleCollapsed: () => void;
 }
 
-export function Sidebar({ className }: SidebarProps) {
-  const [collapsed, setCollapsed] = useState(false);
+export function Sidebar({
+  className,
+  collapsed,
+  onToggleCollapsed,
+}: SidebarProps) {
   const [expandedItems, setExpandedItems] = useState<string[]>([]);
   const location = useLocation();
   const { user, logout, overrideSchool } = useAuthStore();
@@ -40,7 +58,7 @@ export function Sidebar({ className }: SidebarProps) {
     <>
       {/* Mobile Toggle */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
+        onClick={onToggleCollapsed}
         className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-white dark:bg-slate-900 rounded-lg shadow-md"
       >
         {collapsed ? <Menu size={24} /> : <X size={24} />}
@@ -62,13 +80,15 @@ export function Sidebar({ className }: SidebarProps) {
                 <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-sm">ET</span>
                 </div>
-                <span className="font-bold text-lg text-slate-950 dark:text-slate-50">EduTrak</span>
+                <span className="font-bold text-lg text-slate-950 dark:text-slate-50">
+                  EduTrak
+                </span>
               </div>
             )}
             <button
-              onClick={() => setCollapsed(!collapsed)}
+              onClick={onToggleCollapsed}
               className="hidden lg:block p-1 hover:bg-gray-100 rounded"
-              >
+            >
               {collapsed ? <ChevronRight size={20} /> : <X size={20} />}
             </button>
           </div>
@@ -79,7 +99,8 @@ export function Sidebar({ className }: SidebarProps) {
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                   <span className="text-blue-600 font-semibold">
-                    {user.firstName[0]}{user.lastName[0]}
+                    {user.firstName[0]}
+                    {user.lastName[0]}
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
@@ -128,13 +149,16 @@ export function Sidebar({ className }: SidebarProps) {
       {!collapsed && (
         <div
           className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-          onClick={() => setCollapsed(true)}
+          onClick={onToggleCollapsed}
         />
       )}
     </>
   );
 }
 
+// ============================================
+// NavItemComponent – with popover background fix
+// ============================================
 interface NavItemComponentProps {
   item: NavItem;
   collapsed: boolean;
@@ -153,38 +177,114 @@ function NavItemComponent({
   const hasChildren = item.children && item.children.length > 0;
   const active = isActive(item.href);
 
-  if (hasChildren) {
-    return (
-      <div>
-        <button
-          onClick={onToggle}
-          className={cn(
-            'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
-            active
-              ? 'bg-blue-50 text-blue-600'
-              : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-            collapsed && 'justify-center'
-          )}
-        >
-          <div className="flex items-center space-x-3">
-            <item.icon size={20} />
-            {!collapsed && (
-              <span className="text-sm font-medium">{item.title}</span>
-            )}
-          </div>
-          {!collapsed && (
-            <div className="flex items-center space-x-2">
-            {item.badge && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 rounded-full">
-                {item.badge}
-              </span>
-            )}
-            {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-          </div>
+  // ---------- LEAF ITEM (no children) ----------
+  if (!hasChildren) {
+    const linkContent = (
+      <Link
+        to={item.href}
+        className={cn(
+          'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
+          active
+            ? 'bg-blue-50 text-blue-600'
+            : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+          collapsed && 'justify-center'
         )}
+      >
+        {/* Left group: icon + title */}
+        <div className="flex items-center space-x-3">
+          <item.icon size={20} />
+          {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
+        </div>
+        {/* Right group: badge (if any) */}
+        {!collapsed && item.badge && (
+          <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 rounded-full">
+            {item.badge}
+          </span>
+        )}
+      </Link>
+    );
+
+    if (collapsed) {
+      return (
+        <Tooltip>
+          <TooltipTrigger asChild>{linkContent}</TooltipTrigger>
+          <TooltipContent side="right">{item.title}</TooltipContent>
+        </Tooltip>
+      );
+    }
+    return linkContent;
+  }
+
+  // ---------- PARENT ITEM (has children) ----------
+  if (collapsed) {
+    // Show a Popover with children
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            className={cn(
+              'w-full flex items-center justify-center px-3 py-2 rounded-lg transition-colors',
+              active
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+            )}
+          >
+            <item.icon size={20} />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          side="right"
+          className="w-48 p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-lg rounded-lg"
+        >
+          <div className="space-y-1">
+            {item.children?.map((child) => (
+              <Link
+                key={child.href}
+                to={child.href}
+                className={cn(
+                  'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors',
+                  isActive(child.href)
+                    ? 'bg-blue-50 text-blue-600'
+                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
+                )}
+              >
+                <child.icon size={16} />
+                <span>{child.title}</span>
+              </Link>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  // ---------- EXPANDED MODE (not collapsed) – original inline expand/collapse ----------
+  return (
+    <div>
+      <button
+        onClick={onToggle}
+        className={cn(
+          'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
+          active
+            ? 'bg-blue-50 text-blue-600'
+            : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800'
+        )}
+      >
+        <div className="flex items-center space-x-3">
+          <item.icon size={20} />
+          <span className="text-sm font-medium">{item.title}</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          {item.badge && (
+            <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 rounded-full">
+              {item.badge}
+            </span>
+          )}
+          {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </div>
       </button>
 
-      {!collapsed && isExpanded && (
+      {isExpanded && (
         <div className="ml-6 mt-1 space-y-1">
           {item.children?.map((child) => (
             <Link
@@ -204,31 +304,5 @@ function NavItemComponent({
         </div>
       )}
     </div>
-  );
-}
-
-return (
-  <Link
-      to={item.href}
-      className={cn(
-        'flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
-        active
-          ? 'bg-blue-50 text-blue-600'
-          : 'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
-        collapsed && 'justify-center'
-      )}
-    >
-      <div className="flex items-center space-x-3">
-        <item.icon size={20} />
-        {!collapsed && (
-          <span className="text-sm font-medium">{item.title}</span>
-        )}
-      </div>
-      {!collapsed && item.badge && (
-        <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 rounded-full">
-          {item.badge}
-        </span>
-      )}
-    </Link>
   );
 }

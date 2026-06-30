@@ -655,9 +655,7 @@ export class AcademicService extends BaseService {
           status: 'ACTIVE',
         },
       }),
-      this.prisma.teacher.count({
-        where: this.buildWhereClause({}, schoolId, isSuperAdmin),
-      }),
+      this.prisma.teacher. count(),
       this.prisma.class.count({
         where: { ...baseWhere, ...academicYearWhere },
       }),

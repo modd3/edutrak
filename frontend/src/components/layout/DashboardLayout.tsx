@@ -5,6 +5,7 @@ import { SchoolContextSwitcher } from './SchoolContextSwitcher';
 import { useAuthStore } from '../../store/auth-store';
 import { Bell, Moon, Sun, Zap } from 'lucide-react';
 import { CommandPalette } from './CommandPalette';
+import { cn } from '@/lib/utils';
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,6 +18,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   const navigate = useNavigate();
   const { isAuthenticated, user, overrideSchool, clearOverrideSchool } = useAuthStore();
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem('edutrak-theme') === 'dark');
+  const [sideBarCollapsed, setSideBarCollapsed] = useState(false);
+
+  const toggleSideBar = () => setSideBarCollapsed(prev => !prev)
 
   // Redirect to login only if auth state is definitively not authenticated
   // (not just still hydrating)
@@ -52,10 +56,14 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,hsl(239_84%_67%_/_0.12),transparent_32rem),linear-gradient(180deg,#f8fafc,#eef2ff)] dark:bg-[radial-gradient(circle_at_top_left,hsl(239_84%_67%_/_0.14),transparent_32rem),linear-gradient(180deg,#020617,#0f172a)]">
-      <Sidebar />
+      <Sidebar collapsed={sideBarCollapsed} onToggleCollapsed={toggleSideBar}/>
 
       {/* Main Content */}
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <div className={cn(
+        'flex flex-col min-h-screen transition-all duration-300',
+        'lg:pl-64',
+        sideBarCollapsed && 'lg:pl-20'
+      )}>
         {/* Top Header */}
         <header className="sticky top-0 z-30 border-b border-white/60 bg-white/75 shadow-sm backdrop-blur-md dark:border-slate-800/80 dark:bg-slate-950/75">
           <div className="flex items-center justify-between px-4 lg:px-8 py-4">

@@ -10,8 +10,6 @@ export function PricingPage() {
   } = usePlans({ isActive: true, limit: 50 });
   const { 
     data: registryData,
-    isLoading: isRegistryLoading,
-    isError: isRegistryError
   } = useFeatureRegistry();
 
   const registry = registryData?.data || {};

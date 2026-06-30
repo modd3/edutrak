@@ -61,7 +61,7 @@ import { useGetFeeStructures } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
 import { useAcademicYears, useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { RoleGuard } from '@/components/RoleGuard';
-import { formatCurrency, unwrapPaginated } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { FeeStructureViewerModal } from '@/components/fees/FeeStructureViewerModal';
 import  FeeStructureFormModal  from '@/components/fees/FeeStructureFormModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
@@ -117,7 +117,7 @@ export function FeeStructuresPage() {
     {enabled: isSuperAdmin}
   ));
   const allSchools = schoolsData.data
-  const schoolOptions: School[] = (allSchools || []).map((school: School) => ({
+  const schoolOptions = (allSchools || []).map((school: School) => ({
     value: school.id,
     label: school.name,
     description: school.county ? `${school.county} County` : "Unassigned Region",
@@ -140,7 +140,7 @@ export function FeeStructuresPage() {
   //const termOptions = activeAcademicYear?.terms ?? [];
 
   const classesQuery = useClasses(activeAcademicYear?.id);
-  const classesData = unwrapPaginated<any>(classesQuery.data);
+  const classesData = classesQuery.data || [];
   const classLevels = Array.from(
     new Set(classesData.map((c: any) => String(c.level)))
   ).sort() as string[];
