@@ -6,17 +6,12 @@ import { AssignTeacherToSubjectDialog } from '@/components/teachers/AssignTeache
 import { useNavigate } from 'react-router-dom';
 import { RecentActivities } from '@/components/shared/RecentActivities';
 import type { ActivityItem } from '@/components/shared/RecentActivities';
+import { TeacherTimetableWidget } from '@/components/timetable/TimetableWidget';
 
 export function TeacherDashboard() {
   const { user } = useAuthStore();
   const navigate = useNavigate();
   const [showTeacherDialog, setShowTeacherDialog] = useState(false);
-
-  const myClasses = [
-    { name: 'Form 3 North', subject: 'Mathematics', students: 42, period: 'Period 1 (8:00 AM)' },
-    { name: 'Form 2 East', subject: 'Mathematics', students: 38, period: 'Period 4 (11:00 AM)' },
-    { name: 'Form 4 South', subject: 'Mathematics', students: 35, period: 'Period 7 (2:00 PM)' },
-  ];
 
   const upcomingAssessments = [
     { class: 'Form 3 North', subject: 'Mathematics', type: 'CAT 2', date: 'Tomorrow' },
@@ -46,15 +41,6 @@ export function TeacherDashboard() {
       description: `${a.subject} — ${a.date}`,
       time: a.date,
       link: '/assessments',
-    })),
-    ...myClasses.slice(0, 2).map((cls, i) => ({
-      id: `class-${i}`,
-      icon: BookOpen,
-      color: 'bg-green-500',
-      title: `${cls.name} — ${cls.subject}`,
-      description: `${cls.students} students — ${cls.period}`,
-      time: 'Today',
-      link: '/classes',
     })),
   ];
 
@@ -113,23 +99,14 @@ export function TeacherDashboard() {
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Today's Classes */}
-        <div className="bg-white rounded-lg shadow p-6">
+        {/* Today's Schedule */}
+        <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">Today's Schedule</h2>
-          <div className="space-y-4">
-            {myClasses.map((cls, index) => (
-              <div key={index} className="flex items-start justify-between p-4 bg-gray-50 rounded-lg">
-                <div>
-                  <h3 className="font-medium text-gray-900">{cls.name}</h3>
-                  <p className="text-sm text-gray-600">{cls.subject}</p>
-                  <p className="text-xs text-gray-500 mt-1">{cls.period}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-600">{cls.students} students</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {user?.teacher?.id ? (
+            <TeacherTimetableWidget teacherId={user.teacher.id} />
+          ) : (
+            <p className="text-sm text-gray-500">No teacher profile linked to your account.</p>
+          )}
         </div>
 
         {/* Pending Grading */}

@@ -38,6 +38,10 @@ coverage/
 .jest/
 *.test.ts.snap
 
+# JWT private key (never commit this)
+keys/jwt_private.pem
+keys/jwt_public.pem
+*keys/*
 # Temporary files
 .tmp/
 temp/

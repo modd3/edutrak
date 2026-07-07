@@ -2,15 +2,17 @@ import { BookOpen, Calendar, Trophy, TrendingUp, ClipboardCheck } from 'lucide-r
 import { useAuthStore } from '@/store/auth-store';
 import { RecentActivities } from '@/components/shared/RecentActivities';
 import type { ActivityItem } from '@/components/shared/RecentActivities';
+import { StudentTimetableWidget } from '@/components/timetable/TimetableWidget';
 
 export function StudentDashboard() {
   const { user } = useAuthStore();
 
-  const upcomingClasses = [
-    { subject: 'Mathematics', time: '8:00 AM - 9:00 AM', teacher: 'Mr. John Doe', room: 'Lab 2' },
-    { subject: 'English', time: '9:00 AM - 10:00 AM', teacher: 'Mrs. Jane Smith', room: 'Room 14' },
-    { subject: 'Science', time: '11:00 AM - 12:00 PM', teacher: 'Dr. Bob Wilson', room: 'Lab 1' },
-  ];
+  // Get the student's active enrollment
+  const activeEnrollment = user?.student?.enrollments?.find(
+    (e: any) => e.status === 'ACTIVE'
+  ) || user?.student?.enrollments?.[0];
+  const classId = activeEnrollment?.classId;
+  const streamId = activeEnrollment?.streamId;
 
   const recentGrades = [
     { subject: 'Mathematics', assessment: 'CAT 1', grade: 'A', score: '85/100', date: '2 days ago' },
@@ -39,14 +41,6 @@ export function StudentDashboard() {
       title: `Upcoming: ${a.subject} ${a.type}`,
       description: `${a.date} at ${a.time}`,
       time: a.date,
-    })),
-    ...upcomingClasses.slice(0, 2).map((cls, i) => ({
-      id: `class-${i}`,
-      icon: BookOpen,
-      color: 'bg-blue-500',
-      title: cls.subject,
-      description: `${cls.teacher} — ${cls.room}`,
-      time: cls.time,
     })),
   ];
 
@@ -108,23 +102,11 @@ export function StudentDashboard() {
         {/* Today's Schedule */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
           <h2 className="text-lg font-semibold mb-4">Today's Schedule</h2>
-          <div className="space-y-4">
-            {upcomingClasses.map((cls, index) => (
-              <div key={index} className="flex items-center p-4 bg-gray-50 rounded-lg">
-                <div className="w-16 h-16 bg-blue-100 rounded-lg flex items-center justify-center mr-4">
-                  <BookOpen className="text-blue-600" size={24} />
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-gray-900">{cls.subject}</h3>
-                  <p className="text-sm text-gray-600">{cls.teacher}</p>
-                  <p className="text-xs text-gray-500">{cls.room}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-medium text-blue-600">{cls.time}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          {classId ? (
+            <StudentTimetableWidget classId={classId} streamId={streamId} />
+          ) : (
+            <p className="text-sm text-gray-500">No class enrollment found.</p>
+          )}
         </div>
 
         {/* Recent Activities */}

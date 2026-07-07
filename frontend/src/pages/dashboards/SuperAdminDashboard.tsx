@@ -3,15 +3,18 @@ import { useAuthStore } from '@/store/auth-store';
 import { useNavigate } from 'react-router-dom';
 import { useSchools } from '@/hooks/use-schools';
 import { usePlans } from '@/hooks/use-plans';
+import { useTeachers } from '@/hooks/use-teachers';
 import { Button } from '@/components/ui/button';
 import { RecentActivities } from '@/components/shared/RecentActivities';
 import type { ActivityItem } from '@/components/shared/RecentActivities';
+import { AdminTimetableWidget } from '@/components/timetable/TimetableWidget';
 
 export function SuperAdminDashboard() {
   const { user, setOverrideSchool } = useAuthStore();
   const navigate = useNavigate();
 
   const { data: schoolsData } = useSchools();
+  const { data: teachersData } = useTeachers();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const schools: any[] = (schoolsData as any)?.data || [];
 
@@ -24,6 +27,13 @@ export function SuperAdminDashboard() {
   const { data: plansData } = usePlans();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const plans: any[] = (plansData as any)?.data || [];
+
+  // Prepare teachers list for admin widget
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const teachers: Array<{ id: string; name: string }> = (teachersData as any)?.data?.map((t: any) => ({
+    id: t.id,
+    name: `${t.user?.firstName || ''} ${t.user?.lastName || ''}`.trim() || t.id,
+  })) || [];
 
   const totalSchools = schools.length;
   const activeSchools = schools.filter((s: any) => s.isActive !== false).length;
@@ -168,6 +178,14 @@ export function SuperAdminDashboard() {
           </Button>
         </div>
       </div>
+
+      {/* Teacher Schedule Overview */}
+      {teachers.length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6">
+          <h2 className="text-lg font-semibold mb-4">Teacher Schedules</h2>
+          <AdminTimetableWidget teachers={teachers} defaultTeacherId={teachers[0]?.id} />
+        </div>
+      )}
 
       {/* Main Content Grid: Schools Table + Recent Activities */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
