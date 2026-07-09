@@ -41,6 +41,22 @@ export const authenticate = async (
     // Verify token
     const decoded = verifyToken(token);
 
+    // Access, refresh, and password-reset tokens are all signed with the
+    // same key/issuer - type is the only thing telling them apart. Without
+    // this check, a leaked refresh or password-reset token would be
+    // usable as a normal access token on every other route. Tokens with no
+    // type field at all are treated as legacy access tokens (that was the
+    // only kind minted before this field existed) - anything explicitly
+    // typed as something other than 'access' is rejected.
+    if (decoded.type && decoded.type !== 'access') {
+      logger.warn('Rejected non-access token on authenticated route', {
+        userId: decoded.userId,
+        type: decoded.type,
+      });
+      ResponseUtil.unauthorized(res, 'Invalid or expired token');
+      return;
+    }
+
     // Attach user info to request
     req.user = decoded;
 

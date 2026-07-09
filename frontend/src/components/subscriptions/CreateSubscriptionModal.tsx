@@ -54,8 +54,8 @@ export function CreateSubscriptionModal({
   const createMutation = useCreateSubscription();
   const [isTrialing, setIsTrialing] = useState(false);
     
-  const schools = schoolsData.data?.data.data
-  
+  const schools = schoolsData.data?.data
+ 
   const {
     watch, 
     handleSubmit, 

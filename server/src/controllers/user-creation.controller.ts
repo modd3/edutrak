@@ -5,6 +5,7 @@ import { userCreationService } from '../services/user-creation.service';
 import { auditService } from '../services/audit.service';
 import logger from '../utils/logger';
 import { ResponseUtil } from '../utils/response';
+import { webhookEmitter } from '../services/webhook-emitter.service';
 
 export class UserCreationController {
   /**
@@ -33,6 +34,14 @@ export class UserCreationController {
         createdBy: req.user?.userId,
         schoolId,
       });
+
+      await webhookEmitter.emitUserEvent(user, "created");
+
+      // Also emit student event if user is a student
+      const createUser = user as any;
+      if (createUser.role === 'STUDENT' && createUser.student) {
+        await webhookEmitter.emitStudentEvent(createUser.student, "created");
+      }
 
       // Audit log
       auditService.log({
@@ -72,6 +81,15 @@ export class UserCreationController {
         req.schoolId,
         req.isSuperAdmin || false
       );
+
+      await webhookEmitter.emitUserEvent(user, "updated");
+
+      // Also emit student event if user is a student
+      const updatedUser = user as any;
+      if (updatedUser.role === 'STUDENT' && updatedUser.student) {
+        await webhookEmitter.emitStudentEvent(updatedUser.student, "updated");
+      }
+
 
       // Audit log
       auditService.log({
@@ -113,6 +131,16 @@ export class UserCreationController {
         req.isSuperAdmin || false,
         req.user?.userId
       );
+
+      // Emit events for each successfully created user
+      for (const user of results.successful) {
+        await webhookEmitter.emitUserEvent(user, "created");
+        
+        const bulkUser = user as any;
+        if (bulkUser.role === 'STUDENT' && bulkUser.student) {
+          await webhookEmitter.emitStudentEvent(bulkUser.student, "created");
+        }
+      }
 
       // Audit log
       auditService.log({

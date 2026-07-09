@@ -73,6 +73,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       schoolId: user.schoolId,
+      type: 'access',
     });
 
     // Optionally generate refresh token
@@ -164,6 +165,7 @@ export class AuthService {
       email: user.email,
       role: user.role,
       schoolId: user.schoolId,
+      type: 'access',
     });
 
     logger.info('User registered successfully', {
@@ -211,6 +213,7 @@ export class AuthService {
         email: user.email,
         role: user.role,
         schoolId: user.schoolId,
+        type: 'access',
       });
 
       const newRefreshToken = generateToken(

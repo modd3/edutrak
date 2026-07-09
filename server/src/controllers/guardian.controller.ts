@@ -95,7 +95,6 @@ export class GuardianController {
         limit: filters.limit ? parseInt(filters.limit as string) : undefined,
         search: filters.search as string,
       });
-console.log("Guardians: ", result)
       return ResponseUtil.paginated(res, 'Guardians retrieved successfully', result.guardians, result.pagination);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);

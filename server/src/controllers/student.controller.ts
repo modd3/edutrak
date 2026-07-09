@@ -5,6 +5,7 @@ import logger from '../utils/logger';
 import { Role } from '@prisma/client';
 import { RequestWithUser } from '@/middleware/school-context';
 import { auditService } from '../services/audit.service';
+import { webhookEmitter } from '../services/webhook-emitter.service';
 
 export class StudentController {
   private getService(req: RequestWithUser) {
@@ -90,6 +91,8 @@ export class StudentController {
       const studentService = this.getService(req);
       const student = await studentService.updateStudent(id, req.body, req.schoolId, req.isSuperAdmin);
 
+      await webhookEmitter.emitStudentEvent(student, "updated");
+
       // Audit log
       auditService.log({
         schoolId: req.schoolId,
@@ -122,6 +125,8 @@ export class StudentController {
 
       const studentService = this.getService(req);
       const enrollment = await studentService.enrollStudent(req.body);
+
+      await webhookEmitter.emitEnrollmentEvent(enrollment, "created");
       
       // Audit log
       auditService.log({
@@ -157,6 +162,8 @@ export class StudentController {
       req.schoolId,
       req.isSuperAdmin || false
     );
+
+    await webhookEmitter.emitEnrollmentEvent(enrollment, "updated");
 
     // Audit log
     auditService.log({
@@ -196,6 +203,8 @@ export class StudentController {
 
       const studentService = this.getService(req);
       const enrollment = await studentService.updateEnrollmentStatus(enrollmentId, status);
+
+      await webhookEmitter.emitEnrollmentEvent(enrollment, "updated");
 
       // Audit log
       auditService.log({
@@ -318,16 +327,34 @@ export class StudentController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
-  async deleteStudent(req: RequestWithUser, res: Response) {
+  async deleteStudent(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
 
       const studentService = this.getService(req);
+
+      // Fetch student with user before deletion for webhook
+      const student = await studentService.getStudentById(
+        id,
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
+
+      if (!student) {
+        return ResponseUtil.notFound(res, 'Student');
+      }
+
       await studentService.deleteStudent(
         id,
         req.schoolId,
         req.isSuperAdmin || false
       );
+
+      // Emit webhooks after successful deletion
+      await webhookEmitter.emitStudentEvent(student, "deleted");
+      if (student.user) {
+        await webhookEmitter.emitUserEvent(student.user, "deleted");
+      }
 
       // Audit log
       auditService.log({
@@ -341,12 +368,9 @@ export class StudentController {
         ipAddress: req.ip,
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      res.json({ message: 'Student deleted successfully' });
+      return ResponseUtil.success(res, 'Student deleted successfully', { message: 'Student deleted successfully' });
     } catch (error: any) {
-      res.status(400).json({
-        error: 'DELETE_STUDENT_FAILED',
-        message: error.message,
-      });
+      return ResponseUtil.error(res, error.message, 400);
     }
   }
 
