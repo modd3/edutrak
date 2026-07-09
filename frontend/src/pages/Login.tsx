@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -16,11 +16,40 @@ const loginSchema = z.object({
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
+// The LMS frontend origin - the only place this page will ever postMessage
+// a token to. Deliberately NOT read from a query param: trusting a
+// caller-supplied origin would let anyone who can get a user to this popup
+// choose where their EduTrak token gets sent.
+const LMS_URL = import.meta.env.VITE_LMS_URL || 'http://localhost:5173';
+const LMS_ORIGIN = new URL(LMS_URL).origin;
+
 export function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
   const { setAuth } = useAuthStore();
+
+  // True only when this page was opened as an SSO popup by the LMS
+  // (window.opener set AND the LMS asked for SSO mode via ?sso=lms).
+  // window.opener alone isn't enough - plenty of ordinary links open in a
+  // new tab/window without being an SSO handshake.
+  const isSSOPopup =
+    typeof window !== 'undefined' &&
+    !!window.opener &&
+    new URLSearchParams(window.location.search).get('sso') === 'lms';
+
+  // If this is an SSO popup and the user already has a valid EduTrak
+  // session, hand the token to the LMS window and close immediately
+  // instead of showing a login form the user didn't ask for.
+  useEffect(() => {
+    if (!isSSOPopup) return;
+
+    const state = useAuthStore.getState();
+    if (state.token && state.isAuthenticated) {
+      window.opener.postMessage({ type: 'edutrak-sso', token: state.token }, LMS_ORIGIN);
+      window.close();
+    }
+  }, [isSSOPopup]);
 
   const {
     register,
@@ -48,6 +77,16 @@ export function Login() {
 
       if (response.data.success) {
         const { user, token, refreshToken } = response.data.data;
+
+        if (isSSOPopup) {
+          // Hand the token to the LMS window that opened us and close.
+          // Deliberately skip setAuth/navigate here - this tab's job is
+          // done, and we don't want an EduTrak session lingering in a
+          // popup the user never intended to browse EduTrak from.
+          window.opener.postMessage({ type: 'edutrak-sso', token }, LMS_ORIGIN);
+          window.close();
+          return;
+        }
 
         // Store authentication data
         setAuth(user, token, refreshToken);

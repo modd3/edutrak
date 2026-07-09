@@ -60,7 +60,22 @@ const queryClient = new QueryClient({
 
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, token } = useAuthStore();
+
+  // SSO popup: if already authenticated, hand the token to the LMS window
+  // that opened us and close immediately — no redirect to dashboard.
+  if (
+    isAuthenticated &&
+    token &&
+    typeof window !== 'undefined' &&
+    window.opener &&
+    new URLSearchParams(window.location.search).get('sso') === 'lms'
+  ) {
+    const LMS_ORIGIN = new URL(import.meta.env.VITE_LMS_URL || 'http://localhost:5173').origin;
+    window.opener.postMessage({ type: 'edutrak-sso', token }, LMS_ORIGIN);
+    window.close();
+    return null;
+  }
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
