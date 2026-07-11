@@ -25,6 +25,13 @@ import { ChangePlanModal } from '@/components/subscriptions/ChangePlanModal';
 import { ManageSubscriptionStatusModal } from '@/components/subscriptions/ManageSubscriptionStatusModal';
 import { PayInvoiceModal } from '@/components/billing/PayInvoiceModal';
 import { ColumnDef } from '@tanstack/react-table';
+import { BillingPageHeader } from '@/components/billing/BillingPageHeader';
+import { CurrentPlanCard } from '@/components/billing/CurrentPlanCard';
+import { CapacityCard } from '@/components/billing/CapacityCard';
+import { UpgradeBanner } from '@/components/billing/UpgradeBanner';
+import { BillingInvoiceTable } from '@/components/billing/BillingInvoiceTable';
+import { LimitWarningModal } from '@/components/billing/LimitWarningModal';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
 
 const STATUS_COLORS: Record<string, string> = {
   TRIALING: 'bg-blue-100 text-blue-800',
@@ -68,6 +75,8 @@ export default function BillingAdminPage() {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false);
   const [showManageStatusModal, setShowManageStatusModal] = useState(false);
   const [showPayInvoiceModal, setShowPayInvoiceModal] = useState(false);
+  const [showLimitWarningModal, setShowLimitWarningModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
   const { kpis, rows, isLoading } = useBillingOverview({ status: statusFilter, search });
 
@@ -190,6 +199,46 @@ export default function BillingAdminPage() {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
+          {/* ── Visual Billing Dashboard (from design reference) ── */}
+          <BillingPageHeader />
+
+          {/* Current Plan — uses first subscription from list */}
+          <CurrentPlanCard
+            subscription={rows.length > 0 ? rows[0] : undefined}
+            isLoading={isLoading}
+          />
+
+          {/* Capacity Trackers */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <CapacityCard
+              title="Student Capacity"
+              used={rows[0]?.plan?.features?.find(f => f.featureKey === 'used_students')?.limitValue ?? 110}
+              total={rows[0]?.plan?.features?.find(f => f.featureKey === 'max_students')?.limitValue ?? 150}
+              pct={73}
+              color="#10b981"
+              trackColor="#d1fae5"
+              icon="🎓"
+              status="healthy"
+            />
+            <CapacityCard
+              title="Teacher Capacity"
+              used={20}
+              total={rows[0]?.plan?.features?.find(f => f.featureKey === 'max_teachers')?.limitValue ?? 20}
+              pct={100}
+              color="#ef4444"
+              trackColor="#fee2e2"
+              icon="👩‍🏫"
+              status="critical"
+            />
+          </div>
+
+          {/* Upgrade Banner */}
+          <UpgradeBanner onUpgrade={() => setShowLimitWarningModal(true)} />
+
+          {/* Invoice History */}
+          <BillingInvoiceTable invoices={invoices} currency={kpis.currency} />
+
+          {/* ── Admin KPI Section ── */}
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
             <KpiCard label="MRR" value={currencyMajor(kpis.mrrMinor)} />
             <KpiCard label="Active schools" value={String(kpis.activeSchoolCount)} />
@@ -377,6 +426,35 @@ export default function BillingAdminPage() {
         open={showPayInvoiceModal}
         onOpenChange={setShowPayInvoiceModal}
         invoice={latestOpenInvoice ?? null}
+      />
+
+      {/* Limit Warning Modal — triggers from UpgradeBanner */}
+      <LimitWarningModal
+        open={showLimitWarningModal}
+        onClose={() => setShowLimitWarningModal(false)}
+        onUpgrade={() => {
+          setShowLimitWarningModal(false);
+          setShowUpgradeModal(true);
+        }}
+        currentPlanName={rows[0]?.plan?.name || 'Starter Plan'}
+        currentLimit={rows[0]?.plan?.features?.find(f => f.featureKey === 'max_teachers')?.limitValue ?? 20}
+        newPlanName={plans.length > 1 ? plans[1].name : 'Growth Plan'}
+        newLimit={plans.length > 1 ? (plans[1].features?.find(f => f.featureKey === 'max_teachers')?.limitValue ?? 50) : 50}
+        price={plans.length > 1 ? `$${Math.round(plans[1].priceMinor / 100 * 0.8)}/mo` : '$400/mo'}
+      />
+
+      {/* Upgrade Modal — full plan selector */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        plans={plans}
+        currentPlanName={rows[0]?.plan?.name || 'Starter Plan'}
+        currentPrice={rows[0]?.plan?.priceMinor || 20000}
+        currency={kpis.currency || 'KES'}
+        onConfirm={(planId, billing) => {
+          console.log('Upgrade confirmed:', { planId, billing });
+          setShowUpgradeModal(false);
+        }}
       />
     </div>
   );
