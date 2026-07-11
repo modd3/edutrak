@@ -47,7 +47,8 @@ export function FeeArrearsTable({
   const [search, setSearch] = useState('');
  
   const { data, isLoading, error } = useGetDefaultersReport({ academicYearId, termId });
-  const rawList: any[] = data?.data?.data ?? data?.data ?? [];
+  // useGetDefaultersReport now returns the array directly
+  const rawList: any[] = data ?? [];
  
   // Filter by search
   const filtered = rawList.filter((row) => {

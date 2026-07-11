@@ -64,13 +64,12 @@ export function CollectionsChart({ academicYearId, termId }: CollectionsChartPro
   const [dateFrom, setDateFrom] = useState(thirtyDaysAgo.toISOString().slice(0, 10));
   const [dateTo, setDateTo] = useState(today.toISOString().slice(0, 10));
  
-  const { data, isLoading } = useGetFeeCollectionReport({
+  const { data: report, isLoading } = useGetFeeCollectionReport({
     academicYearId,
     termId,
     date: dateTo,
   });
- 
-  const report = data?.data?.data ?? data?.data;
+
   const dailyData = report?.dailyCollection ?? [];
   const byMethod = report?.byPaymentMethod ?? {};
  
@@ -144,7 +143,7 @@ export function CollectionsChart({ academicYearId, termId }: CollectionsChartPro
                 axisLine={{ stroke: '#e5e7eb' }}
               />
               <YAxis
-                tickFormatter={formatCurrency}
+                tickFormatter={(value) => formatCurrency(value)}
                 tick={{ fontSize: 11, fill: '#6b7280' }}
                 tickLine={false}
                 axisLine={false}

@@ -85,8 +85,8 @@ export function InvoicesPage() {
   const queryClient = useQueryClient();
 
   // Get active academic year and terms
-  const { data: activeYearData } = useActiveAcademicYear();
-  const activeYear = activeYearData?.data ?? activeYearData;
+  // useActiveAcademicYear already returns the year object directly
+  const { data: activeYear } = useActiveAcademicYear();
   const terms = activeYear?.terms ?? [];
 
   // State
@@ -112,7 +112,8 @@ export function InvoicesPage() {
     limit: 100,
   });
 
-  const invoices = invoicesData?.data?.data || invoicesData?.data || [];
+  // useGetInvoices now returns {data: Invoice[], pagination} directly
+  const invoices = invoicesData?.data ?? [];
 
   // Client-side search filter
   const filteredInvoices = invoices.filter((invoice: any) => {

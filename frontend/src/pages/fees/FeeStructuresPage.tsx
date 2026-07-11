@@ -1,10 +1,12 @@
 /**
  * Fee Structures Management Page
  * Complete fee structure lifecycle: create, view, edit, generate invoices
+ * Uses the shared DataTable component with TanStack columns.
  */
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { type ColumnDef } from '@tanstack/react-table';
 import {
   Card,
   CardContent,
@@ -12,12 +14,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import {
-  Button,
-} from '@/components/ui/button';
-import {
-  Badge,
-} from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,17 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Input,
-} from '@/components/ui/input';
+import { Input } from '@/components/ui/input';
 import {
   Plus,
   MoreVertical,
@@ -57,17 +45,17 @@ import {
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Combobox } from '@/components/ui/combobox';
+import { DataTable } from '@/components/shared/DataTable';
 import { useGetFeeStructures } from '@/hooks/use-fees';
 import { usePermission } from '@/hooks/use-permission';
 import { useAcademicYears, useActiveAcademicYear, useClasses } from '@/hooks/use-academic';
 import { RoleGuard } from '@/components/RoleGuard';
 import { formatCurrency } from '@/lib/utils';
 import { FeeStructureViewerModal } from '@/components/fees/FeeStructureViewerModal';
-import  FeeStructureFormModal  from '@/components/fees/FeeStructureFormModal';
+import FeeStructureFormModal from '@/components/fees/FeeStructureFormModal';
 import { BulkGenerateInvoicesModal } from '@/components/fees/BulkGenerateInvoicesModal';
 import { toast } from 'sonner';
 import { useSchoolContext } from '@/hooks/use-school-context';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useSchools } from '@/hooks/use-schools';
 import { useDebounce } from '@/hooks/use-debounce';
 import { School } from '@/types';
@@ -87,7 +75,7 @@ interface StructureWithActions {
 
 export function FeeStructuresPage() {
   const { can } = usePermission();
-  const {schoolId, schoolName, isSuperAdmin} = useSchoolContext();
+  const { schoolId, isSuperAdmin } = useSchoolContext();
   const queryClient = useQueryClient();
 
   // State management
@@ -100,103 +88,226 @@ export function FeeStructuresPage() {
   const [showBulkGenerateModal, setShowBulkGenerateModal] = useState(false);
   const [selectedStructure, setSelectedStructure] = useState<StructureWithActions | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [schoolFilter, setSchoolFilter] = useState('');
-  const [selectedSchoolId, setSelectedSchoolId] = useState<string>("");
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
 
-  // Fetch all schools
-  const { data: schoolsData, isFetching} = useSchools(
-    {
-      search: debouncedSearch
-    },
-    {enabled: isSuperAdmin}
+  // Fetch all schools (super-admin only)
+  const { data: schoolsData, isFetching } = useSchools(
+    { search: debouncedSearch },
+    { enabled: isSuperAdmin }
   );
-  console.log("Schools Data: ", useSchools(
-    {
-      search: debouncedSearch
-    },
-    {enabled: isSuperAdmin}
-  ));
-  const allSchools = schoolsData.data
+  const allSchools = schoolsData?.data;
   const schoolOptions = (allSchools || []).map((school: School) => ({
     value: school.id,
     label: school.name,
-    description: school.county ? `${school.county} County` : "Unassigned Region",
+    description: school.county ? `${school.county} County` : 'Unassigned Region',
   }));
-  console.log("SChool options: ", schoolOptions)
   const activeSchool = allSchools?.find((s: School) => s.id === selectedSchoolId);
 
-  // Structures Data fetching
+  const effectiveSchoolId = schoolId || activeSchool?.id || '';
+
+  // Structures data fetching
   const { data: structuresData, isLoading } = useGetFeeStructures({
-    schoolId: schoolId || activeSchool.id,
+    schoolId: effectiveSchoolId,
     page: 1,
     limit: 100,
   });
-  
+
   const structures: StructureWithActions[] = structuresData?.data || [];
   const { data: academicYearsData } = useAcademicYears();
   const academicYears = academicYearsData?.data || [];
-
   const { data: activeAcademicYear } = useActiveAcademicYear();
-  //const termOptions = activeAcademicYear?.terms ?? [];
-
   const classesQuery = useClasses(activeAcademicYear?.id);
-  const classesData = classesQuery.data || [];
+  const classesData = classesQuery.data?.data || [];
   const classLevels = Array.from(
     new Set(classesData.map((c: any) => String(c.level)))
   ).sort() as string[];
 
-  // Filter structures by search
-  const filteredStructures = structures.filter((s) =>
-    search === ''
-      ? true
-      : s.name.toLowerCase().includes(search.toLowerCase()) ||
-        s.classLevel?.toLowerCase().includes(search.toLowerCase()) ||
-        s.academicYear?.year.toString() === search
+  // Client-side search filter
+  const filteredStructures = useMemo(
+    () =>
+      structures.filter((s) =>
+        search === ''
+          ? true
+          : s.name.toLowerCase().includes(search.toLowerCase()) ||
+            s.classLevel?.toLowerCase().includes(search.toLowerCase()) ||
+            s.academicYear?.year.toString() === search
+      ),
+    [structures, search]
   );
+
+  // Helpers
+  const getStructureTotal = (items: StructureWithActions['items']) =>
+    items.reduce((sum, item) => Number(sum) + Number(item.amount), 0);
+  const getMandatoryTotal = (items: StructureWithActions['items']) =>
+    items.filter((item) => !item.isOptional).reduce((sum, item) => sum + item.amount, 0);
 
   // Handlers
   const handleView = (structure: StructureWithActions) => {
     setSelectedStructure(structure);
     setShowViewModal(true);
   };
-
   const handleEdit = (structure: StructureWithActions) => {
     setSelectedStructure(structure);
     setShowEditModal(true);
   };
-
   const handleDelete = (structure: StructureWithActions) => {
     setSelectedStructure(structure);
     setShowDeleteDialog(true);
   };
-
   const handleGenerateInvoices = (structure: StructureWithActions) => {
     setSelectedStructure(structure);
     setShowBulkGenerateModal(true);
   };
-
   const confirmDelete = async () => {
     if (!selectedStructure) return;
-
     try {
-      // Delete API call would go here
       toast.success(`Fee structure "${selectedStructure.name}" deleted`);
       queryClient.invalidateQueries({ queryKey: ['feeStructures'] });
       setShowDeleteDialog(false);
       setSelectedStructure(null);
-    } catch (error) {
+    } catch {
       toast.error('Failed to delete fee structure');
     }
   };
 
-  // Calculate totals for each structure
-  const getStructureTotal = (items: StructureWithActions['items']) =>
-    items.reduce((sum, item) => Number(sum) + Number(item.amount), 0);
-
-  const getMandatoryTotal = (items: StructureWithActions['items']) =>
-    items
-      .filter((item) => !item.isOptional)
-      .reduce((sum, item) => sum + item.amount, 0);
+  // ── TanStack column definitions ──────────────────────────────────────────
+  const columns = useMemo<ColumnDef<StructureWithActions>[]>(
+    () => [
+      {
+        accessorKey: 'name',
+        header: 'Name',
+        cell: ({ row }) => (
+          <span className="font-semibold">{row.original.name}</span>
+        ),
+      },
+      {
+        id: 'academicYear',
+        header: 'Academic Year',
+        accessorFn: (row) => row.academicYear?.year ?? '',
+        cell: ({ row }) => row.original.academicYear?.year ?? '—',
+      },
+      {
+        accessorKey: 'classLevel',
+        header: 'Class Level',
+        cell: ({ row }) => row.original.classLevel ?? '—',
+      },
+      {
+        accessorKey: 'boardingStatus',
+        header: 'Type',
+        cell: ({ row }) =>
+          row.original.boardingStatus ? (
+            <Badge
+              variant={row.original.boardingStatus === 'BOARDING' ? 'default' : 'secondary'}
+              className="text-xs"
+            >
+              {row.original.boardingStatus}
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-sm">—</span>
+          ),
+      },
+      {
+        id: 'items',
+        header: 'Items',
+        accessorFn: (row) => row.items.length,
+        cell: ({ row }) => (
+          <span className="font-medium text-right block">{row.original.items.length}</span>
+        ),
+      },
+      {
+        id: 'mandatory',
+        header: 'Mandatory',
+        accessorFn: (row) => getMandatoryTotal(row.items),
+        cell: ({ row }) => (
+          <span className="font-mono font-semibold text-blue-600 dark:text-blue-400 text-right block">
+            {formatCurrency(getMandatoryTotal(row.original.items))}
+          </span>
+        ),
+      },
+      {
+        id: 'total',
+        header: 'Total',
+        accessorFn: (row) => getStructureTotal(row.items),
+        cell: ({ row }) => (
+          <span className="font-mono font-bold text-green-600 dark:text-green-400 text-right block">
+            {formatCurrency(getStructureTotal(row.original.items))}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'isActive',
+        header: 'Status',
+        cell: ({ row }) => (
+          <Badge variant={row.original.isActive ? 'default' : 'outline'} className="text-xs">
+            {row.original.isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        ),
+      },
+      {
+        id: 'invoices',
+        header: 'Invoices',
+        accessorFn: (row) => row._count?.invoices ?? 0,
+        cell: ({ row }) => (
+          <Badge variant="secondary" className="text-xs">
+            {row.original._count?.invoices ?? 0}
+          </Badge>
+        ),
+      },
+      {
+        id: 'actions',
+        header: '',
+        enableSorting: false,
+        cell: ({ row }) => {
+          const structure = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <MoreVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => handleView(structure)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  View Details
+                </DropdownMenuItem>
+                {can('manage_fees') && (
+                  <DropdownMenuItem onClick={() => handleEdit(structure)}>
+                    <Edit2 className="h-4 w-4 mr-2" />
+                    Edit
+                  </DropdownMenuItem>
+                )}
+                {can('manage_fees') && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => handleGenerateInvoices(structure)}>
+                      <FileText className="h-4 w-4 mr-2" />
+                      Generate Invoices
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {can('manage_fees') && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => handleDelete(structure)}
+                      className="text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      },
+    ],
+    [can, structures]
+  );
 
   return (
     <RoleGuard roles={['ADMIN', 'SUPER_ADMIN']}>
@@ -219,25 +330,24 @@ export function FeeStructuresPage() {
               className="h-10"
             />
           </div>
-          {/* Select Box Block */}
-          {isSuperAdmin && 
-            
-      <div className="space-y-2 max-w-md">
-        <label className="text-sm font-medium text-foreground">
-          Switch Managed Institution
-        </label>
-        
-        <Combobox
-          options={schoolOptions}
-          value={selectedSchoolId}
-          onChange={setSelectedSchoolId}
-          placeholder="Type to find a school..."
-          searchPlaceholder="Search by name or county location..."
-          emptyMessage="No matching institutions registered."
-          isLoading={isLoading}
-        />
-      </div>
-               }
+
+          {isSuperAdmin && (
+            <div className="space-y-2 max-w-md">
+              <label className="text-sm font-medium text-foreground">
+                Switch Managed Institution
+              </label>
+              <Combobox
+                options={schoolOptions}
+                value={selectedSchoolId}
+                onChange={setSelectedSchoolId}
+                placeholder="Type to find a school..."
+                searchPlaceholder="Search by name or county location..."
+                emptyMessage="No matching institutions registered."
+                isLoading={isFetching}
+              />
+            </div>
+          )}
+
           {can('manage_fees') && (
             <Button
               onClick={() => {
@@ -259,7 +369,8 @@ export function FeeStructuresPage() {
               <div>
                 <CardTitle>Fee Structures</CardTitle>
                 <CardDescription>
-                  {filteredStructures.length} structure{filteredStructures.length !== 1 ? 's' : ''}
+                  {filteredStructures.length} structure
+                  {filteredStructures.length !== 1 ? 's' : ''}
                 </CardDescription>
               </div>
               {filteredStructures.length > 0 && (
@@ -290,117 +401,7 @@ export function FeeStructuresPage() {
                 )}
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Academic Year</TableHead>
-                      <TableHead>Class Level</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead className="text-right">Items</TableHead>
-                      <TableHead className="text-right">Mandatory</TableHead>
-                      <TableHead className="text-right">Total</TableHead>
-                      <TableHead className="text-center">Status</TableHead>
-                      <TableHead className="text-center">Invoices</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredStructures.map((structure) => (
-                      <TableRow key={structure.id} className="hover:bg-slate-50 dark:hover:bg-slate-900">
-                        <TableCell className="font-semibold">{structure.name}</TableCell>
-                        <TableCell>{structure.academicYear?.year || '—'}</TableCell>
-                        <TableCell>{structure.classLevel || '—'}</TableCell>
-                        <TableCell>
-                          {structure.boardingStatus ? (
-                            <Badge
-                              variant={
-                                structure.boardingStatus === 'BOARDING'
-                                  ? 'default'
-                                  : 'secondary'
-                              }
-                              className="text-xs"
-                            >
-                              {structure.boardingStatus}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground text-sm">—</span>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right font-medium">
-                          {structure.items.length}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-semibold text-blue-600 dark:text-blue-400">
-                          {formatCurrency(getMandatoryTotal(structure.items))}
-                        </TableCell>
-                        <TableCell className="text-right font-mono font-bold text-green-600 dark:text-green-400">
-                          {formatCurrency(getStructureTotal(structure.items))}
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge
-                            variant={structure.isActive ? 'default' : 'outline'}
-                            className="text-xs"
-                          >
-                            {structure.isActive ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <Badge variant="secondary" className="text-xs">
-                            {structure._count?.invoices || 0}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem onClick={() => handleView(structure)}>
-                                <Eye className="h-4 w-4 mr-2" />
-                                View Details
-                              </DropdownMenuItem>
-                              {can('manage_fees') && (
-                                <DropdownMenuItem onClick={() => handleEdit(structure)}>
-                                  <Edit2 className="h-4 w-4 mr-2" />
-                                  Edit
-                                </DropdownMenuItem>
-                              )}
-                              {can('manage_fees') && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleGenerateInvoices(structure)}
-                                  >
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    Generate Invoices
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                              {can('manage_fees') && (
-                                <>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem
-                                    onClick={() => handleDelete(structure)}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </>
-                              )}
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              <DataTable columns={columns} data={filteredStructures} pageSize={15} />
             )}
           </CardContent>
         </Card>
@@ -452,7 +453,6 @@ export function FeeStructuresPage() {
             onOpenChange={setShowCreateModal}
             mode="create"
             academicYears={academicYears}
-            //terms={termOptions}
             classLevels={classLevels}
           />
         )}
@@ -464,7 +464,6 @@ export function FeeStructuresPage() {
             mode="edit"
             structureId={selectedStructure.id}
             academicYears={academicYears}
-            //terms={termOptions}
             classLevels={classLevels}
           />
         )}

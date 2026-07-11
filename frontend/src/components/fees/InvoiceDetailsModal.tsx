@@ -52,7 +52,8 @@ export function InvoiceDetailsModal({
   const { data: invoiceData, isLoading } = useGetInvoiceById(invoiceId);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  const invoice = invoiceData?.data?.data
+  // useGetInvoiceById now returns the invoice object directly
+  const invoice = invoiceData;
   
   if (isLoading) {
     return (

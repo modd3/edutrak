@@ -19,8 +19,9 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
-import { useTransitionSubscriptionStatus } from '@/hooks/use-subscriptions';
+import { Badge } from '@/components/ui/badge';
+import { AlertCircle, Loader2, RefreshCw } from 'lucide-react';
+import { useTransitionSubscriptionStatus, useRenewSubscription } from '@/hooks/use-subscriptions';
 import { Subscription } from '@/types';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
@@ -44,14 +45,17 @@ interface ManageSubscriptionStatusModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   subscription: Subscription | null;
+  onRenewed?: () => void;
 }
 
 export function ManageSubscriptionStatusModal({
   open,
   onOpenChange,
   subscription,
+  onRenewed,
 }: ManageSubscriptionStatusModalProps) {
   const transitionMutation = useTransitionSubscriptionStatus();
+  const renewMutation = useRenewSubscription();
 
   const form = useForm<TransitionStatusInput>({
     resolver: zodResolver(transitionStatusSchema),
@@ -62,8 +66,10 @@ export function ManageSubscriptionStatusModal({
   });
 
   const allowedStatuses = subscription ? ALLOWED_TRANSITIONS[subscription.status] || [] : [];
+  const hasTrialOption = subscription && ['EXPIRED', 'CANCELED', 'ACTIVE'].includes(subscription.status);
+  const isExpired = subscription?.status === 'EXPIRED' || subscription?.status === 'CANCELED';
 
-  const handleSubmit = async (data: TransitionStatusInput) => {
+  const handleStatusSubmit = async (data: TransitionStatusInput) => {
     if (!subscription) return;
 
     await transitionMutation.mutateAsync({
@@ -80,36 +86,94 @@ export function ManageSubscriptionStatusModal({
     }
   };
 
+  const handleRenew = async (withTrial: boolean = false, trialEndsAt?: string) => {
+    if (!subscription) return;
+
+    await renewMutation.mutateAsync({
+      subscriptionId: subscription.id,
+      data: {
+        withTrial,
+        trialEndsAt,
+      },
+    });
+
+    if (!renewMutation.isPending) {
+      onRenewed?.();
+      onOpenChange(false);
+    }
+  };
+
   if (!subscription) return null;
+
+  const isPending = transitionMutation.isPending || renewMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Manage Subscription Status</DialogTitle>
+          <DialogTitle>Manage Subscription</DialogTitle>
           <DialogDescription>
-            Update the subscription status for {subscription.school?.name}
+            Update subscription status for {subscription.school?.name}
           </DialogDescription>
         </DialogHeader>
 
-        {allowedStatuses.length === 0 ? (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>
-              No status transitions available from {subscription.status}. This subscription cannot be modified.
-            </AlertDescription>
-          </Alert>
-        ) : (
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+        {/* Quick Renewal for Expired Subscriptions */}
+        {isExpired && (
+          <div className="space-y-4">
+            <Alert>
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                Your subscription has expired. Renew now to restore access to all features.
+              </AlertDescription>
+            </Alert>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                size="lg"
+                className="w-full gap-2"
+                onClick={() => handleRenew(false)}
+                disabled={isPending}
+              >
+                {renewMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4" />
+                )}
+                Renew Now (Start Immediately)
+              </Button>
+
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full gap-2"
+                onClick={() => {
+                  const trialDate = new Date();
+                  trialDate.setDate(trialDate.getDate() + 14);
+                  handleRenew(true, trialDate.toISOString().split('T')[0]);
+                }}
+                disabled={isPending}
+              >
+                <RefreshCw className="h-4 w-4" />
+                Renew with 14-Day Trial
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Status Transition Form */}
+        {!isExpired && allowedStatuses.length > 0 && (
+          <form onSubmit={form.handleSubmit(handleStatusSubmit)} className="space-y-4">
             {/* Current Status */}
             <div>
               <Label>Current Status</Label>
               <div className="px-3 py-2 border rounded bg-gray-50">
-                <span className="font-medium">{subscription.status}</span>
+                <Badge variant="outline" className="font-medium">
+                  {subscription.status}
+                </Badge>
               </div>
             </div>
 
-            {/* Status Info */}
+            {/* Period Info */}
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
@@ -130,7 +194,7 @@ export function ManageSubscriptionStatusModal({
               <Select
                 value={form.watch('status')}
                 onValueChange={(value) => form.setValue('status', value)}
-                disabled={transitionMutation.isPending}
+                disabled={isPending}
               >
                 <SelectTrigger id="status">
                   <SelectValue placeholder="Select new status" />
@@ -156,25 +220,25 @@ export function ManageSubscriptionStatusModal({
                   id="graceEndsAt"
                   type="date"
                   {...form.register('graceEndsAt')}
-                  disabled={transitionMutation.isPending}
+                  disabled={isPending}
                 />
                 <p className="text-xs text-gray-500 mt-1">When should the grace period end?</p>
               </div>
             )}
 
             {/* Actions */}
-            <div className="flex gap-2 justify-end pt-4">
+            <div className="flex gap-2 justify-end pt-4 border-t">
               <Button
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={transitionMutation.isPending}
+                disabled={isPending}
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
-                disabled={transitionMutation.isPending || !form.watch('status')}
+                disabled={isPending || !form.watch('status')}
                 variant={form.watch('status') === 'CANCELED' ? 'destructive' : 'default'}
               >
                 {transitionMutation.isPending ? (
@@ -188,6 +252,16 @@ export function ManageSubscriptionStatusModal({
               </Button>
             </div>
           </form>
+        )}
+
+        {/* No transitions available */}
+        {!isExpired && allowedStatuses.length === 0 && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              No status transitions available from {subscription.status}. This subscription cannot be modified.
+            </AlertDescription>
+          </Alert>
         )}
       </DialogContent>
     </Dialog>

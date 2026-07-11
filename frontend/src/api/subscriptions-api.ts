@@ -2,7 +2,7 @@ import api from './index';
 import { ApiResponse, PaginatedResponse, Plan, Subscription } from '@/types';
 
 export interface CreateSubscriptionInput {
-  schoolId: string;
+  schoolId?: string;
   planId: string;
   startsAt: string;
   currentPeriodStart: string;
@@ -13,6 +13,17 @@ export interface CreateSubscriptionInput {
 export interface TransitionStatusInput {
   status: string;
   graceEndsAt?: string;
+}
+
+export interface ChangePlanInput {
+  planId: string;
+  withTrial?: boolean;
+  trialEndsAt?: string;
+}
+
+export interface RenewSubscriptionInput {
+  withTrial?: boolean;
+  trialEndsAt?: string;
 }
 
 export const subscriptionsApi = {
@@ -40,8 +51,26 @@ export const subscriptionsApi = {
     api.get<ApiResponse<Subscription>>(`/subscriptions/${id}`),
 
   /**
+   * Get current user's subscription
+   */
+  getMySubscription: () =>
+    api.get<ApiResponse<Subscription>>('/subscriptions/my'),
+
+  /**
    * Transition subscription status
    */
   transitionStatus: (id: string, data: TransitionStatusInput) =>
     api.patch<ApiResponse<Subscription>>(`/subscriptions/${id}/status`, data),
+
+  /**
+   * Change subscription plan
+   */
+  changePlan: (id: string, data: ChangePlanInput) =>
+    api.patch<ApiResponse<Subscription>>(`/subscriptions/${id}/change-plan`, data),
+
+  /**
+   * Renew subscription
+   */
+  renew: (id: string, data: RenewSubscriptionInput) =>
+    api.post<ApiResponse<Subscription>>(`/subscriptions/${id}/renew`, data),
 };

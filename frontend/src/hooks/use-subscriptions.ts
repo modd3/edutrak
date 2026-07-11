@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { subscriptionsApi, CreateSubscriptionInput, TransitionStatusInput } from '@/api/subscriptions-api';
+import { subscriptionsApi, CreateSubscriptionInput, TransitionStatusInput, ChangePlanInput, RenewSubscriptionInput } from '@/api/subscriptions-api';
 import { useSchoolContext } from './use-school-context';
 import { toast } from 'sonner';
 
@@ -41,6 +41,21 @@ export function useSubscriptionById(id?: string) {
 }
 
 /**
+ * Fetch current user's subscription
+ */
+export function useMySubscription() {
+  const { schoolId } = useSchoolContext();
+
+  return useQuery({
+    queryKey: ['subscriptions', 'my', schoolId],
+    queryFn: async () => {
+      const response = await subscriptionsApi.getMySubscription();
+      return response.data.data;
+    },
+  });
+}
+
+/**
  * Create a new subscription
  */
 export function useCreateSubscription() {
@@ -54,6 +69,7 @@ export function useCreateSubscription() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', 'my', schoolId] });
       toast.success('Subscription created successfully');
     },
     onError: (error: any) => {
@@ -77,11 +93,62 @@ export function useTransitionSubscriptionStatus() {
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', 'my', schoolId] });
       queryClient.invalidateQueries({ queryKey: ['subscriptions', data?.id] });
       toast.success('Subscription status updated successfully');
     },
     onError: (error: any) => {
       const message = error.response?.data?.error || error.message || 'Failed to update subscription status';
+      toast.error(message);
+    },
+  });
+}
+
+/**
+ * Change subscription plan
+ */
+export function useChangePlan() {
+  const queryClient = useQueryClient();
+  const { schoolId } = useSchoolContext();
+
+  return useMutation({
+    mutationFn: async (params: { subscriptionId: string; data: ChangePlanInput }) => {
+      const response = await subscriptionsApi.changePlan(params.subscriptionId, params.data);
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', 'my', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', data?.id] });
+      toast.success('Plan changed successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || error.message || 'Failed to change plan';
+      toast.error(message);
+    },
+  });
+}
+
+/**
+ * Renew subscription
+ */
+export function useRenewSubscription() {
+  const queryClient = useQueryClient();
+  const { schoolId } = useSchoolContext();
+
+  return useMutation({
+    mutationFn: async (params: { subscriptionId: string; data: RenewSubscriptionInput }) => {
+      const response = await subscriptionsApi.renew(params.subscriptionId, params.data);
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', 'my', schoolId] });
+      queryClient.invalidateQueries({ queryKey: ['subscriptions', data?.id] });
+      toast.success('Subscription renewed successfully');
+    },
+    onError: (error: any) => {
+      const message = error.response?.data?.error || error.message || 'Failed to renew subscription';
       toast.error(message);
     },
   });

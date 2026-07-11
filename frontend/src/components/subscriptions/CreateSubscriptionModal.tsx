@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -19,15 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Loader2, CheckCircle2, Info } from 'lucide-react';
 import { useCreateSubscription } from '@/hooks/use-subscriptions';
-import { useSchoolContext, } from '@/hooks/use-school-context';
-import { useSchools } from '@/hooks/use-schools';
-import { School } from '@/types';
+import { useSchoolContext } from '@/hooks/use-school-context';
+import { usePlans } from '@/hooks/use-plans';
+import { Plan } from '@/types';
 
 const createSubscriptionSchema = z.object({
   planId: z.string().min(1, 'Plan is required'),
-  schoolId: z.string().min(1, 'School is required'),
   startsAt: z.string().min(1, 'Start date is required'),
   currentPeriodStart: z.string().min(1, 'Period start date is required'),
   currentPeriodEnd: z.string().min(1, 'Period end date is required'),
@@ -50,18 +51,18 @@ export function CreateSubscriptionModal({
   isLoadingPlans,
 }: CreateSubscriptionModalProps) {
   const { schoolId, isSuperAdmin } = useSchoolContext();
-  const schoolsData = useSchools();
+  const { data: plansData } = usePlans({ isActive: true, limit: 50 });
   const createMutation = useCreateSubscription();
   const [isTrialing, setIsTrialing] = useState(false);
-    
-  const schools = schoolsData.data?.data
- 
+  
+  const availablePlans = plans || [];
+
   const {
-    watch, 
-    handleSubmit, 
-    reset, 
+    watch,
+    handleSubmit,
+    reset,
     setValue,
-    register, 
+    register,
     formState: { errors },
   } = useForm<CreateSubscriptionInput>({
     resolver: zodResolver(createSubscriptionSchema),
@@ -76,16 +77,27 @@ export function CreateSubscriptionModal({
     },
   });
 
-  const selectedSchool = watch("schoolId");
-  const onSubmit = async (data: CreateSubscriptionInput) => {
-    // Prefer the selected school when super admin, otherwise use context school
-    const finalSchoolId = isSuperAdmin ? (selectedSchool ?? schoolId) : schoolId;
-    if (!finalSchoolId) {
-      return;
-    }
+  const selectedPlanId = watch('planId');
+  const selectedPlan = availablePlans.find(p => p.id === selectedPlanId);
 
+  useEffect(() => {
+    if (open) {
+      const today = new Date().toISOString().split('T')[0];
+      const nextMonth = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      reset({
+        planId: '',
+        startsAt: today,
+        currentPeriodStart: today,
+        currentPeriodEnd: nextMonth,
+        trialEndsAt: '',
+      });
+      setIsTrialing(false);
+    }
+  }, [open, reset]);
+
+  const onSubmit = async (data: CreateSubscriptionInput) => {
     await createMutation.mutateAsync({
-      schoolId: finalSchoolId,
+      schoolId,
       planId: data.planId,
       startsAt: data.startsAt,
       currentPeriodStart: data.currentPeriodStart,
@@ -101,58 +113,81 @@ export function CreateSubscriptionModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create New Subscription</DialogTitle>
+          <DialogTitle>Choose Your Plan</DialogTitle>
           <DialogDescription>
-            Set up a new subscription for your school with a selected plan
+            {isSuperAdmin 
+              ? 'Create a new subscription for a school. Choose a plan and configure the billing period.'
+              : 'Select a plan to subscribe your school. Start with a free trial if you prefer.'}
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          {/* School Selection (only applicable when user is SUPER_ADMIN) */}
-         {isSuperAdmin &&
-          <div>
-            <Label htmlFor="schoolId">Select School</Label>
-            <Select
-              value={selectedSchool}
-              onValueChange={(value) => setValue('schoolId', value)}
-              disabled={!isSuperAdmin || isLoadingPlans || createMutation.isPending}
-            >
-              <SelectTrigger id="schoolId">
-                <SelectValue placeholder="Select a School" />
-              </SelectTrigger>
-              <SelectContent>
-                {schools?.map((school: School) => (
-                  <SelectItem key={school.id} value={school.id}>
-                    {school.name} 
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            {errors.schoolId && (
-              <p className="text-red-600 text-sm mt-1">{errors.schoolId.message}</p>
-            )}
-          </div>}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {!isSuperAdmin && (
+            <Alert>
+              <Info className="h-4 w-4" />
+              <AlertDescription>
+                You are subscribing <strong>{schoolId}</strong>. All plans include a 14-day free trial.
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Plan Selection */}
-          <div>
-            <Label htmlFor="planId">Billing Plan</Label>
-            <Select
-              value={watch('planId')}
-              onValueChange={(value) => setValue('planId', value)}
-              disabled={isLoadingPlans || createMutation.isPending}
-            >
-              <SelectTrigger id="planId">
-                <SelectValue placeholder="Select a plan" />
-              </SelectTrigger>
-              <SelectContent>
-                {plans?.map((plan) => (
-                  <SelectItem key={plan.id} value={plan.id}>
-                    {plan.name} - {(plan.priceMinor / 100).toFixed(2)} {plan.currency} / {plan.billingInterval}
-                  </SelectItem>
+          <div className="space-y-3">
+            <Label htmlFor="planId">Select Plan</Label>
+            {isLoadingPlans || !plansData ? (
+              <div className="text-sm text-gray-500 py-4 text-center">Loading plans...</div>
+            ) : (
+              <div className="grid gap-3">
+                {availablePlans.map((plan: Plan) => (
+                  <div
+                    key={plan.id}
+                    className={`border-2 rounded-lg p-4 cursor-pointer transition-all ${
+                      selectedPlanId === plan.id
+                        ? 'border-blue-500 bg-blue-50'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('planId', plan.id)}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="radio"
+                            checked={selectedPlanId === plan.id}
+                            onChange={() => setValue('planId', plan.id)}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor={`plan-${plan.id}`} className="font-semibold cursor-pointer">
+                            {plan.name}
+                          </Label>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1 ml-6">{plan.description}</p>
+                        <div className="flex items-baseline gap-2 mt-2 ml-6">
+                          <span className="text-2xl font-bold">{(plan.priceMinor / 100).toFixed(2)}</span>
+                          <span className="text-sm text-gray-600">
+                            {plan.currency} / {plan.billingInterval?.toLowerCase()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Features */}
+                    {plan.features && plan.features.length > 0 && (
+                      <div className="mt-3 ml-6 grid grid-cols-2 gap-2">
+                        {plan.features.map((feature: any) => (
+                          <div key={feature.id} className="flex items-center gap-2 text-sm">
+                            <CheckCircle2 className="h-4 w-4 text-green-600 flex-shrink-0" />
+                            <span className="text-gray-700">{feature.featureKey.replace(/_/g, ' ')}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 ))}
-              </SelectContent>
-            </Select>
+              </div>
+            )}
             {errors.planId && (
               <p className="text-red-600 text-sm mt-1">{errors.planId.message}</p>
             )}
@@ -160,7 +195,7 @@ export function CreateSubscriptionModal({
 
           {/* Start Date */}
           <div>
-            <Label htmlFor="startsAt">Subscription Start Date</Label>
+            <Label htmlFor="startsAt">Start Date</Label>
             <Input
               id="startsAt"
               type="date"
@@ -201,38 +236,56 @@ export function CreateSubscriptionModal({
           </div>
 
           {/* Trial Mode */}
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id="isTrialing"
-              checked={isTrialing}
-              onChange={(e) => setIsTrialing(e.target.checked)}
-              disabled={createMutation.isPending}
-              className="rounded border-gray-300"
-            />
-            <Label htmlFor="isTrialing" className="font-normal cursor-pointer">
-              Start with trial period
-            </Label>
-          </div>
+          {selectedPlan && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="isTrialing"
+                  checked={isTrialing}
+                  onCheckedChange={(checked) => setIsTrialing(checked as boolean)}
+                  disabled={createMutation.isPending}
+                />
+                <Label htmlFor="isTrialing" className="font-normal cursor-pointer">
+                  Start with a 14-day trial period
+                </Label>
+              </div>
 
-          {/* Trial End Date */}
-          {isTrialing && (
-            <div>
-              <Label htmlFor="trialEndsAt">Trial End Date</Label>
-              <Input
-                id="trialEndsAt"
-                type="date"
-                {...register('trialEndsAt')}
-                disabled={createMutation.isPending}
-              />
-              {errors.trialEndsAt && (
-                <p className="text-red-600 text-sm mt-1">{errors.trialEndsAt.message}</p>
+              {isTrialing && (
+                <div>
+                  <Label htmlFor="trialEndsAt">Trial End Date</Label>
+                  <Input
+                    id="trialEndsAt"
+                    type="date"
+                    {...register('trialEndsAt')}
+                    disabled={createMutation.isPending}
+                    min={watch('startsAt')}
+                  />
+                  {errors.trialEndsAt && (
+                    <p className="text-red-600 text-sm mt-1">{errors.trialEndsAt.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">
+                    You won't be charged until the trial ends. Cancel anytime during the trial.
+                  </p>
+                </div>
               )}
             </div>
           )}
 
+          {/* Summary */}
+          {selectedPlan && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-blue-900 mb-1">Subscription Summary</p>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p><strong>Plan:</strong> {selectedPlan.name}</p>
+                <p><strong>Price:</strong> {(selectedPlan.priceMinor / 100).toFixed(2)} {selectedPlan.currency} / {selectedPlan.billingInterval?.toLowerCase()}</p>
+                {isTrialing && <p><strong>Trial:</strong> Ends {watch('trialEndsAt') || 'after 14 days'}</p>}
+                {!isTrialing && <p><strong>Billing:</strong> Starts immediately</p>}
+              </div>
+            </div>
+          )}
+
           {/* Actions */}
-          <div className="flex gap-2 justify-end pt-4">
+          <div className="flex gap-2 justify-end pt-4 border-t">
             <Button
               type="button"
               variant="outline"
@@ -241,7 +294,10 @@ export function CreateSubscriptionModal({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={createMutation.isPending}>
+            <Button
+              type="submit"
+              disabled={createMutation.isPending || !selectedPlanId}
+            >
               {createMutation.isPending ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

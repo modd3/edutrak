@@ -16,7 +16,8 @@ export function useGetFeeStructures(params: {
 }) {
   return useQuery({
     queryKey: ['feeStructures', params],
-    queryFn: () => feesApi.getStructures(params),
+    queryFn: () => feesApi.getStructures(params as typeof params & { schoolId: string}),
+    enabled: !!params.schoolId,
   });
 }
 
@@ -145,7 +146,9 @@ export function useDeleteFeeItem() {
 // ══════════════════════════════════════════════════════════════════════════
 
 /**
- * Fetch invoices with pagination and filters
+ * Fetch invoices with pagination and filters.
+ * Server returns ResponseUtil.paginated → axios body: { data: Invoice[], pagination }
+ * Unwrap here so consumers receive { data: Invoice[], pagination } directly.
  */
 export function useGetInvoices(params?: {
   studentId?: string;
@@ -158,17 +161,27 @@ export function useGetInvoices(params?: {
 }) {
   return useQuery({
     queryKey: ['feeInvoices', params],
-    queryFn: () => feesApi.getInvoices(params),
+    queryFn: async () => {
+      const res = await feesApi.getInvoices(params);
+      // axios: res.data = { success, message, data: Invoice[], pagination }
+      return res.data as { data: any[]; pagination: any; count?: number };
+    },
   });
 }
 
 /**
- * Fetch a single invoice by ID
+ * Fetch a single invoice by ID.
+ * Server returns ResponseUtil.success → axios body: { data: Invoice }
+ * Unwrap here so consumers receive the Invoice object directly.
  */
 export function useGetInvoiceById(id: string) {
   return useQuery({
     queryKey: ['feeInvoices', id],
-    queryFn: () => feesApi.getInvoiceById(id),
+    queryFn: async () => {
+      const res = await feesApi.getInvoiceById(id);
+      // axios: res.data = { success, message, data: Invoice }
+      return res.data?.data ?? res.data ?? null;
+    },
     enabled: !!id,
   });
 }
@@ -345,7 +358,9 @@ export function useReversePayment() {
 // ══════════════════════════════════════════════════════════════════════════
 
 /**
- * Fetch fee collection report
+ * Fetch fee collection report.
+ * Server returns ResponseUtil.success → axios body: { data: reportObject }
+ * Unwrap here so consumers receive the report object directly.
  */
 export function useGetFeeCollectionReport(params?: {
   academicYearId?: string;
@@ -355,12 +370,17 @@ export function useGetFeeCollectionReport(params?: {
 }) {
   return useQuery({
     queryKey: ['feeCollectionReport', params],
-    queryFn: () => feesApi.getFeeCollectionReport(params),
+    queryFn: async () => {
+      const res = await feesApi.getFeeCollectionReport(params);
+      return res.data?.data ?? res.data ?? {};
+    },
   });
 }
 
 /**
- * Fetch defaulters report
+ * Fetch defaulters report.
+ * Server returns ResponseUtil.success → axios body: { data: defaultersArray }
+ * Unwrap here so consumers receive the array directly.
  */
 export function useGetDefaultersReport(params?: {
   academicYearId?: string;
@@ -370,7 +390,10 @@ export function useGetDefaultersReport(params?: {
 }) {
   return useQuery({
     queryKey: ['feeDefaultersReport', params],
-    queryFn: () => feesApi.getDefaultersReport(params),
+    queryFn: async () => {
+      const res = await feesApi.getDefaultersReport(params);
+      return (res.data?.data ?? res.data ?? []) as any[];
+    },
   });
 }
 
@@ -653,24 +676,46 @@ export function useGetReconciliationReport(params?: { from?: string; to?: string
 // ANALYTICS
 // ══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Fee analytics summary.
+ * Server returns ResponseUtil.success → axios body: { data: FeeAnalyticsSummary }
+ * Unwrap here so consumers receive the summary object directly.
+ */
 export function useGetAnalytics(params?: { from?: string; to?: string; academicYearId?: string; termId?: string }) {
   return useQuery({
     queryKey: ['feeAnalytics', params],
-    queryFn: () => feesApi.getAnalytics(params),
+    queryFn: async () => {
+      const res = await feesApi.getAnalytics(params);
+      return res.data?.data ?? res.data ?? null;
+    },
   });
 }
 
+/**
+ * Cash flow report.
+ * Unwrap at source.
+ */
 export function useGetCashFlowReport(params?: { from?: string; to?: string }) {
   return useQuery({
     queryKey: ['feeCashFlow', params],
-    queryFn: () => feesApi.getCashFlowReport(params),
+    queryFn: async () => {
+      const res = await feesApi.getCashFlowReport(params);
+      return res.data?.data ?? res.data ?? null;
+    },
   });
 }
 
+/**
+ * Detect payment anomalies.
+ * Unwrap at source.
+ */
 export function useDetectAnomalies(params?: { days?: number }) {
   return useQuery({
     queryKey: ['feeAnomalies', params],
-    queryFn: () => feesApi.detectAnomalies(params),
+    queryFn: async () => {
+      const res = await feesApi.detectAnomalies(params);
+      return (res.data?.data ?? res.data ?? []) as any[];
+    },
   });
 }
 

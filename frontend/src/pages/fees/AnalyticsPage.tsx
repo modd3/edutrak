@@ -1,6 +1,6 @@
 import { AnalyticsDashboard } from '@/components/fees/AnalyticsDashboard';
 
-export function AnalyticsPage() {
+export default function AnalyticsPage() {
   return (
     <div className="space-y-6">
       <div>

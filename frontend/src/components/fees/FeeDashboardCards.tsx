@@ -15,8 +15,7 @@ interface FeeDashboardCardsProps {
 
 export function FeeDashboardCards({ academicYearId, termId }: FeeDashboardCardsProps) {
   const { schoolId } = useSchoolContext();
-  const { data, isLoading } = useGetFeeCollectionReport({ academicYearId, termId });
-  const report = data?.data?.data ?? data?.data;
+  const { data: report, isLoading } = useGetFeeCollectionReport({ academicYearId, termId });
  
   if (isLoading) {
     return (

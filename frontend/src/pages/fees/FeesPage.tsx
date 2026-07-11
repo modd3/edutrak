@@ -35,10 +35,10 @@ import { useGetDefaultersReport } from '@/hooks/use-fees';
 import { RoleGuard } from '@/components/RoleGuard';
 
 // Import professional page components
-import FeeStructuresPagePro from './FeeStructuresPagePro';
-import InvoicesPagePro from './InvoicesPagePro';
-import ReportsPagePro from './ReportsPagePro';
-import PaymentsPagePro from './PaymentsPagePro';
+import FeeStructuresPagePro from './FeeStructuresPage';
+import InvoicesPagePro from './InvoicesPage';
+import AnalyticsPage from './AnalyticsPage';
+import PaymentsPagePro from './PaymentsPage';
 import { FeeDashboardCards } from '@/components/fees/FeeDashboardCards';
 import { FeeArrearsTable } from '@/components/fees/FeeArrearsTable';
 import { CollectionsChart } from '@/components/fees/CollectionsChart';
@@ -52,8 +52,8 @@ export default function FeesPagePro() {
   const { schoolId } = useSchoolContext();
 
   // Get active term
-  const { data: activeYearData } = useActiveAcademicYear();
-  const activeYear = activeYearData?.data ?? activeYearData;
+  // useActiveAcademicYear already returns the year object directly
+  const { data: activeYear } = useActiveAcademicYear();
   const terms = activeYear?.terms ?? [];
 
   const [selectedTermId, setSelectedTermId] = useState<string>('');
@@ -66,7 +66,8 @@ export default function FeesPagePro() {
     termId: filterTerm,
   });
 
-  const defaulters = defaultersData?.data?.data || defaultersData?.data || [];
+  // useGetDefaultersReport now returns the array directly
+  const defaulters = defaultersData ?? [];
 
   // Calculate critical defaulters
   const criticalCount = defaulters.filter((d: any) => {
@@ -242,7 +243,7 @@ export default function FeesPagePro() {
           {/* Reports Tab */}
           {can('manage_fees') && (
             <TabsContent value="reports" className="mt-6">
-              <ReportsPagePro />
+              <AnalyticsPage />
             </TabsContent>
           )}
         </Tabs>

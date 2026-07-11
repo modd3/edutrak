@@ -549,11 +549,15 @@ export class FeeService extends BaseService {
 
   async getInvoiceById(invoiceId: string) {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
-    return await this.prisma.feeInvoice.findFirst({
-      where: {
-        id: invoiceId,
-        ...(isSuperAdmin ? {} : { schoolId: schoolId ?? 'NONE' }),
-      },
+    const query: any = {
+      id: invoiceId,
+      ...(isSuperAdmin ? {} : { schoolId: schoolId ?? 'NONE' }),
+    };
+    
+    logger.debug('Fetching invoice by ID', { invoiceId, schoolId, isSuperAdmin, query });
+    
+    const invoice = await this.prisma.feeInvoice.findFirst({
+      where: query,
       include: {
         student: { select: { id: true, admissionNo: true, firstName: true, lastName: true } },
         feeStructure: { select: { name: true, currency: true } },
@@ -561,6 +565,14 @@ export class FeeService extends BaseService {
         payments: { orderBy: { paidAt: 'desc' } },
       },
     });
+    
+    if (!invoice) {
+      logger.warn('Invoice not found in database', { invoiceId, schoolId, isSuperAdmin });
+    } else {
+      logger.debug('Invoice found', { invoiceId, invoiceSchoolId: invoice.schoolId });
+    }
+    
+    return invoice;
   }
 
   async updateInvoice(invoiceId: string, data: UpdateInvoiceInput) {

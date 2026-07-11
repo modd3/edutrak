@@ -446,4 +446,25 @@ router.get(
   feeController.getReconciliationReport.bind(feeController)
 );
 
+// ── Analytics ────────────────────────────────────────────────────────────────
+
+router.get(
+  '/analytics',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  requireFeature('fees.report'),
+  feeController.getAnalytics.bind(feeController)
+);
+
+router.get(
+  '/analytics/cash-flow',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.getCashFlowReport.bind(feeController)
+);
+
+router.get(
+  '/analytics/anomalies',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  feeController.detectAnomalies.bind(feeController)
+);
+
 export default router;

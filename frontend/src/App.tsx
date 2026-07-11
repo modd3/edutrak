@@ -31,11 +31,11 @@ import StrandManagementPage from './pages/assessments/StrandManagementPage';
 import { StudentSubjectManagementPage } from './pages/subjects/StudentSubjectManagementPage';
 import { StudentSubjectEnrollmentPage } from './pages/students/SubjectEnrollment';
 import ClassSubjectStrandsPage from '@/pages/assessments/ClassSubjectStrands';
-import FeesPagePro from '@/pages/fees/FeesPagePro';
-import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPagePro';
-import InvoicesPagePro from '@/pages/fees/InvoicesPagePro';
-import PaymentsPagePro from '@/pages/fees/PaymentsPagePro';
-import { AnalyticsPage } from '@/pages/fees/AnalyticsPage';
+import FeesPagePro from '@/pages/fees/FeesPage';
+import FeeStructuresPagePro from '@/pages/fees/FeeStructuresPage';
+import InvoicesPagePro from '@/pages/fees/InvoicesPage';
+import PaymentsPagePro from '@/pages/fees/PaymentsPage';
+import AnalyticsPage from '@/pages/fees/AnalyticsPage';
 import { ReconciliationPage } from '@/pages/fees/ReconciliationPage';
 import { ProvidersPage } from '@/pages/fees/ProvidersPage';
 import BillingAdminPage from '@/pages/billing/BillingAdminPage';
@@ -194,7 +194,7 @@ function App() {
           <Route
             path="/subscriptions"
             element={
-              <RoleGuard roles={['SUPER_ADMIN']} fallbackRoute="/dashboard">
+              <RoleGuard roles={['SUPER_ADMIN', 'ADMIN']} fallbackRoute="/dashboard">
                 <DashboardLayout>
                   <SubscriptionsPage />
                 </DashboardLayout>

@@ -1,42 +1,17 @@
 /**
- * Professional Fee Structure Viewer with Print Support
- * Displays fee structure details in a clear, professional format suitable for printing
+ * Fee Structure Viewer Modal
+ * Print-ready view of a fee structure with school header, itemised table, and totals.
  */
 
 import { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  Button,
-} from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Badge,
-  Printer,
-  Download,
-  X,
-} from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Printer, Download, CheckCircle2, XCircle } from 'lucide-react';
 import { useGetFeeStructureById } from '@/hooks/use-fees';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { useAuthStore } from '@/store/auth-store';
 
 interface FeeStructureViewerModalProps {
   open: boolean;
@@ -44,6 +19,197 @@ interface FeeStructureViewerModalProps {
   structureId: string;
 }
 
+// ─── School header (mirrors the one in ProfessionalInvoiceViewer) ────────────
+function SchoolHeader({ school }: { school: any }) {
+  return (
+    <div className="flex items-start gap-4 pb-4 border-b-2 border-gray-800">
+      <div className="w-16 h-16 rounded-lg border-2 border-gray-300 flex items-center justify-center bg-gray-50 shrink-0 text-xs text-gray-400 font-bold text-center leading-tight">
+        LOGO
+      </div>
+      <div className="flex-1 min-w-0">
+        <h1 className="text-xl font-extrabold uppercase tracking-wide text-gray-900">
+          {school?.name ?? 'School Name'}
+        </h1>
+        {school?.address && (
+          <p className="text-xs text-gray-600 mt-0.5">{school.address}</p>
+        )}
+        <div className="flex flex-wrap gap-x-4 gap-y-0 mt-0.5 text-xs text-gray-600">
+          {school?.phone    && <span>Tel: {school.phone}</span>}
+          {school?.email    && <span>Email: {school.email}</span>}
+          {school?.county   && <span>{school.county} County</span>}
+          {school?.knecCode && <span>KNEC: {school.knecCode}</span>}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-2xl font-black uppercase tracking-widest text-gray-800">FEE STRUCTURE</p>
+        <p className="text-xs text-gray-500 mt-0.5">School Management System</p>
+      </div>
+    </div>
+  );
+}
+
+// ─── Structure body ───────────────────────────────────────────────────────────
+function StructureBody({ structure }: { structure: any }) {
+  const totalAmount = (structure.items ?? []).reduce(
+    (s: number, i: any) => s + Number(i.amount), 0
+  );
+  const mandatoryTotal = (structure.items ?? [])
+    .filter((i: any) => !i.isOptional)
+    .reduce((s: number, i: any) => s + Number(i.amount), 0);
+  const optionalTotal = totalAmount - mandatoryTotal;
+  const mandatoryItems = (structure.items ?? []).filter((i: any) => !i.isOptional);
+  const optionalItems  = (structure.items ?? []).filter((i: any) =>  i.isOptional);
+
+  return (
+    <div className="space-y-5 mt-4">
+      {/* Structure meta */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 rounded-lg border border-gray-200 bg-gray-50 p-4">
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Name</p>
+          <p className="font-semibold text-sm">{structure.name}</p>
+        </div>
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Academic Year</p>
+          <p className="text-sm font-medium">{structure.academicYear?.year ?? '—'}</p>
+        </div>
+        {structure.classLevel && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Class Level</p>
+            <p className="text-sm font-medium">{structure.classLevel}</p>
+          </div>
+        )}
+        {structure.boardingStatus && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Boarding</p>
+            <Badge
+              variant={structure.boardingStatus === 'BOARDING' ? 'default' : 'secondary'}
+              className="text-xs"
+            >
+              {structure.boardingStatus}
+            </Badge>
+          </div>
+        )}
+        <div>
+          <p className="text-[10px] font-semibold uppercase text-gray-500">Status</p>
+          <Badge variant={structure.isActive ? 'default' : 'destructive'} className="text-xs">
+            {structure.isActive ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
+        {structure.currency && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Currency</p>
+            <p className="text-sm font-medium">{structure.currency}</p>
+          </div>
+        )}
+        {structure.term && (
+          <div>
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Term</p>
+            <p className="text-sm font-medium">{structure.term.name}</p>
+          </div>
+        )}
+        {structure.description && (
+          <div className="col-span-2">
+            <p className="text-[10px] font-semibold uppercase text-gray-500">Description</p>
+            <p className="text-xs text-gray-600">{structure.description}</p>
+          </div>
+        )}
+      </div>
+
+      {/* Mandatory items */}
+      {mandatoryItems.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase text-gray-500 mb-1 flex items-center gap-1">
+            <CheckCircle2 className="h-3 w-3 text-indigo-500" />
+            Mandatory Fees ({mandatoryItems.length})
+          </p>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-y border-gray-300 bg-indigo-50">
+                <th className="text-left py-1.5 px-2 font-semibold text-xs">Description</th>
+                <th className="text-left py-1.5 px-2 font-semibold text-xs">Category</th>
+                <th className="text-right py-1.5 px-2 font-semibold text-xs">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {mandatoryItems.map((item: any, idx: number) => (
+                <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="py-1 px-2">{item.name}</td>
+                  <td className="py-1 px-2 text-xs text-gray-500">{item.category}</td>
+                  <td className="py-1 px-2 text-right font-medium">{formatCurrency(Number(item.amount))}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-indigo-300 font-bold bg-indigo-50">
+                <td className="py-1.5 px-2 text-indigo-800" colSpan={2}>Mandatory Sub-total</td>
+                <td className="py-1.5 px-2 text-right text-indigo-800">{formatCurrency(mandatoryTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Optional items */}
+      {optionalItems.length > 0 && (
+        <div>
+          <p className="text-[10px] font-bold uppercase text-gray-500 mb-1 flex items-center gap-1">
+            <XCircle className="h-3 w-3 text-amber-500" />
+            Optional Fees ({optionalItems.length})
+          </p>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-y border-gray-300 bg-amber-50">
+                <th className="text-left py-1.5 px-2 font-semibold text-xs">Description</th>
+                <th className="text-left py-1.5 px-2 font-semibold text-xs">Category</th>
+                <th className="text-right py-1.5 px-2 font-semibold text-xs">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              {optionalItems.map((item: any, idx: number) => (
+                <tr key={item.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="py-1 px-2">{item.name}</td>
+                  <td className="py-1 px-2 text-xs text-gray-500">{item.category}</td>
+                  <td className="py-1 px-2 text-right font-medium">{formatCurrency(Number(item.amount))}</td>
+                </tr>
+              ))}
+              <tr className="border-t-2 border-amber-300 font-bold bg-amber-50">
+                <td className="py-1.5 px-2 text-amber-800" colSpan={2}>Optional Sub-total</td>
+                <td className="py-1.5 px-2 text-right text-amber-800">{formatCurrency(optionalTotal)}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Grand total */}
+      <div className="flex justify-end">
+        <div className="w-72 border-2 border-gray-800 rounded-lg overflow-hidden">
+          <div className="flex justify-between px-4 py-2 bg-gray-800 text-white font-bold text-sm">
+            <span>GRAND TOTAL</span>
+            <span>{formatCurrency(totalAmount)}</span>
+          </div>
+          <div className="flex justify-between px-4 py-1.5 text-xs text-gray-600">
+            <span>Mandatory</span>
+            <span>{formatCurrency(mandatoryTotal)}</span>
+          </div>
+          {optionalTotal > 0 && (
+            <div className="flex justify-between px-4 py-1.5 text-xs text-gray-600 border-t">
+              <span>Optional</span>
+              <span>{formatCurrency(optionalTotal)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Footer info */}
+      <div className="text-xs text-gray-500 border-t pt-3 space-y-0.5">
+        <p>Invoice count: {structure._count?.invoices ?? 0}</p>
+        <p>Created: {formatDate(structure.createdAt)}</p>
+        {structure.updatedAt && <p>Last Updated: {formatDate(structure.updatedAt)}</p>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
 export function FeeStructureViewerModal({
   open,
   onOpenChange,
@@ -51,33 +217,26 @@ export function FeeStructureViewerModal({
 }: FeeStructureViewerModalProps) {
   const { data: structureData, isLoading } = useGetFeeStructureById(structureId);
   const [isPrinting, setIsPrinting] = useState(false);
+  const user = useAuthStore((s) => s.user);
+  const school = user?.school;
 
-  const structure = structureData?.data?.data || structureData?.data;
+  const structure = structureData?.data?.data ?? structureData?.data;
 
   const handlePrint = () => {
     setIsPrinting(true);
     setTimeout(() => {
       window.print();
       setIsPrinting(false);
-    }, 100);
-  };
-
-  const handleDownloadPDF = async () => {
-    // Implementation for PDF download would use libraries like pdfkit or print-to-pdf
-    console.log('Download as PDF');
+    }, 150);
   };
 
   if (isLoading) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <Skeleton className="h-6 w-40" />
-          </DialogHeader>
+          <DialogHeader><Skeleton className="h-6 w-40" /></DialogHeader>
           <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-20 w-full" />
-            ))}
+            {[1, 2, 3].map((i) => <Skeleton key={i} className="h-20 w-full" />)}
           </div>
         </DialogContent>
       </Dialog>
@@ -97,223 +256,69 @@ export function FeeStructureViewerModal({
     );
   }
 
-  const totalAmount = structure.items?.reduce(
-    (sum: number, item: any) => sum + Number(item.amount),
-    0
-  ) || 0;
-
-  const mandatoryTotal = structure.items
-    ?.filter((item: any) => !item.isOptional)
-    .reduce((sum: number, item: any) => sum + Number(item.amount), 0) || 0;
-
-  const optionalTotal = structure.items
-    ?.filter((item: any) => item.isOptional)
-    .reduce((sum: number, item: any) => sum + Number(item.amount), 0) || 0;
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto print:max-h-none print:overflow-visible">
-        {/* Print-only header */}
-        <div className="hidden print:block mb-8 border-b-2 pb-4">
-          <div className="text-center space-y-2 mb-6">
-            <h1 className="text-2xl font-bold">FEE STRUCTURE</h1>
-            <p className="text-gray-600">School Management System</p>
-          </div>
-        </div>
-
-        {/* Screen-only header */}
-        <div className="print:hidden">
-          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pr-8">
-            <div>
-              <DialogTitle>Fee Structure Details</DialogTitle>
-            </div>
+    <>
+      {/* ── Screen dialog ─────────────────────────────────────────────────── */}
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-5xl max-h-[95vh] overflow-y-auto print:hidden">
+          <DialogHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <DialogTitle>Fee Structure — {structure.name}</DialogTitle>
             <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handlePrint}
-                disabled={isPrinting}
-              >
-                <Printer className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" onClick={handlePrint} disabled={isPrinting}>
+                <Printer className="h-4 w-4 mr-1.5" />
                 Print
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleDownloadPDF}
-              >
-                <Download className="h-4 w-4 mr-2" />
+              <Button variant="outline" size="sm" disabled title="PDF download coming soon">
+                <Download className="h-4 w-4 mr-1.5" />
                 PDF
               </Button>
             </div>
           </DialogHeader>
+
+          <div className="mt-2 border rounded-xl p-6 bg-white dark:bg-background">
+            <SchoolHeader school={school} />
+            <StructureBody structure={structure} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ── Printable document ────────────────────────────────────────────── */}
+      <div className="hidden print:block" id="structure-print-root">
+        <SchoolHeader school={school} />
+        <StructureBody structure={structure} />
+        <div className="structure-footer">
+          <p>Printed: {formatDate(new Date())} | EduTrak School Management System</p>
+          <p>This is an official fee schedule. Please retain for your records.</p>
         </div>
+      </div>
 
-        <div className="space-y-6 print:space-y-4">
-          {/* Structure Overview Card */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Structure Name</label>
-                <p className="text-lg font-semibold">{structure.name}</p>
-              </div>
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Description</label>
-                <p className="text-sm text-muted-foreground">{structure.description || 'No description'}</p>
-              </div>
-            </div>
+      {/* ── Print CSS ─────────────────────────────────────────────────────── */}
+      <style>{`
+        @media print {
+          body > * { display: none !important; }
+          #structure-print-root { display: block !important; }
 
-            <div className="space-y-3">
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Academic Year</label>
-                <p className="text-sm font-medium">{structure.academicYear?.year}</p>
-              </div>
-              {structure.term && (
-                <div>
-                  <label className="text-xs font-semibold text-muted-foreground uppercase">Term</label>
-                  <p className="text-sm font-medium">{structure.term?.name}</p>
-                </div>
-              )}
-            </div>
-          </div>
+          @page { size: A4; margin: 14mm 16mm; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 11px; color: #111; }
 
-          {/* Key Details Row */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 py-4 px-4 bg-slate-50 dark:bg-slate-900 rounded-lg">
-            {structure.classLevel && (
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Class Level</label>
-                <p className="text-sm font-medium">{structure.classLevel}</p>
-              </div>
-            )}
-            {structure.boardingStatus && (
-              <div>
-                <label className="text-xs font-semibold text-muted-foreground uppercase">Boarding Status</label>
-                <Badge variant={structure.boardingStatus === 'BOARDING' ? 'default' : 'secondary'}>
-                  {structure.boardingStatus}
-                </Badge>
-              </div>
-            )}
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Currency</label>
-              <p className="text-sm font-medium">{structure.currency}</p>
-            </div>
-            <div>
-              <label className="text-xs font-semibold text-muted-foreground uppercase">Status</label>
-              <Badge variant={structure.isActive ? 'default' : 'destructive'}>
-                {structure.isActive ? 'Active' : 'Inactive'}
-              </Badge>
-            </div>
-          </div>
+          table { width: 100%; border-collapse: collapse; }
+          td, th { text-align: left; }
 
-          {/* Fee Items Table */}
-          <Card className="print:border-0 print:shadow-none">
-            <CardHeader className="print:pb-2">
-              <CardTitle className="text-lg">Fee Items</CardTitle>
-              <CardDescription>
-                Total of {structure.items?.length || 0} items
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="print:p-0">
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="print:border-t print:border-gray-400">
-                      <TableHead className="print:px-2 print:py-1">Item</TableHead>
-                      <TableHead className="print:px-2 print:py-1">Category</TableHead>
-                      <TableHead className="text-right print:px-2 print:py-1">Amount</TableHead>
-                      <TableHead className="text-center print:px-2 print:py-1">Type</TableHead>
-                      <TableHead className="print:px-2 print:py-1">Description</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {structure.items?.map((item: any, idx: number) => (
-                      <TableRow
-                        key={item.id}
-                        className={idx % 2 === 0 ? 'bg-transparent' : 'bg-slate-50 dark:bg-slate-900 print:bg-transparent'}
-                      >
-                        <TableCell className="font-medium print:px-2 print:py-1">{item.name}</TableCell>
-                        <TableCell className="text-sm print:px-2 print:py-1">{item.category}</TableCell>
-                        <TableCell className="text-right font-semibold print:px-2 print:py-1">
-                          {formatCurrency(Number(item.amount))}
-                        </TableCell>
-                        <TableCell className="text-center print:px-2 print:py-1">
-                          <Badge variant={item.isOptional ? 'outline' : 'secondary'} className="text-xs">
-                            {item.isOptional ? 'Optional' : 'Mandatory'}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-xs text-muted-foreground print:px-2 print:py-1">
-                          {item.description || '-'}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Summary Section */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 print:grid-cols-3">
-            <Card className="bg-blue-50 dark:bg-blue-900 border-blue-200 dark:border-blue-800">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-2">
-                  <p className="text-sm font-semibold text-muted-foreground uppercase">Mandatory Total</p>
-                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                    {formatCurrency(mandatoryTotal)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{structure.items?.filter((i: any) => !i.isOptional).length} items</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-amber-50 dark:bg-amber-900 border-amber-200 dark:border-amber-800">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-2">
-                  <p className="text-sm font-semibold text-muted-foreground uppercase">Optional Total</p>
-                  <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-                    {formatCurrency(optionalTotal)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">{structure.items?.filter((i: any) => i.isOptional).length} items</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="bg-green-50 dark:bg-green-900 border-green-200 dark:border-green-800">
-              <CardContent className="pt-6">
-                <div className="text-center space-y-2">
-                  <p className="text-sm font-semibold text-muted-foreground uppercase">Grand Total</p>
-                  <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                    {formatCurrency(totalAmount)}
-                  </p>
-                  <p className="text-xs text-muted-foreground">All items</p>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Additional Info */}
-          <div className="text-xs text-muted-foreground space-y-1 pt-4 border-t print:border-gray-300">
-            <p>Active Invoices: {structure._count?.invoices || 0}</p>
-            <p>Created: {formatDate(structure.createdAt)}</p>
-            {structure.updatedAt && <p>Last Updated: {formatDate(structure.updatedAt)}</p>}
-          </div>
-        </div>
-
-        {/* Print stylesheet */}
-        <style>{`
-          @media print {
-            .print\\:hidden { display: none !important; }
-            .print\\:block { display: block !important; }
-            .print\\:grid { display: grid !important; }
-            .print\\:max-h-none { max-height: none !important; }
-            .print\\:overflow-visible { overflow: visible !important; }
-            body { margin: 0; padding: 20px; }
-            .dialog { margin: 0; padding: 0; }
-            table { width: 100%; border-collapse: collapse; }
-            td, th { border: 1px solid #ccc; padding: 8px; text-align: left; }
+          .structure-footer {
+            margin-top: 8mm;
+            font-size: 9px;
+            color: #777;
+            border-top: 1px solid #ddd;
+            padding-top: 4px;
           }
-        `}</style>
-      </DialogContent>
-    </Dialog>
+          .hidden { display: none !important; }
+          .print\\:block { display: block !important; }
+        }
+        @media screen {
+          #structure-print-root { display: none; }
+        }
+      `}</style>
+    </>
   );
 }

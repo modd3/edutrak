@@ -109,7 +109,7 @@ export const sidebarConfig: NavItem[] = [
       },
       {
         title: 'My Subscription',
-        href: '/billing/my-subscription',
+        href: '/subscriptions',
         icon: CalendarCheck,
         roles: ['ADMIN'],
       },
@@ -466,7 +466,7 @@ const SUPER_ADMIN_PLATFORM_CHILD_HREFS = new Set([
   '/users',
   '/users/change-password',
   '/billing/plans',
-  '/billing/my-subscription',
+  '/subscriptions',
   '/classes/timetable',
 ]);
 

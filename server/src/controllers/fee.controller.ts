@@ -2,6 +2,7 @@
 import { Response } from 'express';
 import { z } from 'zod';
 import { FeeService } from '../services/fee.service';
+import { feeAnalyticsService } from '../services/fee/analytics.service';
 import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import { RequestWithUser } from '../middleware/school-context';
@@ -214,11 +215,28 @@ export class FeeController {
   async getInvoiceById(req: RequestWithUser, res: Response) {
     try {
       const { id } = req.params;
+      const { schoolId, isSuperAdmin } = req as any;
+      
       const service = FeeService.withRequest(req);
       const invoice = await service.getInvoiceById(id);
-      if (!invoice) return ResponseUtil.notFound(res, 'Invoice');
+      
+      if (!invoice) {
+        logger.warn('Invoice not found', { 
+          invoiceId: id, 
+          schoolId,
+          isSuperAdmin,
+          path: req.path 
+        });
+        return ResponseUtil.notFound(res, 'Invoice');
+      }
+      
       return ResponseUtil.success(res, 'Invoice retrieved', invoice);
     } catch (error: any) {
+      logger.error('Error fetching invoice', { 
+        error: error.message, 
+        invoiceId: req.params.id,
+        stack: error.stack 
+      });
       return ResponseUtil.serverError(res, error.message);
     }
   }
@@ -582,6 +600,67 @@ export class FeeController {
       const stats = await service.getSchoolReminderStats(schoolId);
       return ResponseUtil.success(res, 'Reminder stats retrieved', stats);
     } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // ANALYTICS
+  // ══════════════════════════════════════════════════════════════════════════
+
+  async getAnalytics(req: RequestWithUser, res: Response) {
+    try {
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const { from, to, academicYearId, termId } = req.query as any;
+
+      const data = await feeAnalyticsService.getAnalytics({
+        schoolId,
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+        academicYearId,
+        termId,
+      });
+
+      return ResponseUtil.success(res, 'Fee analytics retrieved', data);
+    } catch (error: any) {
+      logger.error('Error fetching fee analytics', { error: error.message });
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async getCashFlowReport(req: RequestWithUser, res: Response) {
+    try {
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const { from, to } = req.query as any;
+
+      const data = await feeAnalyticsService.getCashFlowReport({
+        schoolId,
+        from: from ? new Date(from) : undefined,
+        to: to ? new Date(to) : undefined,
+      });
+
+      return ResponseUtil.success(res, 'Cash flow report retrieved', data);
+    } catch (error: any) {
+      logger.error('Error fetching cash flow report', { error: error.message });
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  async detectAnomalies(req: RequestWithUser, res: Response) {
+    try {
+      const { schoolId } = req;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const days = req.query.days ? Number(req.query.days) : 30;
+
+      const data = await feeAnalyticsService.detectAnomalies(schoolId, days);
+      return ResponseUtil.success(res, 'Anomalies detected', data);
+    } catch (error: any) {
+      logger.error('Error detecting anomalies', { error: error.message });
       return ResponseUtil.serverError(res, error.message);
     }
   }

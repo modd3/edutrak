@@ -206,7 +206,8 @@ export function PaymentRecordingModal({
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null);
   const [step, setStep] = useState<'form' | 'success'>('form');
  
-  const invoice = invoiceData?.data?.data;
+  // useGetInvoiceById now returns the invoice object directly
+  const invoice = invoiceData;
   const balance = invoice
     ? invoice.totalAmount - invoice.paidAmount - invoice.discountAmount
     : 0;
