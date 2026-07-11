@@ -16,14 +16,16 @@ import ms from 'ms';
 const JWT_ISSUER = 'edutrak';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '24h';
 
-const privateKey = readFileSync(
-  process.env.JWT_PRIVATE_KEY_PATH || './keys/jwt_private.pem',
-  'utf8'
-);
-const publicKey = readFileSync(
-  process.env.JWT_PUBLIC_KEY_PATH || './keys/jwt_public.pem',
-  'utf8'
-);
+function loadKey(envVarName: string, pathEnvVarName: string, defaultPath: string): string {
+  const encoded = process.env[envVarName];
+  if (encoded) {
+    return Buffer.from(encoded, 'base64').toString('utf8');
+  }
+  return readFileSync(process.env[pathEnvVarName] || defaultPath, 'utf8');
+}
+
+const privateKey = loadKey('JWT_PRIVATE_KEY_B64', 'JWT_PRIVATE_KEY_PATH', './keys/jwt_private.pem');
+const publicKey = loadKey('JWT_PUBLIC_KEY_B64', 'JWT_PUBLIC_KEY_PATH', './keys/jwt_public.pem');
 
 export interface JwtPayload {
   userId: string;
