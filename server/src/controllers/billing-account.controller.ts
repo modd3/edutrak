@@ -23,4 +23,18 @@ export class BillingAccountController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
+
+  async list(req: Request, res: Response): Promise<Response> {
+    try {
+      const { schoolId, page, limit } = req.query;
+      const result = await billingAccountService.listBillingAccounts({
+        schoolId: schoolId as string | undefined,
+        page: page ? Number(page) : undefined,
+        limit: limit ? Number(limit) : undefined,
+      });
+      return ResponseUtil.paginated(res, 'Billing accounts retrieved successfully', result.accounts, result.pagination);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
 }

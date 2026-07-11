@@ -56,4 +56,29 @@ export class BillingAccountService {
       include: { school: { select: { id: true, name: true } } },
     });
   }
+
+  async listBillingAccounts(filters: { schoolId?: string; page?: number; limit?: number }) {
+    const page = filters.page ?? 1;
+    const limit = filters.limit ?? 20;
+    const skip = (page - 1) * limit;
+
+    const where: any = {};
+    if (filters.schoolId) where.schoolId = filters.schoolId;
+
+    const [accounts, total] = await Promise.all([
+      (prisma as any).billingAccount.findMany({
+        where,
+        include: { school: { select: { id: true, name: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+      (prisma as any).billingAccount.count({ where }),
+    ]);
+
+    return {
+      accounts,
+      pagination: { page, limit, total, pages: Math.ceil(total / limit) },
+    };
+  }
 }

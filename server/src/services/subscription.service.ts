@@ -27,6 +27,25 @@ export class SubscriptionService {
       throw new Error('Plan not found');
     }
 
+    // Auto-create billing account if one doesn't exist
+    const existingAccount = await (prisma as any).billingAccount.findUnique({
+      where: { schoolId: data.schoolId },
+    });
+    if (!existingAccount) {
+      const school = await (prisma as any).school.findUnique({
+        where: { id: data.schoolId },
+        select: { name: true },
+      });
+      await (prisma as any).billingAccount.create({
+        data: {
+          id: randomUUID(),
+          schoolId: data.schoolId,
+          legalName: school?.name || data.schoolId,
+          preferredCurrency: plan.currency || 'KES',
+        },
+      });
+    }
+
     const subscription = await (prisma as any).tenantSubscription.create({
       data: {
         id: randomUUID(),

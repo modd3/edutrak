@@ -23,6 +23,26 @@ export function useBillingInvoices(params?: {
 }
 
 /**
+ * Fetch billing invoices for any school (SUPER_ADMIN). Pass schoolId to
+ * scope to one school, e.g. for the billing admin detail panel.
+ */
+export function useAllBillingInvoices(params?: {
+  schoolId?: string;
+  status?: string;
+  page?: number;
+  limit?: number;
+}) {
+  return useQuery({
+    queryKey: ['billing-invoices', 'all', params],
+    queryFn: async () => {
+      const response = await billingInvoicesApi.listInvoices(params);
+      return response;
+    },
+    enabled: params?.schoolId !== undefined,
+  });
+}
+
+/**
  * Pay an invoice via M-Pesa STK Push
  */
 export function usePayInvoice() {

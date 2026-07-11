@@ -35,5 +35,5 @@ export const billingAccountsApi = {
    * Get a single billing account by ID
    */
   getBySchool: (schoolId: string) =>
-    api.get<ApiResponse<BillingAccount>>(`/billing-accounts/${schoolId}`),
+    api.get<ApiResponse<BillingAccount>>(`/billing-accounts/school/${schoolId}`),
 };
