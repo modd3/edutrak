@@ -4,6 +4,8 @@ import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
 import { Role } from '@prisma/client';
+import { generateToken, JwtPayload, verifyToken } from '../utils/jwt';
+import { generateSSOCode, consumeSSOCode, getLMSURL } from '../utils/sso';
 
 const authService = new AuthService();
 
@@ -387,6 +389,119 @@ export const validatePassword = async (req: Request, res: Response) => {
     return ResponseUtil.success(res, 'Password validation completed', validation);
   } catch (err: any) {
     logger.error('Password validation failed', { error: err.message });
+    return ResponseUtil.serverError(res, err.message);
+  }
+};
+
+/**
+ * Generate LMS SSO redirect URL
+ * Authenticated user clicks "E-Learning" -> this endpoint creates a one-time code
+ * and redirects to the LMS with it. LMS exchanges code server-to-server for the JWT.
+ * This flow keeps JWTs out of browser history/logs.
+ *
+ * When called with Accept: application/json (from the sidebar's authenticated fetch),
+ * returns the redirect URL as JSON instead of doing an HTTP redirect. This allows
+ * the frontend to make an authenticated API call (which includes the Bearer token
+ * via the axios interceptor) and then open the URL in a new tab.
+ */
+export const redirectToLMS = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.userId;
+    
+    if (!userId) {
+      // If JSON was requested, return error; otherwise redirect to login
+      if (req.accepts('json')) {
+        return ResponseUtil.unauthorized(res, 'Authentication required');
+      }
+      return res.redirect(`${getLMSURL()}/login`);
+    }
+
+    // Get the current user with their full payload
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) {
+      if (req.accepts('json')) {
+        return ResponseUtil.unauthorized(res, 'No token provided');
+      }
+      return res.redirect(`${getLMSURL()}/login`);
+    }
+
+    const payload = verifyToken(token);
+    
+    // Only allow access tokens (not refresh or reset)
+    if (payload.type !== 'access') {
+      if (req.accepts('json')) {
+        return ResponseUtil.unauthorized(res, 'Invalid token type - re-login required');
+      }
+      return ResponseUtil.unauthorized(res, 'Invalid token type - re-login required');
+    }
+
+    // Generate one-time SSO code with the same payload
+    const ssoCode = generateSSOCode(payload);
+    
+    // For SUPER_ADMIN without school context, allow access too
+    const lmsURL = getLMSURL();
+    const redirectURL = `${lmsURL}/auth/sso/callback?code=${ssoCode}`;
+    
+    logger.info('LMS SSO redirect generated', { userId: payload.userId, schoolId: payload.schoolId });
+    
+    // Audit log — only if we have a valid schoolId to avoid FK violations
+    const schoolIdForAudit = payload.schoolId;
+    if (schoolIdForAudit && schoolIdForAudit !== "null") {
+      auditService.log({
+        schoolId: schoolIdForAudit,
+        actorId: payload.userId,
+        actorRole: payload.role,
+        action: 'LMS_SSO_REDIRECT',
+        entityType: 'User',
+        entityId: payload.userId,
+        details: `User redirected to LMS for SSO`,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
+    }
+    
+    // If the client accepts JSON (e.g. an XHR/fetch from the sidebar),
+    // return the URL as JSON so the frontend can open it in a new tab.
+    // Otherwise, do a browser redirect (legacy behavior).
+    if (req.accepts('json')) {
+      return ResponseUtil.success(res, 'LMS SSO redirect URL generated', { redirectUrl: redirectURL });
+    }
+    
+    return res.redirect(redirectURL);
+  } catch (err: any) {
+    logger.error('LMS SSO redirect failed', { error: err.message });
+    if (req.accepts('json')) {
+      return ResponseUtil.unauthorized(res, 'Authentication failed');
+    }
+    return res.redirect(`${getLMSURL()}/login`);
+  }
+};
+
+/**
+ * Exchange SSO code for EduTrak JWT claims
+ * Called by LMS backend to exchange a one-time code for the JWT payload
+ * This keeps the actual JWT out of browser history/logs
+ */
+export const exchangeSSOCode = async (req: Request, res: Response) => {
+  try {
+    const { code } = req.body;
+    
+    if (!code) {
+      return ResponseUtil.validationError(res, 'SSO code is required');
+    }
+
+    const payload = consumeSSOCode(code);
+    
+    if (!payload) {
+      return ResponseUtil.unauthorized(res, 'Invalid, expired, or already used SSO code');
+    }
+
+    // Return the payload (same structure as JWT claims)
+    logger.info('SSO code exchanged', { userId: payload.userId });
+    
+    return ResponseUtil.success(res, 'SSO code exchanged successfully', payload);
+  } catch (err: any) {
+    logger.error('SSO code exchange failed', { error: err.message });
     return ResponseUtil.serverError(res, err.message);
   }
 };

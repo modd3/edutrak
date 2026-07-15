@@ -6,19 +6,56 @@ import { auditService } from '../services/audit.service';
 import logger from '../utils/logger';
 import { ResponseUtil } from '../utils/response';
 import { webhookEmitter } from '../services/webhook-emitter.service';
+import { entitlementService } from '../services/entitlement.service';
+import prisma from '../database/client';
+
+// Resource-limit checks are keyed by the role being created. Only STUDENT
+// and TEACHER currently have COUNT-type plan features (students.max,
+// teachers.max) - other roles (ADMIN, GUARDIAN) aren't plan-limited today.
+const RESOURCE_LIMIT_BY_ROLE: Record<string, { metricKey: string; countFn: (schoolId: string) => Promise<number> }> = {
+  STUDENT: {
+    metricKey: 'students.max',
+    countFn: (schoolId: string) => prisma.student.count({ where: { schoolId } }),
+  },
+  TEACHER: {
+    metricKey: 'teachers.max',
+    // Teacher has no direct schoolId column - it's scoped via its User.
+    countFn: (schoolId: string) => prisma.teacher.count({ where: { user: { schoolId } } }),
+  },
+};
 
 export class UserCreationController {
   /**
    * Create user with profile
    * This is the ONLY endpoint for creating users
    */
-  async createUserWithProfile(req: RequestWithUser, res: Response) {
+  async createUserWithProfile(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { user: userData, profile: profileData } = req.body;
 
       // School context from middleware
       const schoolId = req.schoolId;
       const isSuperAdmin = req.isSuperAdmin || false;
+
+      // Enforce plan-level resource limits (students.max / teachers.max)
+      // before creating the row - same bypass rule as requireFeature:
+      // a super admin acting outside any single school's context isn't
+      // plan-limited.
+      const limit = RESOURCE_LIMIT_BY_ROLE[userData?.role];
+      if (limit && schoolId && !isSuperAdmin) {
+        const decision = await entitlementService.withinResourceLimit(
+          schoolId,
+          limit.metricKey,
+          () => limit.countFn(schoolId)
+        );
+        if (!decision.allowed) {
+          return res.status(402).json({
+            error: 'RESOURCE_LIMIT_REACHED',
+            featureKey: limit.metricKey,
+            message: decision.reason ?? 'Plan limit reached',
+          });
+        }
+      }
 
       // Create user with profile in atomic transaction
       const user = await userCreationService.createUserWithProfile(
@@ -57,19 +94,19 @@ export class UserCreationController {
         userAgent: req.headers['user-agent'],
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      ResponseUtil.created(res, 'User Created Successfully', user);
+      return ResponseUtil.created(res, 'User Created Successfully', user);
 
     } catch (error: any) {
       logger.error('User creation error', { error: error.message });
       console.log("Error in User Creation: ", error);
-      ResponseUtil.error(res, 'Error Creating User!', res.statusCode, error);
+      return ResponseUtil.error(res, 'Error Creating User!', res.statusCode, error);
     }
   }
 
   /**
    * Update user with profile
    */
-  async updateUserWithProfile(req: RequestWithUser, res: Response) {
+  async updateUserWithProfile(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { id } = req.params;
       const { user: userData, profile: profileData } = req.body;
@@ -105,13 +142,13 @@ export class UserCreationController {
         userAgent: req.headers['user-agent'],
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      res.json({
+      return res.json({
         data: user,
         message: 'User updated successfully',
       });
     } catch (error: any) {
       logger.error('User update error', { error: error.message });
-      res.status(400).json({
+      return res.status(400).json({
         error: 'USER_UPDATE_FAILED',
         message: error.message,
       });
@@ -121,9 +158,35 @@ export class UserCreationController {
   /**
    * Bulk create users with profiles
    */
-  async bulkCreateUsers(req: RequestWithUser, res: Response) {
+  async bulkCreateUsers(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { users } = req.body;
+      const schoolId = req.schoolId;
+      const isSuperAdmin = req.isSuperAdmin || false;
+
+      // Pre-check resource limits against the whole batch, not per-item -
+      // a 40-row student import against a school with room for 5 should
+      // fail upfront with a clear count, not create 5 then error on the 6th.
+      if (schoolId && !isSuperAdmin && Array.isArray(users)) {
+        for (const [role, limit] of Object.entries(RESOURCE_LIMIT_BY_ROLE)) {
+          const requested = users.filter((u: any) => u?.user?.role === role).length;
+          if (requested === 0) continue;
+
+          const decision = await entitlementService.withinResourceLimit(
+            schoolId,
+            limit.metricKey,
+            () => limit.countFn(schoolId),
+            requested
+          );
+          if (!decision.allowed) {
+            return res.status(402).json({
+              error: 'RESOURCE_LIMIT_REACHED',
+              featureKey: limit.metricKey,
+              message: decision.reason ?? `Plan limit reached for ${role.toLowerCase()}s`,
+            });
+          }
+        }
+      }
 
       const results = await userCreationService.bulkCreateUsersWithProfiles(
         users,
@@ -155,13 +218,13 @@ export class UserCreationController {
         userAgent: req.headers['user-agent'],
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      res.status(201).json({
+      return res.status(201).json({
         data: results,
         message: `Created ${results.successful.length} users, ${results.failed.length} failed`,
       });
     } catch (error: any) {
       logger.error('Bulk user creation error', { error: error.message });
-      res.status(400).json({
+      return res.status(400).json({
         error: 'BULK_CREATION_FAILED',
         message: error.message,
       });

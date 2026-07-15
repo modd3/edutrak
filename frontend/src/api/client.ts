@@ -40,15 +40,24 @@ api.interceptors.response.use(
   async (error: AxiosError) => {
     const originalRequest = error.config as AxiosRequestConfig & { _retry?: boolean };
 
-    // If error is 402 (subscription inactive), redirect to the expired page
+    // If error is 402 (subscription inactive), handle based on user role
     if (error.response?.status === 402) {
       const data = error.response.data as { status?: string };
+      const { user } = useAuthStore.getState();
+      
+      // Store status for potential use
       if (data?.status) {
         sessionStorage.setItem('subscription_status', data.status);
       }
-      if (window.location.pathname !== '/subscription-expired') {
-        window.location.href = '/subscription-expired';
+
+      // Admins can access basic functionality even with expired subscription
+      // Only redirect non-admin users to the expired page
+      if (user?.role !== 'ADMIN' && user?.role !== 'SUPER_ADMIN') {
+        if (window.location.pathname !== '/subscription-expired') {
+          window.location.href = '/subscription-expired';
+        }
       }
+      
       return Promise.reject(error);
     }
 

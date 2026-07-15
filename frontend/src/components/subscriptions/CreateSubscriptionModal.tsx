@@ -21,11 +21,15 @@ import {
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, CheckCircle2, Info } from 'lucide-react';
+import { Loader2, CheckCircle2, Info, Building2 } from 'lucide-react';
 import { useCreateSubscription } from '@/hooks/use-subscriptions';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { usePlans } from '@/hooks/use-plans';
+import { useQuery } from '@tanstack/react-query';
+import api from '@/api/client';
 import { Plan } from '@/types';
+import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 const createSubscriptionSchema = z.object({
   planId: z.string().min(1, 'Plan is required'),
@@ -54,8 +58,20 @@ export function CreateSubscriptionModal({
   const { data: plansData } = usePlans({ isActive: true, limit: 50 });
   const createMutation = useCreateSubscription();
   const [isTrialing, setIsTrialing] = useState(false);
-  
+  const [selectedSchoolId, setSelectedSchoolId] = useState<string>('');
+
+  // Fetch schools list for super admin
+  const { data: schoolsData, isLoading: isLoadingSchools } = useQuery({
+    queryKey: ['schools'],
+    queryFn: async () => {
+      const response = await api.get('/schools', { params: { limit: 100 } });
+      return response.data.data;
+    },
+    enabled: isSuperAdmin && open,
+  });
+
   const availablePlans = plans || [];
+  const schools = schoolsData || [];
 
   const {
     watch,
@@ -92,12 +108,20 @@ export function CreateSubscriptionModal({
         trialEndsAt: '',
       });
       setIsTrialing(false);
+      setSelectedSchoolId('');
     }
   }, [open, reset]);
 
   const onSubmit = async (data: CreateSubscriptionInput) => {
+    const targetSchoolId = isSuperAdmin ? selectedSchoolId : schoolId;
+
+    if (!targetSchoolId) {
+      toast.error('Please select a school');
+      return;
+    }
+
     await createMutation.mutateAsync({
-      schoolId,
+      schoolId: targetSchoolId,
       planId: data.planId,
       startsAt: data.startsAt,
       currentPeriodStart: data.currentPeriodStart,
@@ -107,6 +131,7 @@ export function CreateSubscriptionModal({
 
     if (!createMutation.isPending) {
       reset();
+      setSelectedSchoolId('');
       onOpenChange(false);
     }
   };
@@ -131,6 +156,36 @@ export function CreateSubscriptionModal({
                 You are subscribing <strong>{schoolId}</strong>. All plans include a 14-day free trial.
               </AlertDescription>
             </Alert>
+          )}
+
+          {/* School Selection for Super Admin */}
+          {isSuperAdmin && (
+            <div className="space-y-3">
+              <Label htmlFor="schoolId">Select School</Label>
+              {isLoadingSchools ? (
+                <div className="text-sm text-gray-500 py-4 text-center">Loading schools...</div>
+              ) : (
+                <Select
+                  value={selectedSchoolId}
+                  onValueChange={(value) => setSelectedSchoolId(value)}
+                  disabled={createMutation.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a school" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {schools.map((school: any) => (
+                      <SelectItem key={school.id} value={school.id}>
+                        {school.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {!selectedSchoolId && (
+                <p className="text-red-600 text-sm mt-1">Please select a school</p>
+              )}
+            </div>
           )}
 
           {/* Plan Selection */}
@@ -165,7 +220,7 @@ export function CreateSubscriptionModal({
                         </div>
                         <p className="text-sm text-gray-600 mt-1 ml-6">{plan.description}</p>
                         <div className="flex items-baseline gap-2 mt-2 ml-6">
-                          <span className="text-2xl font-bold">{(plan.priceMinor / 100).toFixed(2)}</span>
+                          <span className="text-2xl font-bold">{formatCurrency(plan.priceMinor / 100)}</span>
                           <span className="text-sm text-gray-600">
                             {plan.currency} / {plan.billingInterval?.toLowerCase()}
                           </span>
@@ -277,7 +332,7 @@ export function CreateSubscriptionModal({
               <p className="text-sm font-medium text-blue-900 mb-1">Subscription Summary</p>
               <div className="text-sm text-blue-800 space-y-1">
                 <p><strong>Plan:</strong> {selectedPlan.name}</p>
-                <p><strong>Price:</strong> {(selectedPlan.priceMinor / 100).toFixed(2)} {selectedPlan.currency} / {selectedPlan.billingInterval?.toLowerCase()}</p>
+                <p><strong>Price:</strong> {formatCurrency(selectedPlan.priceMinor/100)} {selectedPlan.currency} / {selectedPlan.billingInterval?.toLowerCase()}</p>
                 {isTrialing && <p><strong>Trial:</strong> Ends {watch('trialEndsAt') || 'after 14 days'}</p>}
                 {!isTrialing && <p><strong>Billing:</strong> Starts immediately</p>}
               </div>

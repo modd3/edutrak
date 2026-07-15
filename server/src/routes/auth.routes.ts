@@ -10,6 +10,8 @@ import {
   getProfile,
   logout,
   validatePassword,
+  redirectToLMS,
+  exchangeSSOCode,
 } from '../controllers/auth.controller';
 import { authenticate, rateLimit, authorize } from '../middleware/auth.middleware';
 
@@ -22,6 +24,22 @@ const router = Router();
  * @access  Public
  */
 router.post('/login', rateLimit(15, 15 * 60 * 1000), login);
+
+// LMS SSO route - authenticated users redirect to LMS with one-time code
+/**
+ * @route   GET /api/auth/lms-sso
+ * @desc    Redirect to LMS using one-time SSO code
+ * @access  Private
+ */
+router.get('/lms-sso', authenticate, redirectToLMS);
+
+// SSO code exchange - LMS backend calls this to get the JWT claims
+/**
+ * @route   POST /api/auth/sso/exchange
+ * @desc    Exchange SSO code for JWT payload (server-to-server)
+ * @access  Public (but intended for LMS backend only)
+ */
+router.post('/sso/exchange', exchangeSSOCode);
 
 /**
  * @route   POST /api/auth/register

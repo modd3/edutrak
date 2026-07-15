@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { ShieldAlert, LogOut, Phone, Mail, RefreshCw } from 'lucide-react';
+import { ShieldAlert, LogOut, Phone, Mail, RefreshCw, CreditCard, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth-store';
@@ -33,6 +33,11 @@ export function SubscriptionExpired() {
     window.location.href = '/dashboard';
   };
 
+  const handleGoToSubscriptions = () => {
+    sessionStorage.removeItem('subscription_status');
+    window.location.href = '/subscriptions';
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-red-50 flex items-center justify-center p-4">
       <div className="max-w-lg w-full">
@@ -60,29 +65,39 @@ export function SubscriptionExpired() {
 
             {/* Heading */}
             <h1 className="text-2xl font-bold text-gray-900 mb-3">
-              Access Temporarily Unavailable
+              {isAdmin ? 'Subscription Action Required' : 'Access Temporarily Unavailable'}
             </h1>
 
             {/* Role-specific message */}
             {isAdmin ? (
               <div className="space-y-4 text-left">
                 <p className="text-gray-600 text-sm text-center">
-                  Your school's subscription has <strong>{statusInfo.label.toLowerCase()}</strong>. All operational
-                  features are currently locked until the subscription is renewed.
+                  Your school's subscription has <strong>{statusInfo.label.toLowerCase()}</strong>. You can still access
+                  basic system navigation, but operational features are locked until the subscription is renewed.
                 </p>
 
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 space-y-3">
                   <p className="text-sm font-semibold text-orange-800 flex items-center gap-2">
+                    <CreditCard className="w-4 h-4 flex-shrink-0" />
+                    Manage Subscription
+                  </p>
+                  <p className="text-xs text-orange-700">
+                    Visit the subscriptions page to create a new subscription or update the existing one for your school.
+                  </p>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <p className="text-sm font-semibold text-blue-800 flex items-center gap-2">
                     <Phone className="w-4 h-4 flex-shrink-0" />
                     Contact Billing Support
                   </p>
-                  <p className="text-xs text-orange-700">
+                  <p className="text-xs text-blue-700">
                     To reactivate your subscription, please reach out to our billing team. Provide your school name
                     and the registered email address.
                   </p>
                   <a
                     href="mailto:billing@edutrak.app"
-                    className="flex items-center gap-2 text-xs font-medium text-orange-700 hover:text-orange-900 transition-colors"
+                    className="flex items-center gap-2 text-xs font-medium text-blue-700 hover:text-blue-900 transition-colors"
                   >
                     <Mail className="w-3.5 h-3.5" />
                     billing@edutrak.app
@@ -107,14 +122,25 @@ export function SubscriptionExpired() {
             {/* Actions */}
             <div className="mt-8 flex flex-col gap-3">
               {isAdmin && (
-                <Button
-                  onClick={handleRetry}
-                  variant="outline"
-                  className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  Try Again
-                </Button>
+                <>
+                  <Button
+                    onClick={handleGoToSubscriptions}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                  >
+                    <CreditCard className="w-4 h-4 mr-2" />
+                    Manage Subscriptions
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+
+                  <Button
+                    onClick={handleRetry}
+                    variant="outline"
+                    className="w-full border-orange-300 text-orange-700 hover:bg-orange-50"
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Try Dashboard Again
+                  </Button>
+                </>
               )}
 
               <Button

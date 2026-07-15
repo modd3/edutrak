@@ -1,10 +1,11 @@
 // Sidebar.tsx
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ChevronDown, ChevronRight, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../../store/auth-store';
 import { getNavigationForRole, NavItem } from '../../config/sidebarConfig';
 import { cn } from '../../lib/utils';
+import api from '../../api/client';
 
 // shadcn/ui components
 import {
@@ -17,6 +18,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { toast } from 'sonner';
 
 interface SidebarProps {
   className?: string;
@@ -177,9 +179,58 @@ function NavItemComponent({
   const hasChildren = item.children && item.children.length > 0;
   const active = isActive(item.href);
 
+  // Detect backend redirect URLs (e.g. /auth/lms-sso) that must make an
+  // authenticated API call, then open the returned URL in a new tab.
+  // A plain <a> tag cannot carry the Authorization header, so the API
+  // route's authenticate middleware would reject the request immediately.
+  const isBackendRedirect = item.href.startsWith('/auth/');
+
+  // Fetch the SSO redirect URL from the API (authenticated via axios interceptor)
+  // and open it in a new tab.
+  const handleBackendRedirect = useCallback(async () => {
+    try {
+      const response = await api.get(item.href, {
+        headers: { Accept: 'application/json' },
+      });
+      if (response.data?.success && response.data?.data?.redirectUrl) {
+        window.open(response.data.data.redirectUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Failed to get redirect URL');
+      }
+    } catch (err: any) {
+      // If the request failed (e.g. 401), show a user-friendly message
+      if (err.response?.status === 401) {
+        toast.error('Session expired. Please log in again.');
+      } else {
+        toast.error('Failed to open E-Learning. Please try again.');
+      }
+    }
+  }, [item.href]);
+
   // ---------- LEAF ITEM (no children) ----------
   if (!hasChildren) {
-    const linkContent = (
+    const linkContent = isBackendRedirect ? (
+      <button
+        onClick={handleBackendRedirect}
+        className={cn(
+          'w-full flex items-center justify-between px-3 py-2 rounded-lg transition-colors',
+          'text-slate-700 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800',
+          collapsed && 'justify-center'
+        )}
+      >
+        {/* Left group: icon + title */}
+        <div className="flex items-center space-x-3">
+          <item.icon size={20} />
+          {!collapsed && <span className="text-sm font-medium">{item.title}</span>}
+        </div>
+        {/* Right group: badge (if any) */}
+        {!collapsed && item.badge && (
+          <span className="px-2 py-0.5 text-xs font-medium bg-blue-100 text-blue-600 rounded-full">
+            {item.badge}
+          </span>
+        )}
+      </button>
+    ) : (
       <Link
         to={item.href}
         className={cn(
@@ -238,19 +289,14 @@ function NavItemComponent({
         >
           <div className="space-y-1">
             {item.children?.map((child) => (
-              <Link
+              <NavItemComponent
                 key={child.href}
-                to={child.href}
-                className={cn(
-                  'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                  isActive(child.href)
-                    ? 'bg-blue-50 text-blue-600'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-                )}
-              >
-                <child.icon size={16} />
-                <span>{child.title}</span>
-              </Link>
+                item={child}
+                collapsed={false}
+                isActive={isActive}
+                isExpanded={isExpanded}
+                onToggle={onToggle}
+              />
             ))}
           </div>
         </PopoverContent>
@@ -287,19 +333,14 @@ function NavItemComponent({
       {isExpanded && (
         <div className="ml-6 mt-1 space-y-1">
           {item.children?.map((child) => (
-            <Link
+            <NavItemComponent
               key={child.href}
-              to={child.href}
-              className={cn(
-                'flex items-center space-x-3 px-3 py-2 rounded-lg text-sm transition-colors',
-                isActive(child.href)
-                  ? 'bg-blue-50 text-blue-600'
-                  : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-800'
-              )}
-            >
-              <child.icon size={16} />
-              <span>{child.title}</span>
-            </Link>
+              item={child}
+              collapsed={collapsed}
+              isActive={isActive}
+              isExpanded={isExpanded}
+              onToggle={onToggle}
+            />
           ))}
         </div>
       )}

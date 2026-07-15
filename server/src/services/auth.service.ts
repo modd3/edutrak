@@ -82,7 +82,7 @@ export class AuthService {
         userId: user.id,
         type: 'refresh',
       },
-      '7d' // Refresh token valid for 7 days
+      '1d' // Refresh token valid for 1 day
     );
 
     logger.info('User logged in successfully', {

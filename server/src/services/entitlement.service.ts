@@ -50,7 +50,8 @@ class EntitlementService {
   async withinResourceLimit(
   schoolId: string,
   metricKey: string,
-  countFn: () => Promise<number>
+  countFn: () => Promise<number>,
+  requestedUnits: number = 1
 ): Promise<EntitlementDecision> {
   const subscription = await (prisma as any).tenantSubscription.findFirst({
     where: { schoolId },
@@ -72,7 +73,6 @@ class EntitlementService {
   return { allowed: true };
 }
 
-// src/services/entitlement.service.ts — add
 async incrementUsage(schoolId: string, metricKey: string, units: number = 1) {
   const now = new Date();
   const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);

@@ -1,9 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useSubscriptions } from '@/hooks/use-subscriptions';
 import { useFeatureRegistry } from '@/hooks/use-feature-registry';
 import { useSchoolContext } from '@/hooks/use-school-context';
 import { useBillingInvoices } from '@/hooks/use-billing-invoices';
+import { usePlans } from '@/hooks/use-plans';
 import { FeatureRow } from '@/components/subscriptions/FeatureRow';
+import { ChangePlanModal } from '@/components/subscriptions/ChangePlanModal';
 import { InvoiceHistoryTable } from '@/components/billing/InvoiceHistoryTable';
 import { PaymentHistoryTable } from '@/components/billing/PaymentHistoryTable';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,10 +22,16 @@ import {
   XCircle,
   Clock,
   AlertTriangle,
+  ArrowUpRight,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { BillingInvoice, Subscription, SubscriptionStatus } from '@/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { CurrentPlanCard } from '@/components/billing/CurrentPlanCard';
+import { CapacityCard } from '@/components/billing/CapacityCard';
+import { UpgradeBanner } from '@/components/billing/UpgradeBanner';
+import { UpgradeModal } from '@/components/billing/UpgradeModal';
+import { LimitWarningModal } from '@/components/billing/LimitWarningModal';
 
 function getStatusConfig(status: SubscriptionStatus) {
   switch (status) {
@@ -111,6 +119,8 @@ function getDaysUntilExpiry(subscription: Subscription): number | null {
 }
 
 export function MySubscriptionPage() {
+  const [showLimitWarningModal, setShowLimitWarningModal] = useState(false);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
   const { schoolId } = useSchoolContext();
   const {
     data: registryData,
@@ -128,6 +138,9 @@ const registry = registryData?.data || {};
     page: 1,
     limit: 10,
   });
+
+  const planQuery = usePlans({ isActive: true, limit: 50 });
+  const plans = planQuery.data?.data || [];
 
   const subscriptions = subscriptionsData?.data || [];
   const subscription = subscriptions.find(
@@ -197,6 +210,7 @@ const registry = registryData?.data || {};
     );
   }
 
+ 
   const statusConfig = getStatusConfig(subscription.status);
   const StatusIcon = statusConfig.icon;
   const daysUntilExpiry = getDaysUntilExpiry(subscription);
@@ -260,6 +274,7 @@ const registry = registryData?.data || {};
       )}
 
       {/* Plan Overview */}
+   {/*   
       <Card>
         <CardHeader>
           <CardTitle>Plan Details</CardTitle>
@@ -307,6 +322,63 @@ const registry = registryData?.data || {};
           </div>
         </CardContent>
       </Card>
+ */}
+      {/* Current Plan Card */}
+      <CurrentPlanCard subscription={subscription} isLoading={subsLoading} />
+
+      {/* Capacity Trackers */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <CapacityCard
+          title="Student Capacity"
+          used={subscription.plan?.features?.find(f => f.featureKey === 'used_students')?.limitValue ?? 110}
+          total={subscription.plan?.features?.find(f => f.featureKey === 'students.max')?.limitValue ?? 150}
+          color="#10b981"
+          trackColor="#d1fae5"
+          icon="🎓"
+          status="healthy"
+        />
+        <CapacityCard
+          title="Teacher Capacity"
+          used={15}
+          total={subscription.plan?.features?.find(f => f.featureKey === 'teachers.max')?.limitValue ?? 20}
+          color="#ef4444"
+          trackColor="#fee2e2"
+          icon="👩‍🏫"
+          status="critical"
+        />
+      </div>
+
+      {/* Upgrade Banner */}
+      <UpgradeBanner onUpgrade={() => setShowLimitWarningModal(true)} />
+
+       {/* Limit Warning Modal — triggers from UpgradeBanner */}
+      <LimitWarningModal
+        open={showLimitWarningModal}
+        onClose={() => setShowLimitWarningModal(false)}
+        onUpgrade={() => {
+          setShowLimitWarningModal(false);
+          setShowUpgradeModal(true);
+        }}
+        currentPlanName={plan.name}
+        currentLimit={plan.features?.find(f => f.featureKey === 'max_teachers')?.limitValue ?? 20}
+        newPlanName={plans.length > 1 ? plans[1].name : 'Growth Plan'}
+        newLimit={plans.length > 1 ? (plans[1].features?.find(f => f.featureKey === 'max_teachers')?.limitValue ?? 50) : 50}
+        price={plans.length > 1 ? `$${Math.round(plans[1].priceMinor / 100 * 0.8)}/mo` : '$400/mo'}
+      />
+
+      {/* Upgrade Modal — full plan selector */}
+      <UpgradeModal
+        open={showUpgradeModal}
+        onClose={() => setShowUpgradeModal(false)}
+        plans={plans}
+        currentPlanName={plan.name}
+        currentPrice={plan?.priceMinor || 20000}
+        currency={plan.currency || 'KES'}
+        onConfirm={(planId, billing) => {
+          console.log('Upgrade confirmed:', { planId, billing });
+          setShowUpgradeModal(false);
+        }}
+        />
 
       {/* Features */}
       <Card>

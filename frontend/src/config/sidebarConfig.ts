@@ -28,6 +28,7 @@ import {
   Tag,
   CalendarCheck,
   Shield,
+  Monitor,
 } from 'lucide-react';
 import { Role } from '@/types';
 
@@ -109,7 +110,7 @@ export const sidebarConfig: NavItem[] = [
       },
       {
         title: 'My Subscription',
-        href: '/subscriptions',
+        href: '/billing/my-subscription',
         icon: CalendarCheck,
         roles: ['ADMIN'],
       },
@@ -446,6 +447,16 @@ export const sidebarConfig: NavItem[] = [
     title: 'Settings',
     href: '/settings',
     icon: Settings,
+    roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT'],
+  },
+
+  // ============================================================
+  // E-Learning / LMS — Opens LMS in new tab via SSO
+  // ============================================================
+  {
+    title: 'E-Learning',
+    href: '/auth/lms-sso',
+    icon: Monitor,
     roles: ['SUPER_ADMIN', 'ADMIN', 'TEACHER', 'STUDENT'],
   },
 ];

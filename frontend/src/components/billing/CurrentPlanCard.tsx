@@ -70,8 +70,8 @@ export function CurrentPlanCard({ subscription, isLoading }: CurrentPlanCardProp
 
           {/* Stats from PlanFeature entries */}
           <div className="flex gap-6">
-            <Stat label="Students" value={getFeatureLimit(features, 'max_students', '—')} />
-            <Stat label="Teachers" value={getFeatureLimit(features, 'max_teachers', '—')} />
+            <Stat label="Students" value={getFeatureLimit(features, 'students.max', '—')} />
+            <Stat label="Teachers" value={getFeatureLimit(features, 'teachers.max', '—')} />
             <Stat label="Storage" value={getFeatureLimit(features, 'storage_gb', '—')} />
           </div>
         </div>

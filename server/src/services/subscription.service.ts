@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto';
 import prisma from '../database/client';
 import logger from '../utils/logger';
+import { School, TenantSubscription } from '@prisma/client';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   TRIALING: ['ACTIVE', 'CANCELED', 'EXPIRED'],
@@ -27,12 +28,27 @@ export class SubscriptionService {
       throw new Error('Plan not found');
     }
 
+    // Check for existing non-terminal subscription
+    const existingSubscription = await (prisma as any).tenantSubscription.findFirst({
+      where: {
+        schoolId: data.schoolId,
+        status: {
+          in: ['TRIALING', 'ACTIVE', 'PAST_DUE', 'GRACE', 'SUSPENDED']
+        }
+      }
+    });
+
+    if (existingSubscription) {
+      logger.error(`School ${data.schoolId} already has an active subscription: ${existingSubscription.id}`);
+      throw new Error('This school already has an active subscription. Please cancel or expire the current subscription before creating a new one.');
+    }
+
     // Auto-create billing account if one doesn't exist
     const existingAccount = await (prisma as any).billingAccount.findUnique({
       where: { schoolId: data.schoolId },
     });
     if (!existingAccount) {
-      const school = await (prisma as any).school.findUnique({
+      const school: School = await (prisma as any).school.findUnique({
         where: { id: data.schoolId },
         select: { name: true },
       });
@@ -41,7 +57,7 @@ export class SubscriptionService {
           id: randomUUID(),
           schoolId: data.schoolId,
           legalName: school?.name || data.schoolId,
-          preferredCurrency: plan.currency || 'KES',
+           preferredCurrency: plan.currency || 'KES',
         },
       });
     }
@@ -59,6 +75,35 @@ export class SubscriptionService {
       },
       include: { plan: true, school: true },
     });
+
+    // Generate initial invoice for the subscription
+    try {
+      const now = new Date();
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
+      const schoolShort = data.schoolId.substring(0, 8).toUpperCase();
+      const invoiceNumber = `SUB-INV-${dateStr}-${schoolShort}-1`;
+      
+      await (prisma as any).billingInvoice.create({
+        data: {
+          schoolId: data.schoolId,
+          subscriptionId: subscription.id,
+          invoiceNumber,
+          subtotalMinor: plan.priceMinor,
+          taxMinor: 0,
+          totalMinor: plan.priceMinor,
+          amountPaidMinor: 0,
+          currency: plan.currency || 'KES',
+          status: 'OPEN',
+          dueAt: new Date(data.currentPeriodEnd),
+        },
+      });
+      logger.info(`Generated initial invoice ${invoiceNumber} for subscription ${subscription.id}`);
+    } catch (invoiceError: any) {
+      logger.error(`Failed to generate initial invoice for subscription ${subscription.id}`, {
+        error: invoiceError.message,
+      });
+      // Don't fail subscription creation if invoice generation fails
+    }
 
     // Audit logging
     if (createdByUserId) {

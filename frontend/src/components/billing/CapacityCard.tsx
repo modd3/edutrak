@@ -4,15 +4,15 @@ interface CapacityCardProps {
   title: string;
   used: number;
   total: number;
-  pct: number;
   color: string;
   trackColor: string;
   icon: string;
   status: 'healthy' | 'critical';
 }
 
-export function CapacityCard({ title, used, total, pct, color, trackColor, icon, status }: CapacityCardProps) {
+export function CapacityCard({ title, used, total, color, trackColor, icon, status }: CapacityCardProps) {
   const isCritical = status === 'critical';
+  const pct = Math.floor((used/total)*100)
 
   return (
     <div

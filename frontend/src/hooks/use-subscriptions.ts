@@ -68,6 +68,8 @@ export function useCreateSubscription() {
       return response.data.data;
     },
     onSuccess: () => {
+      // Invalidate both school-specific and my-subscription queries
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
       queryClient.invalidateQueries({ queryKey: ['subscriptions', { schoolId }] });
       queryClient.invalidateQueries({ queryKey: ['subscriptions', 'my', schoolId] });
       toast.success('Subscription created successfully');
