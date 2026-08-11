@@ -1,9 +1,6 @@
-import { Teacher, EmploymentType, Role, SubjectCategory } from '@prisma/client';
-import { hashPassword } from '../utils/hash';
+import { Teacher, EmploymentType, SubjectCategory } from '@prisma/client';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger';
-import emailService from '../utils/email';
-import { sequenceGenerator } from './sequence-generator.service';
 import { BaseService } from './base.service';
 import { RequestWithUser } from '../middleware/school-context';
 
@@ -25,110 +22,10 @@ export class TeacherService extends BaseService {
     };
   }
 
-  async createTeacher(data: {
-    userId: string;
-    tscNumber: string;
-    employmentType: EmploymentType;
-    qualification?: string;
-    specialization?: string;
-    dateJoined?: Date;
-  }): Promise<Teacher> {
-    const { userId, ...rest } = data;
-    const employeeNumber = await sequenceGenerator.generateEmployeeNumber();
-
-    const teacher = await this.prisma.teacher.create({
-      data: {
-        id: uuidv4(),
-        employeeNumber,
-        ...rest,
-        user: { connect: { id: userId } },
-      },
-    });
-
-    logger.info('Teacher created successfully', { teacherId: teacher.id, tscNumber: teacher.tscNumber });
-    return teacher;
-  }
-
-  async createTeacherWithUser(data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    phone?: string;
-    idNumber?: string;
-    tscNumber: string;
-    employmentType: EmploymentType;
-    qualification?: string;
-    specialization?: string;
-    dateJoined?: Date;
-    schoolId?: string;
-    role?: string; // Added optional role type
-  }, createdBy: { userId: string; role: Role }) {
-    
-    // FIX: Destructure 'role' here to remove it from teacherData
-    const { 
-      email, 
-      password, 
-      firstName, 
-      lastName, 
-      middleName, 
-      phone, 
-      idNumber, 
-      schoolId, 
-      role, // Extracted so it is NOT in teacherData
-      ...teacherData 
-    } = data as any; // Cast to any to handle extra properties safely
-
-    const teacher = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          id: uuidv4(),
-          email,
-          password: await hashPassword(password),
-          firstName,
-          lastName,
-          middleName,
-          phone,
-          idNumber,
-          role: 'TEACHER',
-          schoolId,
-        },
-      });
-
-      const employeeNumber = await sequenceGenerator.generateEmployeeNumber(schoolId);
-      
-      const teacher = await tx.teacher.create({
-        data: {
-          id: uuidv4(),
-          employeeNumber,
-          ...teacherData, // Now this is clean and contains only teacher fields
-          user: { connect: { id: user.id } },
-        },
-        include: {
-          user: true,
-        },
-      });
-
-      logger.info('Teacher with user account created successfully', { 
-        teacherId: teacher.id, 
-        tscNumber: teacher.tscNumber,
-        createdBy: createdBy.userId 
-      });
-
-      return teacher;
-    });
-
-    // Send welcome email asynchronously (fire-and-forget) after transaction completes
-    setImmediate(() => {
-      emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`)
-        .catch(error => {
-          logger.warn('Failed to send welcome email to teacher', { email, error });
-        });
-    });
-
-    return teacher;
-  }
+  // NOTE: teacher creation (with or without a new user account) is handled
+  // exclusively by UserCreationService.createUserWithProfile - see
+  // TeacherController.createTeacherWithUser. Do not re-add a create method
+  // here; that's exactly the duplication that let teachers.max get bypassed.
 
   async getTeachers(filters?: {
     schoolId?: string;

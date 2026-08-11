@@ -3,14 +3,28 @@ interface UpgradeBannerProps {
   title?: string;
   description?: string;
   buttonLabel?: string;
+  used?: number;
+  total?: number;
+  metricLabel?: string;
 }
 
 export function UpgradeBanner({
   onUpgrade,
   title = 'Teacher limit reached',
-  description = 'To add a 21st teacher or more staff members, your school must upgrade to the next tier.',
-  buttonLabel = 'Upgrade to Growth Plan',
+  description = 'To add more staff members, your school must upgrade to the next tier.',
+  buttonLabel = 'Upgrade Plan',
+  used,
+  total,
+  metricLabel = 'teachers',
 }: UpgradeBannerProps) {
+  const safeTotal = Number.isFinite(total || 0) ? (total as number) : 0;
+  const safeUsed = Number.isFinite(used || 0) ? (used as number) : 0;
+  const isAtLimit = safeTotal > 0 && safeUsed >= safeTotal;
+
+  if (!isAtLimit && used === undefined) {
+    return null;
+  }
+
   return (
     <div className="bg-gradient-to-r from-amber-50 to-amber-100 border border-amber-400 rounded-xl px-6 py-[18px] flex items-center justify-between gap-6 shadow-[0_2px_12px_rgba(251,191,36,0.12)]">
       <div className="flex items-start gap-3.5 flex-1">

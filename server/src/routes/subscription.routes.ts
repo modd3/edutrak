@@ -13,11 +13,17 @@ router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), controller.create.bind(contr
 // Allow both ADMIN and SUPER_ADMIN to list subscriptions (ADMIN sees only their school)
 router.get('/', authorize('ADMIN', 'SUPER_ADMIN'), controller.list.bind(controller));
 
+// Get consolidated billing overview
+router.get('/overview', authorize('ADMIN', 'SUPER_ADMIN'), controller.getOverview.bind(controller));
+
 // Allow both ADMIN and SUPER_ADMIN to get their own subscription
 router.get('/my', authorize('ADMIN', 'SUPER_ADMIN'), controller.getMySubscription.bind(controller));
 
 // Allow both ADMIN and SUPER_ADMIN to get subscription by ID
 router.get('/:id', authorize('ADMIN', 'SUPER_ADMIN'), controller.getById.bind(controller));
+
+// Preview proration for plan change
+router.get('/:id/proration-preview', authorize('ADMIN', 'SUPER_ADMIN'), controller.previewProration.bind(controller));
 
 // Allow both ADMIN and SUPER_ADMIN to transition subscription status
 router.patch('/:id/status', authorize('ADMIN', 'SUPER_ADMIN'), controller.transitionStatus.bind(controller));

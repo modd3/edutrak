@@ -3,7 +3,7 @@ import { RequestWithUser } from './school-context';
 import prisma from '../database/client';
 import logger from '../utils/logger';
 
-const ALLOWED_STATUSES = ['TRIALING', 'ACTIVE', 'GRACE'];
+const ALLOWED_STATUSES = ['TRIALING', 'ACTIVE', 'PAST_DUE'];
 
 /**
  * Middleware to enforce active subscription status for all operational routes.

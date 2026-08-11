@@ -13,7 +13,11 @@ router.use(enforceSchoolContext);
 router.use(enforceSubscription);
 
 // Guardian management (Admin only)
-router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), guardianController.createGuardian);
+// NOTE: guardian creation with a new user account happens via /with-user,
+// which delegates to UserCreationService. There is no route to attach a
+// Guardian profile to a pre-existing user - the old one required a userId
+// the frontend never actually sent, and re-implemented user creation logic
+// that belongs solely in UserCreationService.
 router.post('/with-user', authorize('ADMIN', 'SUPER_ADMIN'), guardianController.createGuardianWithUser);
 router.patch('/set-primary', authorize('ADMIN', 'SUPER_ADMIN'), guardianController.setPrimaryGuardian);
 router.delete('/students/:studentId/guardians/:guardianId', authorize('ADMIN', 'SUPER_ADMIN'), guardianController.removeGuardianFromStudent);

@@ -4,6 +4,8 @@ import { hashPassword } from '../utils/hash';
 import { v4 as uuidv4 } from 'uuid';
 import logger from '../utils/logger';
 import { sequenceGenerator, SequenceType } from './sequence-generator.service';
+import { entitlementService, ResourceLimitError } from './entitlement.service';
+import emailService from '../utils/email';
 
 interface BaseUserData {
   email: string;
@@ -90,6 +92,14 @@ export class UserCreationService extends BaseService {
       userData.schoolId = schoolId;
     }
 
+    // Enforce plan-level resource limits (students.max / teachers.max) here,
+    // not in each controller - this is the ONLY place a User gets created,
+    // so this is the only place that needs to know about plan limits.
+    const limitDecision = await entitlementService.checkRoleResourceLimit(schoolId, userData.role, isSuperAdmin);
+    if (!limitDecision.allowed) {
+      throw new ResourceLimitError(userData.role, limitDecision.reason ?? `Plan limit reached for ${userData.role}`);
+    }
+
     // Hash password
     const hashedPassword = await hashPassword(userData.password);
 
@@ -97,7 +107,7 @@ export class UserCreationService extends BaseService {
     this.validateProfileData(userData.role, profileData);
 
     // Use transaction to ensure atomicity
-    return await this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create the base user
       const user = await tx.user.create({
         data: {
@@ -195,6 +205,36 @@ export class UserCreationService extends BaseService {
       const { password, ...userWithoutPassword } = user;
       return userWithoutPassword;
     });
+
+    // Fire-and-forget welcome email, after the transaction has committed -
+    // matches the behavior of the old createTeacherWithUser/
+    // createGuardianWithUser duplicates being removed. Deliberately scoped
+    // to TEACHER/PARENT only (not STUDENT), same as those did.
+    if (userData.role === 'TEACHER' || userData.role === 'PARENT') {
+      setImmediate(() => {
+        emailService.sendWelcomeEmail(userData.email, `${userData.firstName} ${userData.lastName}`)
+          .catch((error) => {
+            logger.warn('Failed to send welcome email', { email: userData.email, role: userData.role, error });
+          });
+      });
+    }
+
+    // Same for guardians nested inside a new student's enrollment - we only
+    // reach this line if the whole transaction committed, so every guardian
+    // in this array was actually created.
+    if (userData.role === 'STUDENT') {
+      const guardians = (profileData as StudentProfileData)?.guardians ?? [];
+      for (const guardianData of guardians) {
+        setImmediate(() => {
+          emailService.sendWelcomeEmail(guardianData.email, `${guardianData.firstName} ${guardianData.lastName}`)
+            .catch((error) => {
+              logger.warn('Failed to send welcome email', { email: guardianData.email, role: 'PARENT', error });
+            });
+        });
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -319,6 +359,48 @@ export class UserCreationService extends BaseService {
     return student;
   }
 
+  /**
+   * Create a guardian's User + Guardian rows within an existing transaction.
+   * This is the one place that does so - used by createGuardiansForStudent
+   * for guardians nested inside a new student's enrollment. It can't be
+   * createUserWithProfile itself (that opens its own top-level transaction,
+   * which can't compose into this one), but every other guardian-creation
+   * call site in the app goes through createUserWithProfile - keep it that
+   * way; don't inline this pattern anywhere else.
+   */
+  private async createGuardianUserAndRecord(
+    tx: any,
+    data: GuardianAccountData & { schoolId?: string }
+  ): Promise<{ user: any; guardian: any }> {
+    const guardianUser = await tx.user.create({
+      data: {
+        id: uuidv4(),
+        email: data.email,
+        password: await hashPassword(data.password),
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        role: 'PARENT',
+        schoolId: data.schoolId,
+      },
+    });
+
+    const guardian = await tx.guardian.create({
+      data: {
+        id: uuidv4(),
+        userId: guardianUser.id,
+        relationship: data.relationship,
+        occupation: data.occupation,
+        employer: data.employer,
+        workPhone: data.workPhone,
+      },
+    });
+
+    return { user: guardianUser, guardian };
+  }
+
   private async createGuardiansForStudent(
     tx: any,
     student: any,
@@ -340,30 +422,9 @@ export class UserCreationService extends BaseService {
     for (let index = 0; index < guardians.length; index++) {
       const guardianData = guardians[index];
 
-      const guardianUser = await tx.user.create({
-        data: {
-          id: uuidv4(),
-          email: guardianData.email,
-          password: await hashPassword(guardianData.password),
-          firstName: guardianData.firstName,
-          lastName: guardianData.lastName,
-          middleName: guardianData.middleName,
-          phone: guardianData.phone,
-          idNumber: guardianData.idNumber,
-          role: 'PARENT',
-          schoolId: student.schoolId,
-        },
-      });
-
-      const guardian = await tx.guardian.create({
-        data: {
-          id: uuidv4(),
-          userId: guardianUser.id,
-          relationship: guardianData.relationship,
-          occupation: guardianData.occupation,
-          employer: guardianData.employer,
-          workPhone: guardianData.workPhone,
-        },
+      const { guardian } = await this.createGuardianUserAndRecord(tx, {
+        ...guardianData,
+        schoolId: student.schoolId,
       });
 
       await tx.studentGuardian.create({

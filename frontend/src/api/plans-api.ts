@@ -18,7 +18,9 @@ export interface PlanFeatureInput {
   limitValue?: number | null;
 }
 
-export type CreatePlanInput  = Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt'>>
+export type CreatePlanInput = Partial<Omit<Plan, 'id' | 'createdAt' | 'updatedAt' | 'features'>> & {
+  features?: PlanFeatureInput[];
+};
 
 export type UpdatePlanInput = Partial<Omit<CreatePlanInput, 'key'>>
 

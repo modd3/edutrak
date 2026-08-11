@@ -6,28 +6,15 @@ import { auditService } from '../services/audit.service';
 import logger from '../utils/logger';
 import { ResponseUtil } from '../utils/response';
 import { webhookEmitter } from '../services/webhook-emitter.service';
-import { entitlementService } from '../services/entitlement.service';
-import prisma from '../database/client';
-
-// Resource-limit checks are keyed by the role being created. Only STUDENT
-// and TEACHER currently have COUNT-type plan features (students.max,
-// teachers.max) - other roles (ADMIN, GUARDIAN) aren't plan-limited today.
-const RESOURCE_LIMIT_BY_ROLE: Record<string, { metricKey: string; countFn: (schoolId: string) => Promise<number> }> = {
-  STUDENT: {
-    metricKey: 'students.max',
-    countFn: (schoolId: string) => prisma.student.count({ where: { schoolId } }),
-  },
-  TEACHER: {
-    metricKey: 'teachers.max',
-    // Teacher has no direct schoolId column - it's scoped via its User.
-    countFn: (schoolId: string) => prisma.teacher.count({ where: { user: { schoolId } } }),
-  },
-};
+import { ResourceLimitError } from '../services/entitlement.service';
 
 export class UserCreationController {
   /**
-   * Create user with profile
-   * This is the ONLY endpoint for creating users
+   * Create user with profile.
+   * UserCreationService.createUserWithProfile is the ONLY place that should
+   * create a User row, for any role (STUDENT, TEACHER, PARENT, ...) - plan
+   * resource limits (students.max, teachers.max) are enforced inside that
+   * service method itself, not here, so every caller gets them for free.
    */
   async createUserWithProfile(req: RequestWithUser, res: Response): Promise<Response> {
     try {
@@ -36,26 +23,6 @@ export class UserCreationController {
       // School context from middleware
       const schoolId = req.schoolId;
       const isSuperAdmin = req.isSuperAdmin || false;
-
-      // Enforce plan-level resource limits (students.max / teachers.max)
-      // before creating the row - same bypass rule as requireFeature:
-      // a super admin acting outside any single school's context isn't
-      // plan-limited.
-      const limit = RESOURCE_LIMIT_BY_ROLE[userData?.role];
-      if (limit && schoolId && !isSuperAdmin) {
-        const decision = await entitlementService.withinResourceLimit(
-          schoolId,
-          limit.metricKey,
-          () => limit.countFn(schoolId)
-        );
-        if (!decision.allowed) {
-          return res.status(402).json({
-            error: 'RESOURCE_LIMIT_REACHED',
-            featureKey: limit.metricKey,
-            message: decision.reason ?? 'Plan limit reached',
-          });
-        }
-      }
 
       // Create user with profile in atomic transaction
       const user = await userCreationService.createUserWithProfile(
@@ -97,6 +64,13 @@ export class UserCreationController {
       return ResponseUtil.created(res, 'User Created Successfully', user);
 
     } catch (error: any) {
+      if (error instanceof ResourceLimitError) {
+        return res.status(402).json({
+          error: 'RESOURCE_LIMIT_REACHED',
+          featureKey: error.role,
+          message: error.message,
+        });
+      }
       logger.error('User creation error', { error: error.message });
       console.log("Error in User Creation: ", error);
       return ResponseUtil.error(res, 'Error Creating User!', res.statusCode, error);
@@ -161,33 +135,12 @@ export class UserCreationController {
   async bulkCreateUsers(req: RequestWithUser, res: Response): Promise<Response> {
     try {
       const { users } = req.body;
-      const schoolId = req.schoolId;
-      const isSuperAdmin = req.isSuperAdmin || false;
 
-      // Pre-check resource limits against the whole batch, not per-item -
-      // a 40-row student import against a school with room for 5 should
-      // fail upfront with a clear count, not create 5 then error on the 6th.
-      if (schoolId && !isSuperAdmin && Array.isArray(users)) {
-        for (const [role, limit] of Object.entries(RESOURCE_LIMIT_BY_ROLE)) {
-          const requested = users.filter((u: any) => u?.user?.role === role).length;
-          if (requested === 0) continue;
-
-          const decision = await entitlementService.withinResourceLimit(
-            schoolId,
-            limit.metricKey,
-            () => limit.countFn(schoolId),
-            requested
-          );
-          if (!decision.allowed) {
-            return res.status(402).json({
-              error: 'RESOURCE_LIMIT_REACHED',
-              featureKey: limit.metricKey,
-              message: decision.reason ?? `Plan limit reached for ${role.toLowerCase()}s`,
-            });
-          }
-        }
-      }
-
+      // No pre-batch limit check here - createUserWithProfile (called once
+      // per item below) checks the live count before each creation, so a
+      // batch that runs out of room partway through fails cleanly on the
+      // items past the limit (surfaced in results.failed) rather than all
+      // succeeding or all failing.
       const results = await userCreationService.bulkCreateUsersWithProfiles(
         users,
         req.schoolId,

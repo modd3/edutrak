@@ -778,6 +778,62 @@ export interface ClassSubject {
   updatedAt: string;
 }
 
+// ─── Self-service onboarding ──────────────────────────────────────────────────
+
+export interface OnboardingSchoolInput {
+  name: string;
+  type: 'PRIMARY' | 'SECONDARY' | 'TVET' | 'SPECIAL_NEEDS' | 'PRE_PRIMARY';
+  county: string;
+  subCounty?: string;
+  ward?: string;
+  ownership: 'PUBLIC' | 'PRIVATE' | 'FAITH_BASED' | 'NGO';
+  boardingStatus: 'DAY' | 'BOARDING' | 'BOTH';
+  gender: 'BOYS' | 'GIRLS' | 'MIXED';
+  phone?: string;
+  email?: string;
+  address?: string;
+  registrationNo?: string;
+  knecCode?: string;
+  kemisCode?: string;
+}
+
+export interface OnboardingAdminInput {
+  firstName: string;
+  lastName: string;
+  middleName?: string;
+  email: string;
+  password: string;
+  phone?: string;
+  idNumber?: string;
+}
+
+export interface OnboardingPlanInput {
+  planId: string;
+  startTrial: boolean;
+}
+
+export interface OnboardingInput {
+  school: OnboardingSchoolInput;
+  admin: OnboardingAdminInput;
+  plan: OnboardingPlanInput;
+}
+
+export interface OnboardingResult {
+  tenant: { id: string; slug: string; name: string };
+  school: { id: string; name: string };
+  subscription: { id: string; status: string; trialEndsAt: string | null };
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    role: string;
+    schoolId: string;
+  };
+  token: string;
+  refreshToken: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;

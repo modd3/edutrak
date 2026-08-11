@@ -134,4 +134,42 @@ export class SubscriptionController {
       return ResponseUtil.serverError(res, error.message);
     }
   }
+
+  /**
+   * Get consolidated billing overview for self-service portal.
+   * GET /subscriptions/overview
+   */
+  async getOverview(req: Request, res: Response): Promise<Response> {
+    try {
+      const user = (req as any).user;
+      const schoolId = user?.schoolId || (req.query.schoolId as string);
+      if (!schoolId) {
+        return ResponseUtil.error(res, 'School context required', 400);
+      }
+
+      const overview = await subscriptionService.getBillingOverview(schoolId);
+      return ResponseUtil.success(res, 'Billing overview retrieved successfully', overview);
+    } catch (error: any) {
+      return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  /**
+   * Calculate proration preview for a plan change.
+   * GET /subscriptions/:id/proration-preview?newPlanId=...
+   */
+  async previewProration(req: Request, res: Response): Promise<Response> {
+    try {
+      const { id } = req.params;
+      const { newPlanId } = req.query;
+      if (!newPlanId) {
+        return ResponseUtil.error(res, 'newPlanId query param required', 400);
+      }
+
+      const result = await subscriptionService.calculateProration(id, newPlanId as string);
+      return ResponseUtil.success(res, 'Proration preview calculated successfully', result);
+    } catch (error: any) {
+      return ResponseUtil.error(res, error.message, 400);
+    }
+  }
 }

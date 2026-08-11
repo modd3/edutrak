@@ -1,8 +1,5 @@
-import { Guardian, Role } from '@prisma/client';
-import { hashPassword } from '../utils/hash';
-import { v4 as uuidv4 } from 'uuid';
+import { Guardian } from '@prisma/client';
 import logger from '../utils/logger';
-import emailService from '../utils/email';
 import { BaseService } from './base.service';
 import { RequestWithUser } from '../middleware/school-context';
 
@@ -24,89 +21,10 @@ export class GuardianService extends BaseService {
     };
   }
 
-  async createGuardian(data: {
-    userId: string;
-    relationship: string;
-    occupation?: string;
-    employer?: string;
-    workPhone?: string;
-  }): Promise<Guardian> {
-    const guardian = await this.prisma.guardian.create({
-      data: {
-        id: uuidv4(),
-        ...data,
-      },
-    });
-
-    logger.info('Guardian created successfully', { guardianId: guardian.id, userId: data.userId });
-    return guardian;
-  }
-
-  async createGuardianWithUser(data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-    middleName?: string;
-    phone?: string;
-    idNumber?: string;
-    relationship: string;
-    occupation?: string;
-    employer?: string;
-    workPhone?: string;
-    schoolId?: string;
-  }, createdBy: { userId: string; role: Role }) {
-    
-    const { email, password, firstName, lastName, middleName, phone, idNumber, relationship, occupation, employer, workPhone, schoolId } = data;
-
-    const guardian = await this.prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          id: uuidv4(),
-          email,
-          password: await hashPassword(password),
-          firstName,
-          lastName,
-          middleName,
-          phone,
-          idNumber,
-          role: 'PARENT',
-          schoolId,
-        },
-      });
-
-      const guardian = await tx.guardian.create({
-        data: {
-          id: uuidv4(),
-          userId: user.id,
-          relationship,
-          occupation,
-          employer,
-          workPhone,
-        },
-        include: {
-          user: true,
-        },
-      });
-
-      logger.info('Guardian with user account created successfully', { 
-        guardianId: guardian.id, 
-        createdBy: createdBy.userId 
-      });
-
-      return guardian;
-    });
-
-    // Send welcome email asynchronously (fire-and-forget) after transaction completes
-    setImmediate(() => {
-      emailService.sendWelcomeEmail(email, `${firstName} ${lastName}`)
-        .catch(error => {
-          logger.warn('Failed to send welcome email to guardian', { email, error });
-        });
-    });
-
-    return guardian;
-  }
+  // NOTE: guardian creation (with or without a new user account) is handled
+  // exclusively by UserCreationService.createUserWithProfile - see
+  // GuardianController.createGuardianWithUser. Do not re-add a create
+  // method here.
 
   async getGuardians(filters?: {
     schoolId?: string;

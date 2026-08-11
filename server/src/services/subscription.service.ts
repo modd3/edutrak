@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto';
 import prisma from '../database/client';
 import logger from '../utils/logger';
 import { School, TenantSubscription } from '@prisma/client';
+import { webhookEmitter } from './webhook-emitter.service';
 
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   TRIALING: ['ACTIVE', 'CANCELED', 'EXPIRED'],
@@ -167,6 +168,7 @@ export class SubscriptionService {
         invoices: {
           orderBy: { createdAt: 'desc' },
           take: 10,
+          include: { payments: { orderBy: { createdAt: 'desc' } } },
         },
       },
     });
@@ -389,6 +391,98 @@ export class SubscriptionService {
       });
     }
 
+    // Emit webhook to LMS
+    webhookEmitter.emitSubscriptionEvent(updated, 'status_changed');
+
     return updated;
+  }
+
+  /**
+   * Calculate proration credit for changing plans mid-billing cycle.
+   */
+  async calculateProration(subscriptionId: string, newPlanId: string) {
+    const subscription = await (prisma as any).tenantSubscription.findUnique({
+      where: { id: subscriptionId },
+      include: { plan: true },
+    });
+    if (!subscription) throw new Error('Subscription not found');
+
+    const newPlan = await (prisma as any).plan.findUnique({ where: { id: newPlanId } });
+    if (!newPlan) throw new Error('New plan not found');
+
+    const now = new Date();
+    const periodStart = new Date(subscription.currentPeriodStart).getTime();
+    const periodEnd = new Date(subscription.currentPeriodEnd).getTime();
+    const totalPeriodMs = Math.max(1, periodEnd - periodStart);
+    const remainingMs = Math.max(0, periodEnd - now.getTime());
+    const unusedRatio = remainingMs / totalPeriodMs;
+
+    const currentPlanPrice = subscription.plan.priceMinor;
+    const unusedCreditMinor = Math.round(currentPlanPrice * unusedRatio);
+    const newPlanPriceMinor = newPlan.priceMinor;
+
+    const netAmountMinor = Math.max(0, newPlanPriceMinor - unusedCreditMinor);
+
+    return {
+      currentPlan: subscription.plan,
+      newPlan,
+      unusedCreditMinor,
+      newPlanPriceMinor,
+      netAmountMinor,
+      currency: newPlan.currency || 'KES',
+    };
+  }
+
+  /**
+   * Consolidated billing overview for self-service portal
+   */
+  async getBillingOverview(schoolId: string) {
+    const [subscription, billingAccount, recentInvoices, activePlans, unusedUsage] = await Promise.all([
+      (prisma as any).tenantSubscription.findFirst({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+        include: {
+          plan: { include: { features: true } },
+          school: { select: { id: true, name: true } },
+        },
+      }),
+      (prisma as any).billingAccount.findUnique({
+        where: { schoolId },
+      }),
+      (prisma as any).billingInvoice.findMany({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: { payments: { orderBy: { createdAt: 'desc' } } },
+      }),
+      (prisma as any).plan.findMany({
+        where: { isActive: true },
+        include: { features: true },
+        orderBy: { priceMinor: 'asc' },
+      }),
+      (prisma as any).usageMetric.findMany({
+        where: { schoolId },
+        orderBy: { createdAt: 'desc' },
+        take: 5,
+      }),
+    ]);
+
+    let totalOutstandingMinor = 0;
+    if (recentInvoices && recentInvoices.length > 0) {
+      totalOutstandingMinor = recentInvoices
+        .filter((inv: any) => inv.status === 'OPEN' || inv.status === 'OVERDUE')
+        .reduce((sum: number, inv: any) => sum + (inv.totalMinor - inv.amountPaidMinor), 0);
+    }
+
+    return {
+      subscription,
+      billingAccount,
+      recentInvoices,
+      availablePlans: activePlans,
+      usageMetrics: unusedUsage,
+      outstandingBalanceMinor: totalOutstandingMinor,
+      currency: subscription?.plan?.currency || 'KES',
+      hasActiveSubscription: !!subscription && ['ACTIVE', 'TRIALING', 'GRACE'].includes(subscription.status),
+    };
   }
 }

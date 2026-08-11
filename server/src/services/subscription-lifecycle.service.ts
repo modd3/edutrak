@@ -30,6 +30,15 @@ export class SubscriptionLifecycleService {
       logger.error('Lifecycle expireTrials failed', { error: err.message });
     }
 
+    // Must run before markPastDue: invoices are generated while the
+    // subscription is still ACTIVE, then markPastDue can safely flip it.
+    try {
+      report.invoicesGenerated = await this.autoGenerateInvoices();
+    } catch (err: any) {
+      report.errors.push(`autoGenerateInvoices: ${err.message}`);
+      logger.error('Lifecycle autoGenerateInvoices failed', { error: err.message });
+    }
+
     try {
       report.markedPastDue = await this.markPastDue();
     } catch (err: any) {
@@ -52,13 +61,6 @@ export class SubscriptionLifecycleService {
     }
 
     try {
-      report.invoicesGenerated = await this.autoGenerateInvoices();
-    } catch (err: any) {
-      report.errors.push(`autoGenerateInvoices: ${err.message}`);
-      logger.error('Lifecycle autoGenerateInvoices failed', { error: err.message });
-    }
-
-    try {
       report.remindersSent = await this.sendExpiryReminders();
     } catch (err: any) {
       report.errors.push(`sendExpiryReminders: ${err.message}`);
@@ -71,14 +73,52 @@ export class SubscriptionLifecycleService {
 
   /**
    * Expire TRIALING subscriptions past their trialEndsAt.
+   * Skips subscriptions that have already been paid for (have a PAID billing invoice
+   * created during the current period), since the webhook should have already
+   * transitioned them to ACTIVE.
    */
   async expireTrials(): Promise<number> {
     const now = new Date();
-    const expired = await (prisma as any).tenantSubscription.updateMany({
+
+    // Find trialing subscriptions past their trial end date
+    const expiringSubs = await (prisma as any).tenantSubscription.findMany({
       where: {
         status: 'TRIALING',
         trialEndsAt: { lt: now },
       },
+      select: {
+        id: true,
+        currentPeriodStart: true,
+      },
+    });
+
+    if (expiringSubs.length === 0) return 0;
+
+    // Filter out subscriptions that have a PAID invoice during their current period
+    const idsToExpire: string[] = [];
+    for (const sub of expiringSubs) {
+      const paidInvoice = await (prisma as any).billingInvoice.findFirst({
+        where: {
+          subscriptionId: sub.id,
+          status: 'PAID',
+          createdAt: { gte: sub.currentPeriodStart },
+        },
+        select: { id: true },
+      });
+
+      if (!paidInvoice) {
+        idsToExpire.push(sub.id);
+      } else {
+        logger.info(
+          `Skipping trial expiry for subscription ${sub.id} — has a paid invoice during current period`,
+        );
+      }
+    }
+
+    if (idsToExpire.length === 0) return 0;
+
+    const expired = await (prisma as any).tenantSubscription.updateMany({
+      where: { id: { in: idsToExpire } },
       data: { status: 'EXPIRED' },
     });
 
@@ -89,15 +129,52 @@ export class SubscriptionLifecycleService {
   }
 
   /**
-   * Move ACTIVE subscriptions to PAST_DUE when currentPeriodEnd has passed.
+   * Move ACTIVE subscriptions to PAST_DUE when currentPeriodEnd has passed,
+   * but only if they have no PAID invoice for the current period.
+   * A school that paid via M-Pesa mid-cycle (webhook advanced the period) must
+   * not be flipped to PAST_DUE just because the old period end is in the past.
    */
   async markPastDue(): Promise<number> {
     const now = new Date();
-    const result = await (prisma as any).tenantSubscription.updateMany({
+
+    const candidates = await (prisma as any).tenantSubscription.findMany({
       where: {
         status: 'ACTIVE',
         currentPeriodEnd: { lt: now },
       },
+      select: {
+        id: true,
+        currentPeriodStart: true,
+      },
+    });
+
+    if (candidates.length === 0) return 0;
+
+    const idsToMark: string[] = [];
+    for (const sub of candidates) {
+      const paidInvoice = await (prisma as any).billingInvoice.findFirst({
+        where: {
+          subscriptionId: sub.id,
+          status: 'PAID',
+          issuedAt: { gte: sub.currentPeriodStart },
+        },
+        select: { id: true },
+      });
+
+      if (paidInvoice) {
+        logger.info(
+          `Skipping PAST_DUE transition for subscription ${sub.id} — has a PAID invoice for current period`,
+          { paidInvoiceId: paidInvoice.id }
+        );
+      } else {
+        idsToMark.push(sub.id);
+      }
+    }
+
+    if (idsToMark.length === 0) return 0;
+
+    const result = await (prisma as any).tenantSubscription.updateMany({
+      where: { id: { in: idsToMark } },
       data: { status: 'PAST_DUE' },
     });
 
@@ -158,9 +235,14 @@ export class SubscriptionLifecycleService {
   }
 
   /**
-   * Auto-generate billing invoices for ACTIVE subscriptions at the start
-   * of a new billing period. Advances currentPeriodStart/currentPeriodEnd
+   * Auto-generate billing invoices for ACTIVE and PAST_DUE subscriptions at
+   * the start of a new billing period. Advances currentPeriodStart/currentPeriodEnd
    * and increments renewalCount.
+   *
+   * NOTE: must run BEFORE markPastDue in the daily lifecycle so that ACTIVE
+   * subscriptions are invoiced before they get flipped to PAST_DUE.  The query
+   * deliberately also covers PAST_DUE so that any subs missed on a previous run
+   * still get their invoice generated.
    */
   async autoGenerateInvoices(): Promise<number> {
     const now = new Date();
@@ -168,7 +250,7 @@ export class SubscriptionLifecycleService {
 
     const subscriptions = await (prisma as any).tenantSubscription.findMany({
       where: {
-        status: 'ACTIVE',
+        status: { in: ['ACTIVE', 'PAST_DUE'] },
         currentPeriodEnd: { lt: now },
       },
       include: {
@@ -185,11 +267,29 @@ export class SubscriptionLifecycleService {
           continue;
         }
 
+        // Guard: skip if an OPEN or PAID invoice already exists for the
+        // current billing period to prevent duplicates on re-runs.
+        const existingInvoice = await (prisma as any).billingInvoice.findFirst({
+          where: {
+            subscriptionId: sub.id,
+            status: { in: ['OPEN', 'PAID'] },
+            issuedAt: { gte: sub.currentPeriodStart },
+          },
+          select: { id: true },
+        });
+        if (existingInvoice) {
+          logger.info(
+            `Sub ${sub.id} already has an invoice for current period — skipping`,
+            { existingInvoiceId: existingInvoice.id }
+          );
+          continue;
+        }
+
         // Calculate new period dates based on billing interval
         const newPeriodStart = new Date(sub.currentPeriodEnd);
         const newPeriodEnd = this.calculateNextPeriodEnd(newPeriodStart, plan.billingInterval);
 
-        // Generate invoice number: INV/{YYYYMMDD}/{SCHOOL_SHORT_ID}
+        // Generate invoice number: SUB-INV/{YYYYMMDD}/{SCHOOL_SHORT_ID}/{renewalCount+1}
         const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
         const schoolShort = (sub.schoolId || '').substring(0, 8).toUpperCase();
         const invoiceNumber = `SUB-INV-${dateStr}-${schoolShort}-${sub.renewalCount + 1}`;

@@ -1,8 +1,9 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
+import apiClient from '@/api/client';
 
 // Layouts
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -12,6 +13,7 @@ import { RoleGuard } from '@/components/RoleGuard';
 
 // Pages
 import { Login } from './pages/Login';
+import RegisterPage from './pages/onboarding/RegisterPage';
 import { Dashboard } from './pages/Dashboard';
 import { Unauthorized } from './pages/Unauthorized';
 import { SubscriptionExpired } from './pages/subscriptions/SubscriptionExpired';
@@ -60,20 +62,57 @@ const queryClient = new QueryClient({
 
 // Public Route Component (redirect to dashboard if authenticated)
 function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, token } = useAuthStore();
+  const { isAuthenticated, token, logout } = useAuthStore();
 
-  // SSO popup: if already authenticated, hand the token to the LMS window
-  // that opened us and close immediately — no redirect to dashboard.
-  if (
-    isAuthenticated &&
-    token &&
+  // SSO popup: if already authenticated, validate the token is still valid
+  // before handing it to the LMS window that opened us. A stale/expired
+  // token would cause the LMS to reject the SSO handshake and show an
+  // "unauthorised" error instead of the EduTrak login form.
+  const isSSOPopup =
     typeof window !== 'undefined' &&
-    window.opener &&
-    new URLSearchParams(window.location.search).get('sso') === 'lms'
-  ) {
-    const LMS_ORIGIN = new URL(import.meta.env.VITE_LMS_URL || 'http://localhost:5173').origin;
-    window.opener.postMessage({ type: 'edutrak-sso', token }, LMS_ORIGIN);
-    window.close();
+    !!window.opener &&
+    new URLSearchParams(window.location.search).get('sso') === 'lms';
+
+  // Start in the validating state when this is an SSO popup with a
+  // persisted session — otherwise the first render would briefly redirect
+  // to /dashboard (via the isAuthenticated branch below) before the
+  // validation effect runs, losing the ?sso=lms context.
+  const [isValidating, setIsValidating] = useState(isSSOPopup && isAuthenticated && !!token);
+
+  useEffect(() => {
+    if (!isSSOPopup || !isAuthenticated || !token) return;
+
+    let cancelled = false;
+    setIsValidating(true);
+
+    // Validate the persisted token is still accepted by the API before
+    // handing it to the LMS. If it's stale/expired, clear the session so
+    // the login form renders instead of a failed SSO handshake.
+    apiClient
+      .get('/auth/profile')
+      .then(() => {
+        if (cancelled) return;
+        const LMS_ORIGIN = new URL(import.meta.env.VITE_LMS_URL || 'http://localhost:5173').origin;
+        window.opener.postMessage({ type: 'edutrak-sso', token }, LMS_ORIGIN);
+        window.close();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Stale/expired session - clear it so the login form shows.
+        logout();
+      })
+      .finally(() => {
+        if (!cancelled) setIsValidating(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSSOPopup, isAuthenticated, token, logout]);
+
+  // While validating the SSO session, render nothing to avoid flashing
+  // the login form or redirecting to the dashboard.
+  if (isSSOPopup && isValidating) {
     return null;
   }
 
@@ -124,6 +163,16 @@ function App() {
             element={
               <PublicRoute>
                 <Login />
+              </PublicRoute>
+            }
+          />
+
+          {/* Self-service school registration — public, no auth required */}
+          <Route
+            path="/register"
+            element={
+              <PublicRoute>
+                <RegisterPage />
               </PublicRoute>
             }
           />

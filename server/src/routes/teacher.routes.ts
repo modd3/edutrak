@@ -13,7 +13,10 @@ router.use(enforceSchoolContext);
 router.use(enforceSubscription);
 
 // Teacher management (Admin only)
-router.post('/', authorize('ADMIN', 'SUPER_ADMIN'), teacherController.createTeacher);
+// NOTE: teacher creation with a new user account happens via /with-user,
+// which delegates to UserCreationService. There is no route to attach a
+// Teacher profile to a pre-existing user - it was unused and re-implemented
+// user creation logic that belongs solely in UserCreationService.
 router.post('/with-user', authorize('ADMIN', 'SUPER_ADMIN'), teacherController.createTeacherWithUser);
 router.post('/assign-subject', authorize('ADMIN', 'SUPER_ADMIN'), teacherController.assignSubjectToTeacher);
 

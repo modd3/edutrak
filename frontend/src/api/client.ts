@@ -94,9 +94,15 @@ api.interceptors.response.use(
         } catch (refreshError) {
           // Refresh failed - logout user
           useAuthStore.getState().logout();
-         
-          if (window.location.pathname !== '/login') {
-            window.location.href = '/login';
+
+          // Preserve the SSO popup context (?sso=lms) when redirecting to
+          // the login page, so a failed token refresh inside an SSO popup
+          // still shows the EduTrak login form instead of losing the
+          // handshake context.
+          const currentPath = window.location.pathname;
+          const currentSearch = window.location.search;
+          if (currentPath !== '/login') {
+            window.location.href = '/login' + currentSearch;
           }
           return Promise.reject(refreshError);
       }

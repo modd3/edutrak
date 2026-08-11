@@ -104,3 +104,90 @@ export function invoiceStatusClass(status: string): string {
       return 'bg-gray-100 text-gray-800 border-gray-300';
   }
 }
+
+export function paymentStatusClass(status: string): string {
+  switch (status.toUpperCase()) {
+    case 'COMPLETED':
+      return 'bg-green-100 text-green-800 border-green-300';
+    case 'PENDING':
+      return 'bg-blue-100 text-blue-800 border-blue-300';
+    case 'FAILED':
+      return 'bg-red-100 text-red-800 border-red-300';
+    case 'REFUNDED':
+      return 'bg-purple-100 text-purple-800 border-purple-300';
+    case 'PARTIALLY_REFUNDED':
+      return 'bg-orange-100 text-orange-800 border-orange-300';
+    default:
+      return 'bg-gray-100 text-gray-800 border-gray-300';
+  }
+}
+
+export const SUBSCRIPTION_STATUS_META: Record<string, { label: string; badge: string; banner: string; icon: 'success' | 'info' | 'warning' | 'danger' | 'neutral' }> = {
+  TRIALING: {
+    label: 'Trial',
+    badge: 'bg-blue-100 text-blue-800 border-blue-300',
+    banner: 'bg-blue-50 border-blue-200',
+    icon: 'info',
+  },
+  ACTIVE: {
+    label: 'Active',
+    badge: 'bg-green-100 text-green-800 border-green-300',
+    banner: 'bg-green-50 border-green-200',
+    icon: 'success',
+  },
+  PAST_DUE: {
+    label: 'Past due',
+    badge: 'bg-orange-100 text-orange-800 border-orange-300',
+    banner: 'bg-orange-50 border-orange-200',
+    icon: 'warning',
+  },
+  GRACE: {
+    label: 'Grace period',
+    badge: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+    banner: 'bg-yellow-50 border-yellow-200',
+    icon: 'warning',
+  },
+  SUSPENDED: {
+    label: 'Suspended',
+    badge: 'bg-red-100 text-red-800 border-red-300',
+    banner: 'bg-red-50 border-red-200',
+    icon: 'danger',
+  },
+  CANCELED: {
+    label: 'Canceled',
+    badge: 'bg-gray-100 text-gray-800 border-gray-300',
+    banner: 'bg-gray-50 border-gray-200',
+    icon: 'neutral',
+  },
+  EXPIRED: {
+    label: 'Expired',
+    badge: 'bg-gray-100 text-gray-800 border-gray-300',
+    banner: 'bg-gray-50 border-gray-200',
+    icon: 'neutral',
+  },
+};
+
+export function getPlanFeatureLimit(plan: { features?: Array<{ featureKey: string; limitValue?: number | null }> } | undefined, key: string, fallback: number): number {
+  if (!plan?.features) return fallback;
+  const feature = plan.features.find((f) => f.featureKey === key);
+  const value = feature?.limitValue;
+  return typeof value === 'number' && !Number.isNaN(value) ? value : fallback;
+}
+
+export function formatPlanPrice(minor: number, currency: string = 'KES'): string {
+  if (isNaN(minor) || minor === null || minor === undefined) return '0.00';
+  return new Intl.NumberFormat('en-KE', {
+    style: 'currency',
+    currency,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(minor / 100);
+}
+
+export function generateIdempotencyKey(namespace: string = 'billing'): string {
+  return `${namespace}:${crypto.randomUUID()}`;
+}
+
+export function intervalLabel(interval: string): string {
+  return { MONTHLY: '/mo', QUARTERLY: '/quarter', YEARLY: '/yr' }[interval] ?? '';
+}

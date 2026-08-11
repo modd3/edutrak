@@ -1,6 +1,24 @@
 import api from '@/api';
 import { Teacher, ApiResponse, PaginatedResponse } from '@/types';
 
+interface CreateTeacherUserData {
+  email?: string;
+  password?: string;
+  firstName?: string;
+  lastName?: string;
+  middleName?: string;
+  phone?: string;
+  idNumber?: string;
+  role?: string;
+  schoolId?: string;
+  tscNumber?: string;
+  employeeNumber?: string;
+  employmentType?: string;
+  qualification?: string;
+  specialization?: string;
+  dateJoined?: string | Date;
+}
+
 export const teacherService = {
   getAll: async (params?: {
     schoolId?: string;
@@ -23,8 +41,30 @@ export const teacherService = {
     return response.data.data!;
   },
 
-  create_user: async (data: Partial<Teacher>): Promise<Teacher> => {
-    const response = await api.post<ApiResponse<Teacher>>('/teachers/with-user', data);
+  create_user: async (data: CreateTeacherUserData): Promise<Teacher> => {
+    // Delegate to UserCreationService via POST /api/users
+    // Teacher+User creation is now handled exclusively by UserCreationService
+    const response = await api.post<ApiResponse<Teacher>>('/users', {
+      user: {
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        role: 'TEACHER',
+        schoolId: data.schoolId,
+      },
+      profile: {
+        tscNumber: data.tscNumber,
+        employeeNumber: data.employeeNumber,
+        employmentType: data.employmentType,
+        qualification: data.qualification,
+        specialization: data.specialization,
+        dateJoined: data.dateJoined,
+      },
+    });
     return response.data.data!;
   },
 

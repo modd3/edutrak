@@ -133,6 +133,27 @@ export class WebhookEmitterService {
             schoolId: enrollment.school?.id || enrollment.schoolId,
         }, enrollment.school?.id || enrollment.schoolId, tenantId);
     }
+
+    async emitSubscriptionEvent(subscription: any, action: 'created' | 'updated' | 'status_changed' | 'canceled', tenantId?: string) {
+        const lmsFeature = subscription.plan?.features?.find((f: any) => f.featureKey === 'lms.core');
+        const storageFeature = subscription.plan?.features?.find((f: any) => f.featureKey === 'lms.storage_limit');
+        const lmsEnabled = lmsFeature ? lmsFeature.enabled : true; // Default true if plan features not populated or core enabled
+
+        return this.emitEvent(`tenant.subscription.${action}`, {
+            subscriptionId: subscription.id,
+            schoolId: subscription.schoolId,
+            planKey: subscription.plan?.key,
+            planName: subscription.plan?.name,
+            status: subscription.status,
+            startsAt: subscription.startsAt,
+            currentPeriodEnd: subscription.currentPeriodEnd,
+            lmsAccess: {
+                enabled: lmsEnabled && ['ACTIVE', 'TRIALING', 'GRACE'].includes(subscription.status),
+                storageLimitGb: storageFeature ? storageFeature.limitValue : 10,
+                status: subscription.status,
+            }
+        }, subscription.schoolId, tenantId);
+    }
 }
 
 export const webhookEmitter = new WebhookEmitterService();

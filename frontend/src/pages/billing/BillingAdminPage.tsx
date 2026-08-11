@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { useBillingOverview } from '@/hooks/use-billing-overview';
 import { useSchoolBillingAccount } from '@/hooks/use-billing-account';
@@ -18,7 +19,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataTable } from '@/components/shared/DataTable';
 import { Plus, Search, ArrowUpRight, Smartphone } from 'lucide-react';
-import { formatCurrency, formatDate } from '@/lib/utils';
+import { formatCurrency, formatDate, invoiceStatusClass, paymentStatusClass, SUBSCRIPTION_STATUS_META } from '@/lib/utils';
 import type { Subscription, BillingInvoice, BillingAccount } from '@/types';
 import { CreateBillingAccountModal } from '@/components/billing/createBillingAccountModal';
 import { ChangePlanModal } from '@/components/subscriptions/ChangePlanModal';
@@ -29,24 +30,10 @@ import { BillingPageHeader } from '@/components/billing/BillingPageHeader';
 import { BillingInvoiceTable } from '@/components/billing/BillingInvoiceTable';
 import { LimitWarningModal } from '@/components/billing/LimitWarningModal';
 import { UpgradeModal } from '@/components/billing/UpgradeModal';
-
-const STATUS_COLORS: Record<string, string> = {
-  TRIALING: 'bg-blue-100 text-blue-800',
-  ACTIVE: 'bg-green-100 text-green-800',
-  PAST_DUE: 'bg-orange-100 text-orange-800',
-  GRACE: 'bg-yellow-100 text-yellow-800',
-  SUSPENDED: 'bg-red-100 text-red-800',
-  CANCELED: 'bg-gray-100 text-gray-800',
-  EXPIRED: 'bg-gray-100 text-gray-800',
-};
-
-const INVOICE_STATUS_COLORS: Record<string, string> = {
-  PAID: 'bg-green-100 text-green-800',
-  OPEN: 'bg-blue-100 text-blue-800',
-  OVERDUE: 'bg-red-100 text-red-800',
-  CANCELLED: 'bg-gray-100 text-gray-800',
-  DRAFT: 'bg-yellow-100 text-yellow-800',
-};
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import { useChangePlan } from '@/hooks/use-subscriptions';
+import { subscriptionsApi } from '@/api/subscriptions-api';
 
 function KpiCard({ label, value, tone }: { label: string; value: string; tone?: 'default' | 'warning' | 'info' }) {
   const toneClass =
@@ -75,118 +62,191 @@ export default function BillingAdminPage() {
   const [showLimitWarningModal, setShowLimitWarningModal] = useState(false);
   const [showUpgradeModal, setShowUpgradeModal] = useState(false);
 
-  const { kpis, rows, isLoading } = useBillingOverview({ status: statusFilter, search });
+  const { data: overview, isLoading: overviewLoading } = useBillingOverview();
+  const { data: billingAccount } = useSchoolBillingAccount(selected?.schoolId || '');
+  const { data: invoicesData } = useAllBillingInvoices({ schoolId: selected?.schoolId, limit: 20 });
+  const { data: plansData } = usePlans({ isActive: true, limit: 50 });
+  const plans = plansData?.data || [];
 
-  const planQuery = usePlans({ isActive: true, limit: 50 });
-  const plans = planQuery.data?.data || [];
+  const { mutateAsync: changePlan, isPending } = useChangePlan();
+  const queryClient = useQueryClient();
 
-  const accountQuery = useSchoolBillingAccount(selected?.schoolId ?? '');
-  const account = accountQuery.data?.data;
+  const rows = overview?.subscription ? [overview.subscription] : [];
+  const invoices = invoicesData?.data || [];
 
-  const invoicesQuery = useAllBillingInvoices({ schoolId: selected?.schoolId, limit: 5 });
-  const invoices = invoicesQuery.data?.data ?? [];
-  const latestOpenInvoice = invoices.find((inv) => inv.status === 'OPEN');
-
-  const currencyMajor = (minor: number) => formatCurrency(minor / 100, kpis.currency);
-
-  // Subscription columns for DataTable
-  const subscriptionColumns: ColumnDef<Subscription>[] = useMemo(() => [
+  const subscriptionColumns: ColumnDef<Subscription>[] = [
     {
-      accessorKey: 'school.name',
+      accessorKey: 'school',
       header: 'School',
-      cell: ({ row }) => <span className="font-medium">{row.original.school?.name || 'N/A'}</span>,
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium">{row.original.school?.name}</p>
+        </div>
+      ),
     },
     {
-      accessorKey: 'plan.name',
+      accessorKey: 'status',
+      header: 'Status',
+      cell: ({ row }) => {
+        const status = row.original.status;
+        const meta = SUBSCRIPTION_STATUS_META[status] || SUBSCRIPTION_STATUS_META.CANCELED;
+        return (
+          <span className={`inline-flex items-center gap-1.5 border text-[11px] font-bold px-2.5 py-0.5 rounded-full uppercase tracking-wider ${meta.badge}`}>
+            <span className="w-1.5 h-1.5 rounded-full bg-current inline-block" />
+            {meta.label}
+          </span>
+        );
+      },
+    },
+    {
+      accessorKey: 'plan',
       header: 'Plan',
       cell: ({ row }) => (
         <div className="text-sm">
           <p className="font-medium">{row.original.plan?.name}</p>
-          <p className="text-gray-500">{row.original.plan ? currencyMajor(row.original.plan.priceMinor) : '—'}</p>
+          <p className="text-muted-foreground">
+            {formatCurrency((row.original.plan?.priceMinor || 0) / 100, row.original.plan?.currency)}
+          </p>
         </div>
       ),
     },
     {
-      accessorKey: 'status',
-      header: 'Status',
+      accessorKey: 'period',
+      header: 'Billing Period',
       cell: ({ row }) => (
-        <Badge className={STATUS_COLORS[row.original.status] || 'bg-gray-100'}>
-          {row.original.status}
-        </Badge>
-      ),
-    },
-    {
-      accessorKey: 'currentPeriodStart',
-      header: 'Period',
-      cell: ({ row }) => (
-        <span className="text-sm">
-          {formatDate(row.original.currentPeriodStart)} to {formatDate(row.original.currentPeriodEnd)}
-        </span>
+        <div className="text-sm">
+          {new Date(row.original.currentPeriodStart).toLocaleDateString()} – {new Date(row.original.currentPeriodEnd).toLocaleDateString()}
+        </div>
       ),
     },
     {
       accessorKey: 'trialEndsAt',
-      header: 'Trial ends',
+      header: 'Trial Ends',
       cell: ({ row }) => (
-        <span className="text-sm">{row.original.trialEndsAt ? formatDate(row.original.trialEndsAt) : '—'}</span>
+        <span className="text-sm">
+          {row.original.trialEndsAt ? new Date(row.original.trialEndsAt).toLocaleDateString() : '—'}
+        </span>
       ),
     },
-  ], [currencyMajor]);
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setSelected(row.original)}>
+            Manage
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
-  // Invoice columns for DataTable
-  const invoiceColumns: ColumnDef<BillingInvoice>[] = useMemo(() => [
+  const invoiceColumns: ColumnDef<BillingInvoice>[] = [
     {
       accessorKey: 'invoiceNumber',
       header: 'Invoice #',
-    },
-    {
-      accessorKey: 'school.name',
-      header: 'School',
-      cell: ({ row }) => <span className="font-medium">{(row.original as any).school?.name || 'N/A'}</span>,
-    },
-    {
-      accessorKey: 'totalMinor',
-      header: 'Amount',
-      cell: ({ row }) => <span>{currencyMajor(row.original.totalMinor)}</span>,
+      cell: ({ row }) => <span className="font-medium">{row.original.invoiceNumber}</span>,
     },
     {
       accessorKey: 'status',
       header: 'Status',
       cell: ({ row }) => (
-        <Badge className={INVOICE_STATUS_COLORS[row.original.status] || 'bg-gray-100'}>
-          {row.original.status}
+        <Badge variant="outline" className={invoiceStatusClass(row.original.status)}>
+          {row.original.status.toLowerCase()}
         </Badge>
       ),
     },
     {
-      accessorKey: 'dueAt',
-      header: 'Due date',
-      cell: ({ row }) => <span className="text-sm">{row.original.dueAt ? formatDate(row.original.dueAt) : '—'}</span>,
+      accessorKey: 'amount',
+      header: 'Amount',
+      cell: ({ row }) => (
+        <div>
+          <p className="font-medium">{formatCurrency(row.original.totalMinor / 100, row.original.currency)}</p>
+          <p className="text-xs text-muted-foreground">
+            {row.original.totalMinor - row.original.amountPaidMinor > 0
+              ? `${formatCurrency((row.original.totalMinor - row.original.amountPaidMinor) / 100, row.original.currency)} due`
+              : 'Paid'}
+          </p>
+        </div>
+      ),
     },
-  ], [currencyMajor]);
+    {
+      accessorKey: 'dueAt',
+      header: 'Due Date',
+      cell: ({ row }) => <span className="text-sm">{formatDate(row.original.dueAt)}</span>,
+    },
+    {
+      accessorKey: 'paidAt',
+      header: 'Paid Date',
+      cell: ({ row }) => (
+        <span className="text-sm">{row.original.paidAt ? formatDate(row.original.paidAt) : '—'}</span>
+      ),
+    },
+    {
+      id: 'actions',
+      header: 'Actions',
+      cell: ({ row }) => {
+        const invoice = row.original;
+        const remaining = invoice.totalMinor - invoice.amountPaidMinor;
+        const isPayable = invoice.status === 'OPEN' && remaining > 0;
+        return (
+          <div className="flex gap-2">
+            {isPayable && (
+              <Button size="sm" onClick={() => {
+                setSelected((prev) => prev || rows[0]);
+                setShowPayInvoiceModal(true);
+              }} className="gap-1">
+                <Smartphone className="h-3 w-3" />
+                Collect
+              </Button>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
+
+  const filteredRows = useMemo(() => {
+    let data = rows;
+    if (statusFilter !== 'All') {
+      data = data.filter((s) => s.status === statusFilter);
+    }
+    if (search.trim()) {
+      const q = search.trim().toLowerCase();
+      data = data.filter((s) => s.school?.name?.toLowerCase().includes(q));
+    }
+    return data;
+  }, [rows, statusFilter, search]);
+
+  const kpis = useMemo(() => {
+    const activeCount = rows.filter((s) => s.status === 'ACTIVE' || s.status === 'GRACE').length;
+    const pastDueCount = rows.filter((s) => s.status === 'PAST_DUE').length;
+    const outstanding = invoices.reduce((sum, i) => sum + (i.totalMinor - i.amountPaidMinor), 0);
+    const currency = rows[0]?.plan?.currency || 'KES';
+    return { activeCount, pastDueCount, outstanding, currency };
+  }, [rows, invoices]);
+
+  const handleChangePlan = async ({ planId }: { planId: string }) => {
+    if (!selected) return;
+    try {
+      await changePlan({
+        subscriptionId: selected.id,
+        data: { planId, withTrial: false },
+      });
+      toast.success('Plan updated successfully');
+      setShowChangePlanModal(false);
+      queryClient.invalidateQueries({ queryKey: ['subscriptions'] });
+      queryClient.invalidateQueries({ queryKey: ['billing-overview'] });
+    } catch (error) {
+      // error handled by hook toast
+    }
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Billing and subscriptions</h1>
-          <p className="text-gray-600">Manage school billing accounts, plans and payments</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" asChild>
-            <Link to="/subscriptions/plans">
-              Manage plans
-              <ArrowUpRight className="h-4 w-4 ml-1" />
-            </Link>
-          </Button>
-          <Button onClick={() => setShowCreateAccountModal(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Subscription
-          </Button>
-        </div>
-      </div>
+      <BillingPageHeader />
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
@@ -194,130 +254,98 @@ export default function BillingAdminPage() {
           <TabsTrigger value="accounts">Billing Accounts</TabsTrigger>
         </TabsList>
 
-         {/* Overview Tab */}
-         <TabsContent value="overview" className="space-y-6">
-          {/* ── Visual Billing Dashboard (from design reference) ── */}
-          <BillingPageHeader />
-
-          {/* Invoice History */}
-          <BillingInvoiceTable invoices={invoices} currency={kpis.currency} />
-
-          {/* ── Admin KPI Section ── */}
-          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
-            <KpiCard label="MRR" value={currencyMajor(kpis.mrrMinor)} />
-            <KpiCard label="Active schools" value={String(kpis.activeSchoolCount)} />
-            <KpiCard label="Past due" value={`${kpis.pastDueCount} schools`} tone={kpis.pastDueCount > 0 ? 'warning' : 'default'} />
-            <KpiCard
-              label="Trials ending in 7 days"
-              value={`${kpis.trialsEndingSoonCount} schools`}
-              tone={kpis.trialsEndingSoonCount > 0 ? 'info' : 'default'}
-            />
+        <TabsContent value="overview" className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <KpiCard label="Active Schools" value={String(kpis.activeCount)} tone="info" />
+            <KpiCard label="Past Due" value={String(kpis.pastDueCount)} tone="warning" />
+            <KpiCard label="Outstanding" value={formatCurrency(kpis.outstanding / 100, kpis.currency)} tone="warning" />
           </div>
 
           <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex gap-4">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search by school name"
-                    value={search}
-                    onChange={(e) => setSearch(e.target.value)}
-                    className="pl-9"
-                  />
-                </div>
-                <div className="w-56">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All statuses</SelectItem>
-                      <SelectItem value="TRIALING">Trialing</SelectItem>
-                      <SelectItem value="ACTIVE">Active</SelectItem>
-                      <SelectItem value="PAST_DUE">Past due</SelectItem>
-                      <SelectItem value="GRACE">Grace period</SelectItem>
-                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                      <SelectItem value="CANCELED">Canceled</SelectItem>
-                      <SelectItem value="EXPIRED">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold">Selected School</h3>
+                {selected ? (
+                  <Button variant="ghost" size="sm" onClick={() => setSelected(null)}>
+                    Clear
+                  </Button>
+                ) : (
+                  <span className="text-xs text-muted-foreground">Select a school from the table</span>
+                )}
               </div>
 
-              <DataTable columns={subscriptionColumns} data={rows} pageSize={10} />
+              {selected ? (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-lg font-bold">{selected.school?.name}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => setShowChangePlanModal(true)}>Change Plan</Button>
+                      <Button size="sm" variant="outline" onClick={() => setShowManageStatusModal(true)}>
+                        Manage Status
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Plan</p>
+                      <p className="font-medium">{selected.plan?.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Price</p>
+                      <p className="font-medium">{formatCurrency((selected.plan?.priceMinor || 0) / 100, selected.plan?.currency)}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Period</p>
+                      <p className="font-medium">
+                        {new Date(selected.currentPeriodStart).toLocaleDateString()} – {new Date(selected.currentPeriodEnd).toLocaleDateString()}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Trial Ends</p>
+                      <p className="font-medium">{selected.trialEndsAt ? new Date(selected.trialEndsAt).toLocaleDateString() : '—'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button onClick={() => setShowUpgradeModal(true)} className="gap-2">
+                      <ArrowUpRight className="h-4 w-4" />
+                      Upgrade
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-8">
+                  Select a subscription from the table to view details.
+                </p>
+              )}
             </CardContent>
           </Card>
-
-          {selected && (
-            <Card>
-              <CardContent className="pt-6 space-y-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-2">
-                    <p className="font-semibold text-lg">{selected.school?.name}</p>
-                    <Badge className={STATUS_COLORS[selected.status] || 'bg-gray-100'}>{selected.status}</Badge>
-                  </div>
-                  <div className="flex gap-2">
-                    {latestOpenInvoice && (
-                      <Button variant="outline" size="sm" onClick={() => setShowPayInvoiceModal(true)}>
-                        Record payment
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => setShowChangePlanModal(true)}>
-                      Change plan
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setShowManageStatusModal(true)}>
-                      Manage status
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm pt-4 border-t">
-                  <div>
-                    <p className="text-muted-foreground mb-1">Legal name</p>
-                    <p>{accountQuery.isLoading ? 'Loading…' : account?.legalName ?? 'No billing account on file'}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Billing email</p>
-                    <p>{accountQuery.isLoading ? 'Loading…' : account?.email ?? '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Currency</p>
-                    <p>{account?.prefferedCurrency ?? selected.plan?.currency ?? 'KES'}</p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Latest invoice</p>
-                    <p>
-                      {invoicesQuery.isLoading
-                        ? 'Loading…'
-                        : invoices[0]
-                        ? `${invoices[0].invoiceNumber} · ${currencyMajor(invoices[0].totalMinor)}`
-                        : 'No invoices yet'}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Payment method</p>
-                    <p className="flex items-center gap-1">
-                      <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
-                      M-Pesa
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-muted-foreground mb-1">Renewals</p>
-                    <p>{selected.renewalCount ?? 0}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
         </TabsContent>
 
-        {/* Subscriptions Tab */}
         <TabsContent value="subscriptions" className="space-y-6">
           <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="flex gap-4">
-                <div className="relative flex-1 max-w-sm">
+            <CardContent className="pt-6">
+              <div className="flex gap-4 mb-4">
+                <div className="flex-1 max-w-xs">
+                  <label className="text-sm font-medium block mb-2">Filter by Status</label>
+                  <Select value={statusFilter} onValueChange={setStatusFilter}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="All statuses" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Statuses</SelectItem>
+                      <SelectItem value="TRIALING">Trialing</SelectItem>
+                      <SelectItem value="ACTIVE">Active</SelectItem>
+                      <SelectItem value="PAST_DUE">Past Due</SelectItem>
+                      <SelectItem value="GRACE">Grace Period</SelectItem>
+                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
+                      <SelectItem value="CANCELED">Canceled</SelectItem>
+                      <SelectItem value="EXPIRED">Expired</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex-1 max-w-sm">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search by school name"
@@ -326,31 +354,13 @@ export default function BillingAdminPage() {
                     className="pl-9"
                   />
                 </div>
-                <div className="w-56">
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="All statuses" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="All">All statuses</SelectItem>
-                      <SelectItem value="TRIALING">Trialing</SelectItem>
-                      <SelectItem value="ACTIVE">Active</SelectItem>
-                      <SelectItem value="PAST_DUE">Past due</SelectItem>
-                      <SelectItem value="GRACE">Grace period</SelectItem>
-                      <SelectItem value="SUSPENDED">Suspended</SelectItem>
-                      <SelectItem value="CANCELED">Canceled</SelectItem>
-                      <SelectItem value="EXPIRED">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
-              <DataTable columns={subscriptionColumns} data={rows} pageSize={10} />
+              <DataTable columns={subscriptionColumns} data={filteredRows} pageSize={10} />
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Invoices Tab */}
         <TabsContent value="invoices" className="space-y-6">
           <Card>
             <CardContent className="pt-6">
@@ -359,7 +369,6 @@ export default function BillingAdminPage() {
           </Card>
         </TabsContent>
 
-        {/* Billing Accounts Tab */}
         <TabsContent value="accounts" className="space-y-6">
           <Card>
             <CardContent className="pt-6">
@@ -389,21 +398,17 @@ export default function BillingAdminPage() {
       <PayInvoiceModal
         open={showPayInvoiceModal}
         onOpenChange={setShowPayInvoiceModal}
-        invoice={latestOpenInvoice ?? null}
+        invoice={null}
       />
 
-      {/* Upgrade Modal — full plan selector */}
       <UpgradeModal
         open={showUpgradeModal}
         onClose={() => setShowUpgradeModal(false)}
         plans={plans}
-        currentPlanName={selected?.plan?.name || rows[0]?.plan?.name || 'Starter Plan'}
-        currentPrice={selected?.plan?.priceMinor || rows[0]?.plan?.priceMinor || 20000}
+        currentPlanName={selected?.plan?.name || rows[0]?.plan?.name || ''}
+        currentPrice={selected?.plan?.priceMinor || rows[0]?.plan?.priceMinor}
         currency={kpis.currency || 'KES'}
-        onConfirm={(planId, billing) => {
-          console.log('Upgrade confirmed:', { planId, billing });
-          setShowUpgradeModal(false);
-        }}
+        subscriptionId={selected?.id || rows[0]?.id}
       />
     </div>
   );

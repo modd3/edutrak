@@ -19,8 +19,12 @@ import auditRoutes from './audit.routes';
 import studentGuardianRoutes from './student-guardian.routes';
 import entitlementRoutes from './entitlement.routes';
 import timetableRoutes from './timetable.routes';
+import onboardingRoutes from './onboarding.routes';
 
 const router = Router();
+
+// Public self-service onboarding (no auth required)
+router.use('/onboarding', onboardingRoutes);
 
 router.use('/users', userRoutes);
 router.use('/auth', authRoutes);

@@ -8,6 +8,7 @@ import { RequestWithUser } from '../middleware/school-context';
 import { PaymentProviderFactory } from '../services/payment-provider/PaymentProviderFactory';
 import { WebhookPayload } from '../types/payment-provider.types';
 import { InputJsonArray } from '@prisma/client/runtime/library';
+import { webhookEmitter } from '../services/webhook-emitter.service';
 
 export class WebhookController {
   private prisma: PrismaClient;
@@ -336,10 +337,21 @@ export class WebhookController {
       });
 
       if (billingPayment) {
+        const paymentId = billingPayment.id;
+
         await this.prisma.$transaction(async (tx: any) => {
-          // Mark payment as completed
+          const existing = await tx.billingPayment.findUnique({ where: { id: paymentId } });
+          if (existing?.status === 'COMPLETED') {
+            logger.info('Billing payment already completed; skipping duplicate webhook apply', {
+              paymentId,
+              provider,
+              webhookLogId,
+            });
+            return;
+          }
+
           await tx.billingPayment.update({
-            where: { id: billingPayment.id },
+            where: { id: paymentId },
             data: {
               status: 'COMPLETED',
               paidAt: new Date(),
@@ -347,7 +359,6 @@ export class WebhookController {
             },
           });
 
-          // Update invoice
           if (billingPayment.billingInvoiceId) {
             const billInvoice = await tx.billingInvoice.findUnique({
               where: { id: billingPayment.billingInvoiceId },
@@ -366,21 +377,47 @@ export class WebhookController {
                 },
               });
 
-              // If invoice is fully paid, transition subscription back to ACTIVE
-              // if it was in PAST_DUE, GRACE, or SUSPENDED
               if (nextStatus === 'PAID') {
                 const subscription = await tx.tenantSubscription.findUnique({
                   where: { id: billingPayment.subscriptionId },
+                  include: { plan: { include: { features: true } } },
                 });
 
-                if (subscription && ['PAST_DUE', 'GRACE', 'SUSPENDED'].includes(subscription.status)) {
-                  await tx.tenantSubscription.update({
+                if (subscription && ['TRIALING', 'PAST_DUE', 'GRACE', 'SUSPENDED', 'EXPIRED'].includes(subscription.status)) {
+                  // Advance the billing period so the daily lifecycle job does
+                  // not immediately flip this subscription back to PAST_DUE.
+                  // New period starts from whichever is later: the old period
+                  // end (standard renewal) or now (reactivation after a gap).
+                  const oldPeriodEnd = new Date(subscription.currentPeriodEnd);
+                  const newPeriodStart = oldPeriodEnd > new Date() ? oldPeriodEnd : new Date();
+                  const newPeriodEnd = this.calculateNextPeriodEnd(
+                    newPeriodStart,
+                    subscription.plan?.billingInterval ?? 'MONTHLY'
+                  );
+
+                  const updatedSub = await tx.tenantSubscription.update({
                     where: { id: subscription.id },
-                    data: { status: 'ACTIVE' },
+                    data: {
+                      status: 'ACTIVE',
+                      currentPeriodStart: newPeriodStart,
+                      currentPeriodEnd: newPeriodEnd,
+                      lastBillingDate: new Date(),
+                      renewalCount: { increment: 1 },
+                      // Clear grace deadline on successful payment
+                      graceEndsAt: null,
+                    },
+                    include: { plan: { include: { features: true } } },
                   });
-                  logger.info('Subscription reactivated after payment', {
+                  logger.info('Subscription reactivated and period advanced after payment', {
                     subscriptionId: subscription.id,
+                    fromStatus: subscription.status,
+                    newPeriodStart,
+                    newPeriodEnd,
                   });
+                  webhookEmitter.emitSubscriptionEvent(updatedSub, 'status_changed');
+                } else if (subscription && subscription.status === 'ACTIVE') {
+                  // Already active (e.g. payment for current period) — just emit
+                  webhookEmitter.emitSubscriptionEvent(subscription, 'status_changed');
                 }
               }
             }
@@ -388,7 +425,7 @@ export class WebhookController {
         });
 
         logger.info('Billing payment confirmed via webhook', {
-          paymentId: billingPayment.id,
+          paymentId,
           invoiceId: billingPayment.billingInvoiceId,
           provider,
         });
@@ -412,6 +449,25 @@ export class WebhookController {
       if (item.Value !== undefined) metadata[item.Name] = item.Value;
     }
     return metadata;
+  }
+
+  private calculateNextPeriodEnd(from: Date, interval: string): Date {
+    const date = new Date(from);
+    switch (interval) {
+      case 'MONTHLY':
+        date.setMonth(date.getMonth() + 1);
+        break;
+      case 'QUARTERLY':
+        date.setMonth(date.getMonth() + 3);
+        break;
+      case 'YEARLY':
+        date.setFullYear(date.getFullYear() + 1);
+        break;
+      default:
+        date.setMonth(date.getMonth() + 1);
+        break;
+    }
+    return date;
   }
 }
 

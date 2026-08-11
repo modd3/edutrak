@@ -22,17 +22,9 @@ import {
 } from '@/components/ui/select';
 import { Plus, Calendar } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { CreateSubscriptionModal } from '@/components/subscriptions/CreateSubscriptionModal';
-
-const STATUS_COLORS: Record<string, string> = {
-  TRIALING: 'bg-blue-100 text-blue-800',
-  ACTIVE: 'bg-green-100 text-green-800',
-  PAST_DUE: 'bg-orange-100 text-orange-800',
-  GRACE: 'bg-yellow-100 text-yellow-800',
-  SUSPENDED: 'bg-red-100 text-red-800',
-  CANCELED: 'bg-gray-100 text-gray-800',
-  EXPIRED: 'bg-gray-100 text-gray-800',
-};
+import { SUBSCRIPTION_STATUS_META, formatCurrency } from '@/lib/utils';
 
 export function SubscriptionsPage() {
   const [page, setPage] = useState(1);
@@ -59,7 +51,7 @@ export function SubscriptionsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold">Subscriptions</h1>
-          <p className="text-gray-600">Manage your school subscription and billing</p>
+          <p className="text-muted-foreground">Manage your school subscription and billing</p>
         </div>
         {isSuperAdmin && (
           <Button onClick={() => setShowCreateModal(true)} className="gap-2">
@@ -98,62 +90,58 @@ export function SubscriptionsPage() {
                   </Select>
                 </div>
               </div>
-            </CardContent>
-          </Card>
 
-          {/* Subscriptions Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
-                {isLoading ? 'Loading...' : `All Subscriptions (${pagination?.total || 0})`}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
+              <div className="mt-6 overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>School</TableHead>
                       <TableHead>Plan</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="flex items-center gap-1">
-                        <Calendar className="h-4 w-4" />
-                        Period
-                      </TableHead>
+                      <TableHead>Period</TableHead>
                       <TableHead>Trial Ends</TableHead>
-                      <TableHead className="w-[180px]">Actions</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {isLoading ? (
+                    {isLoading && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                          Loading subscriptions...
+                        <TableCell colSpan={6}>
+                          <div className="space-y-2">
+                            {[...Array(5)].map((_, i) => (
+                              <Skeleton key={i} className="h-10 w-full" />
+                            ))}
+                          </div>
                         </TableCell>
                       </TableRow>
-                    ) : subscriptions.length === 0 ? (
+                    )}
+                    {isError && (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                          No subscriptions found
+                        <TableCell colSpan={6} className="text-center text-red-600 py-8">
+                          Failed to load subscriptions. Please try again.
                         </TableCell>
                       </TableRow>
-                    ) : (
-                      subscriptions.map((subscription) => (
+                    )}
+                    {!isLoading && !isError && subscriptions.map((subscription) => {
+                      const meta = SUBSCRIPTION_STATUS_META[subscription.status] || SUBSCRIPTION_STATUS_META.CANCELED;
+                      return (
                         <TableRow key={subscription.id}>
-                          <TableCell className="font-medium">
-                            {subscription.school?.name || 'N/A'}
+                          <TableCell>
+                            <div>
+                              <p className="font-medium">{subscription.school?.name}</p>
+                            </div>
                           </TableCell>
                           <TableCell>
                             <div className="text-sm">
                               <p className="font-medium">{subscription.plan?.name}</p>
-                              <p className="text-gray-500">
-                                {(subscription.plan?.priceMinor || 0) / 100} {subscription.plan?.currency}
+                              <p className="text-muted-foreground">
+                                {formatCurrency((subscription.plan?.priceMinor || 0) / 100, subscription.plan?.currency)}
                               </p>
                             </div>
                           </TableCell>
                           <TableCell>
-                            <Badge className={STATUS_COLORS[subscription.status] || 'bg-gray-100'}>
-                              {subscription.status}
+                            <Badge variant="outline" className={meta.badge}>
+                              {meta.label}
                             </Badge>
                           </TableCell>
                           <TableCell className="text-sm">
@@ -181,8 +169,8 @@ export function SubscriptionsPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))
-                    )}
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </div>

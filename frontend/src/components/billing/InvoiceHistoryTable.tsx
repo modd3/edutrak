@@ -32,6 +32,11 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
     onPayInvoice?.(invoice);
   };
 
+  const handleView = (invoice: BillingInvoice) => {
+    setSelectedInvoice(invoice);
+    // Placeholder: wire to invoice detail view when available.
+  };
+
   if (isLoading) {
     return (
       <Card>
@@ -119,7 +124,7 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
                             Pay Now
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost">
+                        <Button size="sm" variant="ghost" onClick={() => handleView(invoice)}>
                           <Eye className="h-3 w-3" />
                         </Button>
                       </div>

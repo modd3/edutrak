@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatCurrency, formatDate, invoiceStatusClass } from '@/lib/utils';
+import { formatCurrency, formatDate, paymentStatusClass } from '@/lib/utils';
 
 interface PaymentHistoryTableProps {
   payments: BillingPayment[];
@@ -74,10 +74,10 @@ export function PaymentHistoryTable({ payments, isLoading }: PaymentHistoryTable
                     {payment.providerReference || payment.id.slice(0, 8)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {formatCurrency(payment.amountMinor / 100)}
+                    {formatCurrency(payment.amountMinor / 100, payment.currency)}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={invoiceStatusClass(payment.status)}>
+                    <Badge variant="outline" className={paymentStatusClass(payment.status)}>
                       {payment.status.toLowerCase()}
                     </Badge>
                   </TableCell>

@@ -1,76 +1,61 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { TeacherService } from '../services/teacher.service';
+import { userCreationService } from '../services/user-creation.service';
 import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
-import { Role } from '@prisma/client';
 import { RequestWithUser } from '../middleware/school-context';
+import { ResourceLimitError } from '../services/entitlement.service';
 
 export class TeacherController {
-  async createTeacher(req: RequestWithUser, res: Response): Promise<Response> {
+  /**
+   * Create a teacher with a new user account.
+   * Delegates to UserCreationService.createUserWithProfile - the only place
+   * that should create a User row - rather than re-implementing user
+   * creation here. That also means teachers.max is enforced automatically,
+   * since the check lives inside that service method.
+   */
+  async createTeacherWithUser(req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const { userId, tscNumber, employmentType } = req.body;
-      
-      if (!userId || !tscNumber || !employmentType) {
-        return ResponseUtil.validationError(res, 'Required fields: userId, tscNumber, employmentType');
+      const {
+        email, password, firstName, lastName, middleName, phone, idNumber,
+        tscNumber, employmentType, qualification, specialization, dateJoined,
+      } = req.body;
+
+      if (!email || !password || !firstName || !lastName || !tscNumber || !employmentType) {
+        return ResponseUtil.validationError(res, 'Required fields: email, password, firstName, lastName, tscNumber, employmentType');
       }
 
-      const teacherService = new TeacherService(req);
-      const teacher = await teacherService.createTeacher(req.body);
+      const user: any = await userCreationService.createUserWithProfile(
+        { email, password, firstName, lastName, middleName, phone, idNumber, role: 'TEACHER' as any },
+        { tscNumber, employmentType, qualification, specialization, dateJoined: dateJoined ? new Date(dateJoined) : undefined } as any,
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
 
       // Audit log
       auditService.log({
         schoolId: req.schoolId,
         actorId: req.user!.userId,
         actorRole: req.user!.role,
-        action: 'CREATE_TEACHER',
-        entityType: 'Teacher',
-        entityId: teacher.id,
-        details: `Created teacher profile for user ${userId}`,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
-
-      return ResponseUtil.created(res, 'Teacher created successfully', teacher);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Teacher with this TSC number already exists');
-      }
-      return ResponseUtil.error(res, error.message, 400);
-    }
-  }
-
-  async createTeacherWithUser(req: RequestWithUser, res: Response): Promise<Response> {
-    try {
-      const currentUser = req.user!;
-      const { email, password, firstName, lastName, tscNumber, employmentType } = req.body;
-      
-      if (!email || !password || !firstName || !lastName || !tscNumber || !employmentType) {
-        return ResponseUtil.validationError(res, 'Required fields: email, password, firstName, lastName, tscNumber, employmentType');
-      }
-
-      const teacherService = new TeacherService(req);
-      const teacher = await teacherService.createTeacherWithUser(req.body, {
-        userId: currentUser.userId,
-        role: currentUser.role as Role
-      });
-
-      // Audit log
-      auditService.log({
-        schoolId: req.schoolId,
-        actorId: currentUser.userId,
-        actorRole: currentUser.role,
         action: 'CREATE_TEACHER_WITH_USER',
         entityType: 'Teacher',
-        entityId: teacher.id,
+        entityId: user.teacher?.id ?? user.id,
         entityName: `${firstName} ${lastName}`,
         details: `Created teacher with user account: ${firstName} ${lastName} (${email})`,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      return ResponseUtil.created(res, 'Teacher with user account created successfully', teacher);
+      return ResponseUtil.created(res, 'Teacher with user account created successfully', user);
     } catch (error: any) {
+      if (error instanceof ResourceLimitError) {
+        return res.status(402).json({
+          error: 'RESOURCE_LIMIT_REACHED',
+          featureKey: error.role,
+          message: error.message,
+        });
+      }
       if (error.code === 'P2002') {
         return ResponseUtil.conflict(res, 'Teacher or user with these details already exists');
       }

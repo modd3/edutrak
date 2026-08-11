@@ -5,7 +5,37 @@ export type EntitlementDecision = {
   reason?: string;
 };
 
-const SUBSCRIPTION_ACCESS_STATES = new Set(['TRIALING', 'ACTIVE', 'GRACE']);
+// Thrown by UserCreationService when a role's plan limit (students.max,
+// teachers.max, ...) is already reached. Controllers should catch this
+// specifically and respond 402, rather than treating it like a generic
+// validation error.
+export class ResourceLimitError extends Error {
+  constructor(public readonly role: string, message: string) {
+    super(message);
+    this.name = 'ResourceLimitError';
+  }
+}
+
+const SUBSCRIPTION_ACCESS_STATES = new Set(['TRIALING', 'ACTIVE', 'PAST_DUE']);
+
+// Single source of truth for "creating a User with this role counts against
+// a COUNT-type plan feature". Every code path that creates a User (or a
+// role-specific profile like Teacher/Student) MUST check through here -
+// this map used to be duplicated per-controller, which is exactly how the
+// teachers.max limit ended up silently bypassed by a second teacher-creation
+// route that nobody remembered to gate. Add new roles here, not inline in a
+// controller.
+export const ROLE_RESOURCE_LIMITS: Record<string, { metricKey: string; countFn: (schoolId: string) => Promise<number> }> = {
+  STUDENT: {
+    metricKey: 'students.max',
+    countFn: (schoolId: string) => (prisma as any).student.count({ where: { schoolId } }),
+  },
+  TEACHER: {
+    metricKey: 'teachers.max',
+    // Teacher has no direct schoolId column - it's scoped via its User.
+    countFn: (schoolId: string) => (prisma as any).teacher.count({ where: { user: { schoolId } } }),
+  },
+};
 
 class EntitlementService {
   async canUseFeature(schoolId: string, featureKey: string): Promise<EntitlementDecision> {
@@ -67,11 +97,31 @@ class EntitlementService {
   if (!feature?.enabled || feature.limitType !== 'COUNT') return { allowed: true };
 
   const currentCount = await countFn();
-  if (currentCount >= (feature.limitValue ?? 0)) {
-    return { allowed: false, reason: `Limit reached: ${currentCount}/${feature.limitValue} (${metricKey})` };
+  const limitValue = feature.limitValue ?? 0;
+  if (currentCount + requestedUnits > limitValue) {
+    return { allowed: false, reason: `Limit reached: ${currentCount}/${limitValue} (${metricKey})` };
   }
   return { allowed: true };
 }
+
+  /**
+   * Checks whether creating `requestedUnits` more Users of `role` would
+   * exceed that role's plan limit (students.max / teachers.max). Returns
+   * { allowed: true } for roles with no configured limit, and bypasses
+   * entirely for super admins acting outside a single school's context -
+   * same rule as requireFeature. Use this from every controller that can
+   * create a User of a limited role, instead of re-deriving the check.
+   */
+  async checkRoleResourceLimit(
+    schoolId: string | undefined,
+    role: string | undefined,
+    isSuperAdmin: boolean,
+    requestedUnits: number = 1
+  ): Promise<EntitlementDecision> {
+    const limit = ROLE_RESOURCE_LIMITS[role ?? ''];
+    if (!limit || !schoolId || isSuperAdmin) return { allowed: true };
+    return this.withinResourceLimit(schoolId, limit.metricKey, () => limit.countFn(schoolId), requestedUnits);
+  }
 
 async incrementUsage(schoolId: string, metricKey: string, units: number = 1) {
   const now = new Date();

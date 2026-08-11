@@ -92,6 +92,15 @@ export const register = async (req: Request, res: Response) => {
       );
     }
 
+    // Only ADMIN and SUPER_ADMIN can be created without a profile
+    // For STUDENT, TEACHER, and PARENT roles, use POST /api/users instead
+    if (role && !['ADMIN', 'SUPER_ADMIN'].includes(role)) {
+      return ResponseUtil.validationError(
+        res,
+        `Role ${role} requires a profile. Use POST /api/users to create users with profiles.`
+      );
+    }
+
     // Validate password strength
     const passwordValidation = authService.validatePasswordStrength(password);
     if (!passwordValidation.isValid) {

@@ -38,7 +38,9 @@ const FEATURE_REGISTRY: Record<string, { name: string; limitType: 'BOOLEAN' | 'C
   'students.max': { name: 'Student Limit', limitType: 'COUNT' },
   'teachers.max': { name: 'Teacher Limit', limitType: 'COUNT' },
   'sms.monthly_quota': { name: 'SMS Quota', limitType: 'COUNT' },
-  'lms.core': { name: 'Learning Management', limitType: 'BOOLEAN' },
+  'lms.core': { name: 'Learning Management System (Go LMS Integration)', limitType: 'BOOLEAN' },
+  'lms.analytics': { name: 'LMS Advanced Learning Analytics', limitType: 'BOOLEAN' },
+  'lms.storage_limit': { name: 'LMS Content Storage (GB)', limitType: 'COUNT' },
 };
 
 const BILLING_INTERVAL_LABELS: Record<string, string> = {

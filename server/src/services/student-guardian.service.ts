@@ -1,11 +1,10 @@
 // src/services/student-guardian.service.ts
 // Centralized service for managing student-guardian relationships
 import { v4 as uuidv4 } from 'uuid';
-import { hashPassword } from '../utils/hash';
 import logger from '../utils/logger';
-import emailService from '../utils/email';
 import { BaseService } from './base.service';
 import { RequestWithUser } from '../middleware/school-context';
+import { userCreationService } from './user-creation.service';
 
 export class StudentGuardianService extends BaseService {
   private req?: RequestWithUser;
@@ -102,7 +101,18 @@ export class StudentGuardianService extends BaseService {
   }
 
   /**
-   * Create a new guardian user and link them to a student in one step
+   * Create a new guardian user and link them to a student in one step.
+   * User+guardian creation is delegated to UserCreationService (the only
+   * place that should create a User row); this method's own job is just
+   * the student-guardian link, reusing linkGuardianToStudent for that.
+   *
+   * NOTE on atomicity: this is now two committed steps rather than one
+   * transaction (UserCreationService runs its own transaction internally,
+   * which can't be composed into this method's). If the link step fails
+   * after the user/guardian was created, the guardian exists but isn't
+   * linked to this student yet - it's recoverable via the existing
+   * "link existing guardian" flow, not silently lost, but it's not the
+   * single-transaction guarantee the old inline version had.
    */
   async createGuardianAndLink(data: {
     studentId: string;
@@ -119,7 +129,8 @@ export class StudentGuardianService extends BaseService {
     workPhone?: string;
     isPrimary?: boolean;
   }) {
-    const { schoolId, isSuperAdmin } = this.getSchoolContext();
+    const { isSuperAdmin } = this.getSchoolContext();
+    const schoolId = this.req?.schoolId;
 
     // Validate student
     const student = await this.prisma.student.findFirst({
@@ -131,67 +142,44 @@ export class StudentGuardianService extends BaseService {
       throw new Error('Access denied');
     }
 
-    return await this.prisma.$transaction(async (tx) => {
-      // Create guardian user
-      const guardianUser = await tx.user.create({
-        data: {
-          id: uuidv4(),
-          email: data.email,
-          password: await hashPassword(data.password),
-          firstName: data.firstName,
-          lastName: data.lastName,
-          middleName: data.middleName,
-          phone: data.phone,
-          idNumber: data.idNumber,
-          role: 'PARENT',
-          schoolId: student.schoolId,
-        },
-      });
+    const user: any = await userCreationService.createUserWithProfile(
+      {
+        email: data.email,
+        password: data.password,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        middleName: data.middleName,
+        phone: data.phone,
+        idNumber: data.idNumber,
+        role: 'PARENT' as any,
+        // Target the student's own school explicitly - matters for a super
+        // admin acting across schools, where req.schoolId won't match.
+        schoolId: student.schoolId,
+      },
+      { relationship: data.relationship, occupation: data.occupation, employer: data.employer, workPhone: data.workPhone } as any,
+      student.schoolId,
+      isSuperAdmin
+    );
 
-      // Create guardian profile
-      const guardian = await tx.guardian.create({
-        data: {
-          id: uuidv4(),
-          userId: guardianUser.id,
-          relationship: data.relationship,
-          occupation: data.occupation,
-          employer: data.employer,
-          workPhone: data.workPhone,
-        },
-      });
-
-      // If setting as primary, unset other primaries
-      if (data.isPrimary) {
-        await tx.studentGuardian.updateMany({
-          where: { studentId: data.studentId, isPrimary: true },
-          data: { isPrimary: false },
-        });
-      }
-
-      // Link to student
-      const link = await tx.studentGuardian.create({
-        data: {
-          id: uuidv4(),
-          studentId: data.studentId,
-          guardianId: guardian.id,
-          relationship: data.relationship,
-          isPrimary: data.isPrimary || false,
-        },
-      });
-
-      logger.info('Guardian created and linked to student', {
-        studentId: data.studentId,
-        guardianId: guardian.id,
-      });
-
-      return {
-        guardian: {
-          ...guardian,
-          user: guardianUser,
-        },
-        link,
-      };
+    const link = await this.linkGuardianToStudent({
+      studentId: data.studentId,
+      guardianId: user.guardian.id,
+      relationship: data.relationship,
+      isPrimary: data.isPrimary,
     });
+
+    logger.info('Guardian created and linked to student', {
+      studentId: data.studentId,
+      guardianId: user.guardian.id,
+    });
+
+    return {
+      guardian: {
+        ...user.guardian,
+        user,
+      },
+      link,
+    };
   }
 
   /**

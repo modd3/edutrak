@@ -2,7 +2,7 @@ import { Check, X } from 'lucide-react';
 import type { PlanFeature, FeatureRegistry } from '@/types';
 
 export function FeatureRow({ feature, registry }: { feature: PlanFeature; registry: FeatureRegistry }) {
-  const label = registry[feature.featureKey]?.name ?? feature.featureKey;
+  const label = registry[feature.featureKey]?.name ?? feature.featureKey.replace(/_/g, ' ');
 
   if (feature.limitType === 'COUNT') {
     return (

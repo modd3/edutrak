@@ -58,7 +58,7 @@ describe('EntitlementService', () => {
 
   test('allows quota when usage is within limit', async () => {
     mockedPrisma.tenantSubscription.findFirst.mockResolvedValue({
-      status: 'GRACE',
+      status: 'ACTIVE',
       plan: { features: [{ featureKey: 'students.max', enabled: true, limitType: 'COUNT', limitValue: 100 }] },
     });
     mockedPrisma.usageMetric.findFirst.mockResolvedValue({ usedUnits: 60 });

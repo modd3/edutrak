@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -7,6 +7,7 @@ import { Eye, EyeOff, Loader2, GraduationCap } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuthStore } from '@/store/auth-store';
 import { authApi } from '@/api';
+import apiClient from '@/api/client';
 
 // Validation schema
 const loginSchema = z.object({
@@ -41,14 +42,36 @@ export function Login() {
   // If this is an SSO popup and the user already has a valid EduTrak
   // session, hand the token to the LMS window and close immediately
   // instead of showing a login form the user didn't ask for.
+  //
+  // The persisted token is validated against the API first: a stale or
+  // expired token would otherwise be handed to the LMS, which would reject
+  // the SSO handshake and show an "unauthorised" error instead of this
+  // login form. When the token is no longer valid, the stale session is
+  // cleared so the user sees the login form and can sign in again.
   useEffect(() => {
     if (!isSSOPopup) return;
 
     const state = useAuthStore.getState();
-    if (state.token && state.isAuthenticated) {
-      window.opener.postMessage({ type: 'edutrak-sso', token: state.token }, LMS_ORIGIN);
-      window.close();
-    }
+    if (!state.token || !state.isAuthenticated) return;
+
+    let cancelled = false;
+
+    apiClient
+      .get('/auth/profile')
+      .then(() => {
+        if (cancelled) return;
+        window.opener.postMessage({ type: 'edutrak-sso', token: state.token }, LMS_ORIGIN);
+        window.close();
+      })
+      .catch(() => {
+        if (cancelled) return;
+        // Stale/expired session - clear it so the login form shows.
+        useAuthStore.getState().logout();
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [isSSOPopup]);
 
   const {
@@ -351,6 +374,19 @@ export function Login() {
               >
                 Contact Support
                 </a>
+            </p>
+          </div>
+
+          {/* Register link */}
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              New school?{' '}
+              <Link
+                to="/register"
+                className="text-blue-600 hover:text-blue-700 font-medium"
+              >
+                Register your school
+              </Link>
             </p>
           </div>
         </div>

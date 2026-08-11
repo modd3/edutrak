@@ -38,12 +38,12 @@ export const billingInvoicesApi = {
   /**
    * Pay an invoice via M-Pesa STK Push
    */
-  payInvoice: async (invoiceId: string, phoneNumber: string): Promise<{
+  payInvoice: async (invoiceId: string, phoneNumber: string, headers?: Record<string, string>): Promise<{
     success: boolean;
     message: string;
-    data: { checkoutRequestId: string; transactionRef: string; amount: number };
+    data: { checkoutRequestId: string; transactionRef: string; amount: number; paymentId?: string };
   }> => {
-    const response = await api.post('/billing/payments/pay-invoice', { invoiceId, phoneNumber });
+    const response = await api.post('/billing/payments/pay-invoice', { invoiceId, phoneNumber }, { headers });
     return response.data;
   },
 };

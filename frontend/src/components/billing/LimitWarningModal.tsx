@@ -1,25 +1,30 @@
 import { useEffect, useState } from 'react';
+import { formatPlanPrice } from '@/lib/utils';
 
 interface LimitWarningModalProps {
   open: boolean;
   onClose: () => void;
   onUpgrade: () => void;
-  currentPlanName?: string;
-  currentLimit?: number;
-  newPlanName?: string;
-  newLimit?: number;
-  price?: string;
+  currentPlanName: string;
+  currentLimit: number;
+  newPlanName: string;
+  newLimit: number;
+  priceMinor: number;
+  currency?: string;
+  metricLabel?: string;
 }
 
 export function LimitWarningModal({
   open,
   onClose,
   onUpgrade,
-  currentPlanName = 'Starter Plan',
-  currentLimit = 20,
-  newPlanName = 'Growth Plan',
-  newLimit = 50,
-  price = '$400/mo',
+  currentPlanName,
+  currentLimit,
+  newPlanName,
+  newLimit,
+  priceMinor,
+  currency = 'KES',
+  metricLabel = 'teachers',
 }: LimitWarningModalProps) {
   const [visible, setVisible] = useState(false);
 
@@ -47,6 +52,8 @@ export function LimitWarningModal({
 
   if (!open) return null;
 
+  const currentLabel = metricLabel.replace(/s$/, '');
+
   return (
     <div
       onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
@@ -67,7 +74,6 @@ export function LimitWarningModal({
           transition: 'transform 0.2s cubic-bezier(0.34,1.56,0.64,1), opacity 0.2s ease',
         }}
       >
-        {/* Header with icon */}
         <div className="flex items-start gap-4 mb-5">
           <div className="w-11 h-11 rounded-full bg-amber-100 border border-amber-300 flex items-center justify-center flex-shrink-0">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -77,29 +83,29 @@ export function LimitWarningModal({
             </svg>
           </div>
           <div>
-            <h2 className="text-xl font-bold text-[#1e1b4b] m-0">Teacher Limit Reached</h2>
+            <h2 className="text-xl font-bold text-[#1e1b4b] m-0">Limit Reached</h2>
           </div>
         </div>
 
-        {/* Body text */}
         <p className="text-sm text-slate-600 leading-relaxed mb-5 m-0">
           Your school is currently on the <strong>{currentPlanName}</strong>, which supports a maximum of{' '}
-          <strong>{currentLimit} teachers</strong>. To add a {currentLimit + 1}st teacher and continue expanding
+          <strong>
+            {currentLimit} {metricLabel}
+          </strong>
+          . To add a {currentLimit + 1}nd {currentLabel} and continue expanding
           your staff, you must upgrade your workspace subscription to the <strong>{newPlanName}</strong>.
         </p>
 
-        {/* Comparison box */}
         <div className="border border-indigo-200 bg-indigo-50/50 rounded-lg px-4 py-3 flex items-center justify-between mb-6">
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-slate-800">Current:</span> {currentPlanName} ({currentLimit} Teachers max)
+            <span className="font-medium text-slate-800">Current:</span> {currentPlanName} ({currentLimit} {metricLabel} max)
           </div>
           <span className="text-indigo-500 font-bold mx-3">→</span>
           <div className="text-sm text-slate-600">
-            <span className="font-medium text-emerald-700">New Tier:</span> {newPlanName} (Up to {newLimit} Teachers)
+            <span className="font-medium text-emerald-700">New Tier:</span> {newPlanName} (Up to {newLimit} {metricLabel})
           </div>
         </div>
 
-        {/* Action buttons */}
         <div className="flex justify-end gap-3">
           <button
             onClick={handleClose}
@@ -114,7 +120,7 @@ export function LimitWarningModal({
             }}
             className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-indigo-700 to-indigo-800 rounded-lg shadow-[0_4px_16px_rgba(67,56,202,0.3)] hover:from-indigo-800 hover:to-indigo-900 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(67,56,202,0.4)] transition-all duration-150 cursor-pointer"
           >
-            Upgrade to {newPlanName} ({price})
+            Upgrade to {newPlanName} ({formatPlanPrice(priceMinor, currency)}/mo)
           </button>
         </div>
       </div>

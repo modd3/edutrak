@@ -50,8 +50,12 @@ export function usePayInvoice() {
   const { schoolId } = useSchoolContext();
 
   return useMutation({
-    mutationFn: async ({ invoiceId, phoneNumber }: { invoiceId: string; phoneNumber: string }) => {
-      const response = await billingInvoicesApi.payInvoice(invoiceId, phoneNumber);
+    mutationFn: async ({ invoiceId, phoneNumber, idempotencyKey }: { invoiceId: string; phoneNumber: string; idempotencyKey?: string }) => {
+      const headers: Record<string, string> = {};
+      if (idempotencyKey) {
+        headers['Idempotency-Key'] = idempotencyKey;
+      }
+      const response = await billingInvoicesApi.payInvoice(invoiceId, phoneNumber, headers);
       return response.data;
     },
     onSuccess: () => {
@@ -59,6 +63,11 @@ export function usePayInvoice() {
       toast.success('M-Pesa STK Push sent! Check your phone to enter PIN.');
     },
     onError: (error: any) => {
+      const status = error.response?.status;
+      if (status === 409) {
+        toast.info('This payment is already in progress. Please check your phone or wait a moment and try again.');
+        return;
+      }
       const message = error.response?.data?.error || error.message || 'Failed to initiate payment';
       toast.error(message);
     },

@@ -34,7 +34,9 @@ const FEATURE_REGISTRY: Record<string, { name: string; limitType: 'BOOLEAN' | 'C
   'students.max': { name: 'Student Limit', limitType: 'COUNT' },
   'teachers.max': { name: 'Teacher Limit', limitType: 'COUNT' },
   'sms.monthly_quota': { name: 'SMS Quota', limitType: 'COUNT' },
-  'lms.core': { name: 'Learning Management', limitType: 'BOOLEAN' },
+  'lms.core': { name: 'Learning Management System (Go LMS Integration)', limitType: 'BOOLEAN' },
+  'lms.analytics': { name: 'LMS Advanced Learning Analytics', limitType: 'BOOLEAN' },
+  'lms.storage_limit': { name: 'LMS Content Storage (GB)', limitType: 'COUNT' },
 };
 
 const FEATURE_KEYS = Object.keys(FEATURE_REGISTRY);
@@ -45,7 +47,7 @@ const planFormSchema = z.object({
   description: z.string().optional(),
   priceMinor: z.number().min(0, 'Price must be greater than or equal to 0'),
   currency: z.string().default('KES'),
-  billingInterval: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUALLY'], {
+  billingInterval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY'], {
     errorMap: () => ({ message: 'Please select a valid billing interval' }),
   }),
   isActive: z.boolean().default(true),
@@ -314,7 +316,7 @@ export function PlanFormModal({
               <SelectContent>
                 <SelectItem value="MONTHLY">Monthly</SelectItem>
                 <SelectItem value="QUARTERLY">Quarterly</SelectItem>
-                <SelectItem value="ANNUALLY">Annually</SelectItem>
+                <SelectItem value="YEARLY">Annually</SelectItem>
               </SelectContent>
             </Select>
             {errors.billingInterval && (

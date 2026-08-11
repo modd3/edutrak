@@ -10,7 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Loader2, Smartphone, CheckCircle2, AlertCircle } from 'lucide-react';
 import { usePayInvoice } from '@/hooks/use-billing-invoices';
 import { BillingInvoice } from '@/types';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, generateIdempotencyKey } from '@/lib/utils';
 
 const payInvoiceSchema = z.object({
   phoneNumber: z.string().min(10, 'Enter a valid phone number').max(15),
@@ -45,6 +45,7 @@ export function PayInvoiceModal({ open, onOpenChange, invoice }: PayInvoiceModal
       await payMutation.mutateAsync({
         invoiceId: invoice.id,
         phoneNumber: data.phoneNumber,
+        idempotencyKey: generateIdempotencyKey('pay-invoice'),
       });
       setStep('success');
     } catch (error: any) {
@@ -90,7 +91,7 @@ export function PayInvoiceModal({ open, onOpenChange, invoice }: PayInvoiceModal
           </div>
           <div className="flex justify-between text-base font-bold pt-2 border-t">
             <span>Amount Due</span>
-            <span>{formatCurrency(remaining)}</span>
+            <span>{formatCurrency(remaining, invoice.currency)}</span>
           </div>
         </div>
 

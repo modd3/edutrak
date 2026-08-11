@@ -91,7 +91,7 @@ export function CreateBillingAccountModal({
       city: data.city,
       addressLine1: data.addressLine1 || "",
       addressLine2: data.addressLine2,
-
+      preferredCurrency: data.prefferedCurrency || "KES",
     });
 
     if (!createMutation.isPending) {

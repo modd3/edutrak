@@ -1,83 +1,60 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
 import { GuardianService } from '../services/guardian.service';
+import { userCreationService } from '../services/user-creation.service';
 import { auditService } from '../services/audit.service';
 import { ResponseUtil } from '../utils/response';
 import logger from '../utils/logger';
-import { Role } from '@prisma/client';
 import { RequestWithUser } from '@/middleware/school-context';
+import { ResourceLimitError } from '../services/entitlement.service';
 
 export class GuardianController {
- /* private getService(req: RequestWithUser) {
-    return new GuardianService(req);
-  }
-*/
-  async createGuardian(req: RequestWithUser, res: Response): Promise<Response> {
+  /**
+   * Create a guardian with a new user account.
+   * Delegates to UserCreationService.createUserWithProfile - the only place
+   * that should create a User row - rather than re-implementing user
+   * creation here.
+   */
+  async createGuardianWithUser(req: RequestWithUser, res: Response): Promise<Response> {
     try {
-      const { userId, relationship } = req.body;
+      const {
+        email, password, firstName, lastName, middleName, phone, idNumber,
+        relationship, occupation, employer, workPhone,
+      } = req.body;
 
-      if (!userId || !relationship) {
-        return ResponseUtil.validationError(res, 'Required fields: userId, relationship');
+      if (!email || !password || !firstName || !lastName || !relationship) {
+        return ResponseUtil.validationError(res, 'Required fields: email, password, firstName, lastName, relationship');
       }
 
-      const guardianService = GuardianService.withRequest(req);
-      const guardian = await guardianService.createGuardian(req.body);
+      const user: any = await userCreationService.createUserWithProfile(
+        { email, password, firstName, lastName, middleName, phone, idNumber, role: 'PARENT' as any },
+        { relationship, occupation, employer, workPhone } as any,
+        req.schoolId,
+        req.isSuperAdmin || false
+      );
 
       // Audit log
       auditService.log({
         schoolId: req.schoolId,
         actorId: req.user!.userId,
         actorRole: req.user!.role,
-        action: 'CREATE_GUARDIAN',
-        entityType: 'Guardian',
-        entityId: guardian.id,
-        details: `Created guardian profile for user ${userId}`,
-        ipAddress: req.ip,
-        userAgent: req.headers['user-agent'],
-      }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
-
-      return ResponseUtil.created(res, 'Guardian created successfully', guardian);
-    } catch (error: any) {
-      if (error.code === 'P2002') {
-        return ResponseUtil.conflict(res, 'Guardian with this user already exists');
-      }
-      return ResponseUtil.error(res, error.message, 400);
-    }
-  }
-
-  async createGuardianWithUser(req: RequestWithUser, res: Response): Promise<Response> {
-    try {
-      const currentUser = req.user!;
-      const { email, password, firstName, lastName, relationship } = req.body;
-
-      if (!email || !password || !firstName || !lastName || !relationship) {
-        return ResponseUtil.validationError(res, 'Required fields: email, password, firstName, lastName, relationship');
-      }
-
-      const guardianService = GuardianService.withRequest(req);
-      const guardian = await guardianService.createGuardianWithUser(
-        { ...req.body, schoolId: req.schoolId },
-        {
-          userId: currentUser.userId,
-          role: currentUser.role as Role,
-        }
-      );
-
-      // Audit log
-      auditService.log({
-        schoolId: req.schoolId,
-        actorId: currentUser.userId,
-        actorRole: currentUser.role,
         action: 'CREATE_GUARDIAN_WITH_USER',
         entityType: 'Guardian',
-        entityId: guardian.id,
+        entityId: user.guardian?.id ?? user.id,
         entityName: `${firstName} ${lastName}`,
         details: `Created guardian with user account: ${firstName} ${lastName} (${email})`,
         ipAddress: req.ip,
         userAgent: req.headers['user-agent'],
       }).catch((err) => logger.warn('Audit log failed', { error: err.message }));
 
-      return ResponseUtil.created(res, 'Guardian with user account created successfully', guardian);
+      return ResponseUtil.created(res, 'Guardian with user account created successfully', user);
     } catch (error: any) {
+      if (error instanceof ResourceLimitError) {
+        return res.status(402).json({
+          error: 'RESOURCE_LIMIT_REACHED',
+          featureKey: error.role,
+          message: error.message,
+        });
+      }
       if (error.code === 'P2002') {
         return ResponseUtil.conflict(res, 'Guardian or user with these details already exists');
       }

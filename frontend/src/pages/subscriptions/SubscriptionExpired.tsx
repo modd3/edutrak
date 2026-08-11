@@ -3,13 +3,14 @@ import { ShieldAlert, LogOut, Phone, Mail, RefreshCw, CreditCard, ArrowRight } f
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/auth-store';
+import { SUBSCRIPTION_STATUS_META } from '@/lib/utils';
 
 // Map raw status strings to user-friendly labels
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  EXPIRED: { label: 'Expired', color: 'bg-red-100 text-red-700 border-red-200' },
-  SUSPENDED: { label: 'Suspended', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  PAST_DUE: { label: 'Past Due', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  CANCELED: { label: 'Canceled', color: 'bg-gray-100 text-gray-700 border-gray-200' },
+  EXPIRED: { label: 'Expired', color: SUBSCRIPTION_STATUS_META.EXPIRED.badge },
+  SUSPENDED: { label: 'Suspended', color: SUBSCRIPTION_STATUS_META.SUSPENDED.badge },
+  PAST_DUE: { label: 'Past Due', color: SUBSCRIPTION_STATUS_META.PAST_DUE.badge },
+  CANCELED: { label: 'Canceled', color: SUBSCRIPTION_STATUS_META.CANCELED.badge },
 };
 
 export function SubscriptionExpired() {
@@ -18,7 +19,7 @@ export function SubscriptionExpired() {
 
   // Read the status forwarded by the 402 response (stored temporarily in sessionStorage)
   const rawStatus = sessionStorage.getItem('subscription_status') || 'EXPIRED';
-  const statusInfo = STATUS_LABELS[rawStatus] ?? { label: rawStatus, color: 'bg-red-100 text-red-700 border-red-200' };
+  const statusInfo = STATUS_LABELS[rawStatus] ?? { label: rawStatus, color: SUBSCRIPTION_STATUS_META.EXPIRED.badge };
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
 
@@ -72,7 +73,7 @@ export function SubscriptionExpired() {
             {isAdmin ? (
               <div className="space-y-4 text-left">
                 <p className="text-gray-600 text-sm text-center">
-                  Your school's subscription has <strong>{statusInfo.label.toLowerCase()}</strong>. You can still access
+                  Your school&apos;s subscription has <strong>{statusInfo.label.toLowerCase()}</strong>. You can still access
                   basic system navigation, but operational features are locked until the subscription is renewed.
                 </p>
 
@@ -107,7 +108,7 @@ export function SubscriptionExpired() {
             ) : (
               <div className="space-y-4 text-left">
                 <p className="text-gray-600 text-sm text-center">
-                  Your school's subscription is currently <strong>{statusInfo.label.toLowerCase()}</strong>. Access to
+                  Your school&apos;s subscription is currently <strong>{statusInfo.label.toLowerCase()}</strong>. Access to
                   the system has been temporarily suspended.
                 </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">

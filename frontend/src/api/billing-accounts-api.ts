@@ -2,6 +2,7 @@ import api from './client';
 import { ApiResponse, PaginatedResponse, BillingAccount } from '@/types';
 
 export interface CreateBillingAccountInput {
+  schoolId: string;
   legalName: string;
   email?: string;
   phone?: string;
@@ -11,6 +12,7 @@ export interface CreateBillingAccountInput {
   addressLine1: string;
   addressLine2?: string;
   prefferedCurrency?: string;
+  preferredCurrency?: string;
 }
 
 export const billingAccountsApi = {

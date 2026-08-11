@@ -1,5 +1,5 @@
-import api from './index';
-import { ApiResponse, PaginatedResponse, Plan, Subscription } from '@/types';
+import api from './client';
+import { ApiResponse, PaginatedResponse, Plan, Subscription, BillingAccount, BillingInvoice, BillingPayment } from '@/types';
 
 export interface CreateSubscriptionInput {
   schoolId?: string;
@@ -24,6 +24,17 @@ export interface ChangePlanInput {
 export interface RenewSubscriptionInput {
   withTrial?: boolean;
   trialEndsAt?: string;
+}
+
+export interface BillingOverview {
+  subscription?: Subscription;
+  billingAccount?: BillingAccount;
+  recentInvoices: BillingInvoice[];
+  availablePlans: Plan[];
+  usageMetrics: any[];
+  outstandingBalanceMinor: number;
+  currency: string;
+  hasActiveSubscription: boolean;
 }
 
 export const subscriptionsApi = {
@@ -55,6 +66,12 @@ export const subscriptionsApi = {
    */
   getMySubscription: () =>
     api.get<ApiResponse<Subscription>>('/subscriptions/my'),
+
+  /**
+   * Get consolidated billing overview
+   */
+  getOverview: () =>
+    api.get<ApiResponse<BillingOverview>>('/subscriptions/overview'),
 
   /**
    * Transition subscription status

@@ -44,7 +44,10 @@ export class BillingInvoiceService {
     const [invoices, total] = await Promise.all([
       (prisma as any).billingInvoice.findMany({
         where,
-        include: { subscription: { include: { plan: true } } },
+        include: {
+          subscription: { include: { plan: true } },
+          payments: { orderBy: { createdAt: 'desc' } },
+        },
         orderBy: { createdAt: 'desc' },
         skip,
         take: limit,
@@ -80,7 +83,7 @@ export class BillingInvoiceService {
           providerReference: data.providerReference ?? null,
           amountMinor: data.amountMinor,
           currency: data.currency ?? 'KES',
-          status: 'SUCCEEDED',
+          status: 'COMPLETED',
           paidAt: data.paidAt ? new Date(data.paidAt) : new Date(),
         },
       });
