@@ -24,7 +24,7 @@ import type { Subscription, BillingInvoice, BillingAccount } from '@/types';
 import { CreateBillingAccountModal } from '@/components/billing/createBillingAccountModal';
 import { ChangePlanModal } from '@/components/subscriptions/ChangePlanModal';
 import { ManageSubscriptionStatusModal } from '@/components/subscriptions/ManageSubscriptionStatusModal';
-import { PayInvoiceModal } from '@/components/billing/PayInvoiceModal';
+import { TenantPaymentModal } from '@/components/billing/TenantPaymentModal';
 import { ColumnDef } from '@tanstack/react-table';
 import { BillingPageHeader } from '@/components/billing/BillingPageHeader';
 import { BillingInvoiceTable } from '@/components/billing/BillingInvoiceTable';
@@ -395,10 +395,11 @@ export default function BillingAdminPage() {
         onOpenChange={setShowManageStatusModal}
         subscription={selected}
       />
-      <PayInvoiceModal
+      <TenantPaymentModal
         open={showPayInvoiceModal}
         onOpenChange={setShowPayInvoiceModal}
-        invoice={null}
+        invoice={invoices.find(inv => inv.status === 'OPEN' && (inv.totalMinor - inv.amountPaidMinor) > 0) || null}
+        schoolName={selected?.school?.name}
       />
 
       <UpgradeModal

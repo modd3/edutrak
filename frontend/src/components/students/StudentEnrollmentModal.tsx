@@ -83,9 +83,8 @@ export function StudentEnrollmentModal({
   const streams = Array.isArray(streamsData) ? streamsData : [];
   
   // Extract classes data properly
-  const classes = Array.isArray(classesData) ? classesData : classesData?.data || [];
-  console.log("Classes Data: ", classesData)
-  
+  const classes = classesData?.data?.data;
+    
   // Enroll mutation (create)
   const { mutate: createEnrollment, isPending: isCreating } = useMutation({
     mutationFn: async (data: EnrollmentFormData) => {
