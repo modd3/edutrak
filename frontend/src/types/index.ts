@@ -819,7 +819,6 @@ export interface OnboardingInput {
 }
 
 export interface OnboardingResult {
-  tenant: { id: string; slug: string; name: string };
   school: { id: string; name: string };
   subscription: { id: string; status: string; trialEndsAt: string | null };
   user: {

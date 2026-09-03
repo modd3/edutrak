@@ -39,6 +39,7 @@ export function useSchoolStatistics(schoolId?: string) {
   return useQuery({
     queryKey: [...schoolKeys.statistics(), schoolId],
     queryFn: () => schoolService.getStatistics(schoolId),
+    enabled: !!schoolId,
   });
 }
 

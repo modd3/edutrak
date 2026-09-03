@@ -1,4 +1,5 @@
 import { Response } from 'express';
+import { stripAnsi } from './sanitize';
 
 export interface ApiResponse<T = any> {
   success: boolean;
@@ -16,10 +17,17 @@ export interface ApiResponse<T = any> {
 }
 
 export class ResponseUtil {
+  private static sanitize(message: string, error?: string): { message: string; error?: string } {
+    return {
+      message: stripAnsi(message),
+      ...(error !== undefined && { error: stripAnsi(error) }),
+    };
+  }
+
   static success<T>(res: Response, message: string, data?: T, count?: number): Response {
     const response: ApiResponse<T> = {
       success: true,
-      message,
+      ...this.sanitize(message),
       data,
       count,
       timestamp: new Date(),
@@ -35,7 +43,7 @@ export class ResponseUtil {
   static created<T>(res: Response, message: string, data?: T): Response {
     const response: ApiResponse<T> = {
       success: true,
-      message,
+      ...this.sanitize(message),
       data,
       timestamp: new Date(),
     };
@@ -51,7 +59,7 @@ export class ResponseUtil {
   ): Response {
     const response: ApiResponse<T[]> = {
       success: true,
-      message,
+      ...this.sanitize(message),
       data,
       count: data.length,
       pagination: {
@@ -69,8 +77,7 @@ export class ResponseUtil {
   static error(res: Response, message: string, statusCode: number = 400, error?: string): Response {
     const response: ApiResponse = {
       success: false,
-      message,
-      error,
+      ...this.sanitize(message, error),
       timestamp: new Date(),
     };
 

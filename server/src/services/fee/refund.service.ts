@@ -83,7 +83,6 @@ class RefundService {
           paymentId,
           invoiceId: payment.invoiceId,
           studentId: payment.studentId,
-          tenantId: payment.tenantId ?? undefined,
           amount,
           reason,
           initiatedBy,

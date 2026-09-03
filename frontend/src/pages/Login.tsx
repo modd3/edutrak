@@ -151,7 +151,7 @@ export function Login() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-blue-600 via-blue-700 to-indigo-800 p-12 flex-col justify-between">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-12 flex-col justify-between">
         <div className="flex items-center space-x-2 text-white">
           <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center">
             <GraduationCap className="text-blue-600" size={24} />
@@ -309,7 +309,7 @@ export function Login() {
             <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 focus:ring-4 focus:ring-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+            className="w-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white py-3 rounded-lg font-medium hover:bg-blue focus:ring-4 focus:ring-blue-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
           >
             {isLoading ? (
               <>

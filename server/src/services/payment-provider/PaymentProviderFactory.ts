@@ -27,19 +27,19 @@ export class PaymentProviderFactory {
   private static configCache: Map<string, ProviderConfig[]> = new Map();
 
   /**
-   * Get a payment provider instance for a specific tenant (school).
+   * Get a payment provider instance for a specific school (tenant).
    * Caches provider instances and reuses them for the lifetime of the process.
    *
-   * @param tenantId - The school/tenant ID
+   * @param schoolId - The school/tenant ID
    * @param providerName - Optional specific provider (e.g., "MPESA", "FLUTTERWAVE")
    * @returns An initialized IPaymentProvider instance
-   * @throws Error if no active provider is configured for the tenant
+   * @throws Error if no active provider is configured for the school
    */
   static async getProvider(
-    tenantId: string,
+    schoolId: string,
     providerName?: string
   ): Promise<IPaymentProvider> {
-    const cacheKey = `${tenantId}:${providerName || 'primary'}`;
+    const cacheKey = `${schoolId}:${providerName || 'primary'}`;
 
     // Check cache first
     const cached = this.providerCache.get(cacheKey);
@@ -48,10 +48,10 @@ export class PaymentProviderFactory {
     }
 
     // Load configs from DB
-    const configs = await this.loadConfigs(tenantId);
+    const configs = await this.loadConfigs(schoolId);
     if (configs.length === 0) {
       throw new Error(
-        `No active payment provider configured for tenant: ${tenantId}`
+        `No active payment provider configured for school: ${schoolId}`
       );
     }
 
@@ -68,7 +68,7 @@ export class PaymentProviderFactory {
 
     if (!config) {
       throw new Error(
-        `No active payment provider found for tenant: ${tenantId}${providerName ? `, requested: ${providerName}` : ''}`
+        `No active payment provider found for school: ${schoolId}${providerName ? `, requested: ${providerName}` : ''}`
       );
     }
 
@@ -77,7 +77,7 @@ export class PaymentProviderFactory {
     this.providerCache.set(cacheKey, provider);
 
     logger.info('Payment provider initialized', {
-      tenantId,
+      schoolId,
       provider: config.provider,
     });
 
@@ -85,16 +85,16 @@ export class PaymentProviderFactory {
   }
 
   /**
-   * Get all configured providers for a tenant.
+   * Get all configured providers for a school.
    */
-  static async getProvidersForTenant(
-    tenantId: string
+  static async getProvidersForSchool(
+    schoolId: string
   ): Promise<IPaymentProvider[]> {
-    const configs = await this.loadConfigs(tenantId);
+    const configs = await this.loadConfigs(schoolId);
     return configs
       .filter((c) => c.isActive)
       .map((config) => {
-        const cacheKey = `${tenantId}:${config.provider}`;
+        const cacheKey = `${schoolId}:${config.provider}`;
         const cached = this.providerCache.get(cacheKey);
         if (cached) return cached;
 
@@ -105,47 +105,47 @@ export class PaymentProviderFactory {
   }
 
   /**
-   * List available provider types (names) for a tenant.
+   * List available provider types (names) for a school.
    */
-  static async getAvailableProviders(tenantId: string): Promise<string[]> {
-    const configs = await this.loadConfigs(tenantId);
+  static async getAvailableProviders(schoolId: string): Promise<string[]> {
+    const configs = await this.loadConfigs(schoolId);
     return configs.filter((c) => c.isActive).map((c) => c.provider);
   }
 
   /**
-   * Invalidate the cache for a tenant (call this when config changes).
+   * Invalidate the cache for a school (call this when config changes).
    */
-  static invalidateCache(tenantId?: string): void {
-    if (tenantId) {
-      // Clear all cache entries for this tenant
+  static invalidateCache(schoolId?: string): void {
+    if (schoolId) {
+      // Clear all cache entries for this school
       for (const key of this.providerCache.keys()) {
-        if (key.startsWith(tenantId)) {
+        if (key.startsWith(schoolId)) {
           this.providerCache.delete(key);
         }
       }
-      this.configCache.delete(tenantId);
+      this.configCache.delete(schoolId);
     } else {
       this.providerCache.clear();
       this.configCache.clear();
     }
-    logger.info('Payment provider cache invalidated', { tenantId: tenantId || 'all' });
+    logger.info('Payment provider cache invalidated', { schoolId: schoolId || 'all' });
   }
 
   // ─── Private ─────────────────────────────────────────────────────────────────
 
-  private static async loadConfigs(tenantId: string): Promise<ProviderConfig[]> {
-    if (this.configCache.has(tenantId)) {
-      return this.configCache.get(tenantId)!;
+  private static async loadConfigs(schoolId: string): Promise<ProviderConfig[]> {
+    if (this.configCache.has(schoolId)) {
+      return this.configCache.get(schoolId)!;
     }
 
     // Load from payment_provider_configs table (Prisma model)
     const records = await this.prisma.paymentProviderConfig.findMany({
-      where: { tenantId, isActive: true },
+      where: { schoolId, isActive: true },
     });
 
     const configs: ProviderConfig[] = records.map((r) => ({
       id: r.id,
-      tenantId: r.tenantId,
+      schoolId: r.schoolId,
       provider: r.provider,
       apiKey: isEncrypted(r.apiKey) ? decrypt(r.apiKey) : r.apiKey,
       secretKey: isEncrypted(r.secretKey) ? decrypt(r.secretKey) : r.secretKey,
@@ -155,7 +155,7 @@ export class PaymentProviderFactory {
       extraConfig: (r.extraConfig as Record<string, string>) || undefined,
     }));
 
-    this.configCache.set(tenantId, configs);
+    this.configCache.set(schoolId, configs);
     return configs;
   }
 

@@ -8,25 +8,6 @@ import { OnboardingInput } from '../validation/onboarding.validation';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
- * Derive a URL-safe tenant slug from the school name.
- * e.g. "St. Mary's Girls High School" → "st-marys-girls-high-school-a1b2c3d4"
- */
-function buildSlug(schoolName: string): string {
-  const base = schoolName
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')   // strip non-alphanumeric (keeps spaces and hyphens)
-    .trim()
-    .replace(/\s+/g, '-')            // spaces → hyphens
-    .replace(/-+/g, '-')             // collapse multiple hyphens
-    .substring(0, 40);               // cap base length
-
-  // Append 8-char UUID fragment to guarantee uniqueness across schools with
-  // identical names without needing a second round-trip before the transaction.
-  const suffix = randomUUID().replace(/-/g, '').substring(0, 8);
-  return `${base}-${suffix}`;
-}
-
-/**
  * Calculate subscription period end from now based on billing interval.
  */
 function calcPeriodEnd(interval: string, from: Date): Date {
@@ -41,7 +22,6 @@ function calcPeriodEnd(interval: string, from: Date): Date {
 // ─── Result type ──────────────────────────────────────────────────────────────
 
 export interface OnboardingResult {
-  tenant: { id: string; slug: string; name: string };
   school: { id: string; name: string };
   subscription: { id: string; status: string; trialEndsAt: Date | null };
   user: {
@@ -60,17 +40,16 @@ export interface OnboardingResult {
 
 export class OnboardingService {
   /**
-   * Provision a complete new-school workspace atomically.
+   * Single-school workspace provisioning (School IS the tenant).
    *
    * Order inside the transaction:
    *  1. Guard: email uniqueness
    *  2. Guard: plan exists and is active
-   *  3. Create Tenant
-   *  4. Create School  (linked to Tenant)
-   *  5. Create BillingAccount (linked to School)
-   *  6. Create TenantSubscription
-   *  7. Create BillingInvoice
-   *  8. Create User (ADMIN, linked to School)
+   *  3. Create School
+   *  4. Create BillingAccount (linked to School)
+   *  5. Create TenantSubscription
+   *  6. Create BillingInvoice
+   *  7. Create User (ADMIN, linked to School)
    *
    * If any step throws, Prisma rolls the entire transaction back.
    */
@@ -102,24 +81,11 @@ export class OnboardingService {
 
     const result = await (prisma as any).$transaction(async (tx: any) => {
       const now = new Date();
-      const slug = buildSlug(schoolData.name);
 
-      // 3. Tenant
-      const tenant = await tx.tenant.create({
-        data: {
-          id: randomUUID(),
-          name: schoolData.name,
-          slug,
-          type: 'SCHOOL',
-          isActive: true,
-        },
-      });
-
-      // 4. School
+      // 3. School
       const school = await tx.school.create({
         data: {
           id: randomUUID(),
-          tenantId: tenant.id,
           name: schoolData.name,
           type: schoolData.type,
           county: schoolData.county,
@@ -211,11 +177,10 @@ export class OnboardingService {
         },
       });
 
-      return { tenant, school, subscription, user };
+      return { school, subscription, user };
     });
 
-    logger.info('Tenant workspace provisioned', {
-      tenantId: result.tenant.id,
+    logger.info('School workspace provisioned', {
       schoolId: result.school.id,
       userId: result.user.id,
       plan: plan.key,
@@ -255,11 +220,6 @@ export class OnboardingService {
     );
 
     return {
-      tenant: {
-        id: result.tenant.id,
-        slug: result.tenant.slug,
-        name: result.tenant.name,
-      },
       school: {
         id: result.school.id,
         name: result.school.name,

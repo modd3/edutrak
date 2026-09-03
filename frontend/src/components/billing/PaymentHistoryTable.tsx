@@ -1,6 +1,6 @@
-import { BillingPayment, BillingPaymentStatus } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { BillingPayment, BillingPaymentStatus } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -8,15 +8,23 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { formatCurrency, formatDate, paymentStatusClass } from '@/lib/utils';
+} from "@/components/ui/table";
+import {
+  formatCurrency,
+  formatDate,
+  paymentStatusClass,
+  paymentStatusLabel,
+} from "@/lib/utils";
 
 interface PaymentHistoryTableProps {
   payments: BillingPayment[];
   isLoading?: boolean;
 }
 
-export function PaymentHistoryTable({ payments, isLoading }: PaymentHistoryTableProps) {
+export function PaymentHistoryTable({
+  payments,
+  isLoading,
+}: PaymentHistoryTableProps) {
   if (isLoading) {
     return (
       <Card>
@@ -41,7 +49,9 @@ export function PaymentHistoryTable({ payments, isLoading }: PaymentHistoryTable
           <CardTitle>Payment History</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 text-center py-8">No payments found</p>
+          <p className="text-sm text-gray-500 text-center py-8">
+            No payments found
+          </p>
         </CardContent>
       </Card>
     );
@@ -74,15 +84,23 @@ export function PaymentHistoryTable({ payments, isLoading }: PaymentHistoryTable
                     {payment.providerReference || payment.id.slice(0, 8)}
                   </TableCell>
                   <TableCell className="font-medium">
-                    {formatCurrency(payment.amountMinor / 100, payment.currency)}
+                    {formatCurrency(
+                      payment.amountMinor / 100,
+                      payment.currency,
+                    )}
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline" className={paymentStatusClass(payment.status)}>
-                      {payment.status.toLowerCase()}
+                    <Badge
+                      variant="outline"
+                      className={paymentStatusClass(payment.status)}
+                    >
+                      {paymentStatusLabel(payment.status)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-sm">
-                    {payment.paidAt ? formatDate(payment.paidAt) : formatDate(payment.createdAt)}
+                    {payment.paidAt
+                      ? formatDate(payment.paidAt)
+                      : formatDate(payment.createdAt)}
                   </TableCell>
                 </TableRow>
               ))}

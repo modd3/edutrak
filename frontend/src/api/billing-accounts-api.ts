@@ -1,5 +1,5 @@
-import api from './client';
-import { ApiResponse, PaginatedResponse, BillingAccount } from '@/types';
+import api from "./client";
+import { ApiResponse, PaginatedResponse, BillingAccount } from "@/types";
 
 export interface CreateBillingAccountInput {
   schoolId: string;
@@ -20,7 +20,7 @@ export const billingAccountsApi = {
    * Create a new subscription
    */
   create: (data: CreateBillingAccountInput) =>
-    api.put<ApiResponse<BillingAccount>>('/billing-accounts', data),
+    api.put<ApiResponse<BillingAccount>>("/billing-accounts", data),
 
   /**
    * Get list of billing accounts with filters
@@ -31,11 +31,13 @@ export const billingAccountsApi = {
     page?: number;
     limit?: number;
   }) =>
-    api.get<PaginatedResponse<BillingAccount>>('/billing-accounts', { params }),
+    api.get<PaginatedResponse<BillingAccount>>("/billing-accounts", { params }),
 
   /**
    * Get a single billing account by ID
    */
   getBySchool: (schoolId: string) =>
-    api.get<ApiResponse<BillingAccount>>(`/billing-accounts/school/${schoolId}`),
+    api.get<ApiResponse<BillingAccount>>(
+      `/billing-accounts/school/${schoolId}`,
+    ),
 };

@@ -14,6 +14,7 @@ This guide is self-contained. Follow it sequentially. Cross-references to actual
 ## 1. Executive Summary & Objectives
 
 ### Current Strengths (Leverage These)
+
 - Solid `TenantSubscription` model with clean status machine (`TRIALING`, `ACTIVE`, `PAST_DUE`, `GRACE`, `SUSPENDED`, `CANCELED`, `EXPIRED`).
 - Recent improvement (latest push): `createSubscription` now auto-creates `billingAccount` if missing.
 - Existing payment providers (Daraja/M-Pesa + Flutterwave), webhook controller, idempotency middleware.
@@ -22,6 +23,7 @@ This guide is self-contained. Follow it sequentially. Cross-references to actual
 - Rich frontend components already exist (`MySubscriptionPage`, billing modals, `use-fees.ts`).
 
 ### Target State After This Guide
+
 - Automatic end-to-end payment confirmation (webhooks update invoices & subscriptions reliably).
 - Automated dunning & reminders with minimal manual work.
 - Self-service billing portal that feels complete (clear overview, one-click actions).
@@ -31,6 +33,7 @@ This guide is self-contained. Follow it sequentially. Cross-references to actual
 - Maintains existing patterns (school context, audit logs, Prisma usage).
 
 **Success Criteria**:
+
 - Creating a subscription automatically sets up billing account.
 - Payments via M-Pesa/Flutterwave update invoice status automatically in >90% of cases.
 - Schools can view and manage their subscription + invoices with minimal support tickets.
@@ -41,6 +44,7 @@ This guide is self-contained. Follow it sequentially. Cross-references to actual
 ## 2. Latest Codebase State (Verified 2026-07-11)
 
 ### Key Files & Current Behavior
+
 - `server/src/services/subscription.service.ts` (latest SHA reflects auto `billingAccount` creation in `createSubscription` + full status transition logic).
 - `server/src/services/fee.service.ts` (large but contains core invoice/payment logic + sub-services in `server/src/services/fee/`).
 - `frontend/src/hooks/use-fees.ts` (26k+ lines – central data layer for fees/billing).
@@ -50,12 +54,14 @@ This guide is self-contained. Follow it sequentially. Cross-references to actual
 
 **Recent Positive Change (Latest Push)**:
 In `createSubscription`, after plan validation, the code now does:
+
 ```typescript
 const existingAccount = await (prisma as any).billingAccount.findUnique({ where: { schoolId: data.schoolId } });
 if (!existingAccount) {
   // create billingAccount
 }
 ```
+
 This is excellent for SaaS onboarding.
 
 ---
@@ -63,16 +69,20 @@ This is excellent for SaaS onboarding.
 ## 3. Implementation Roadmap (Follow in Order)
 
 ### Phase 0: Documentation & Audit Refresh (Do First – 30-60 min)
+
 **Goal**: Update living documentation so future agents have accurate context.
 
 **Actions**:
+
 1. Update `FEE_MODULE_UPGRADES.md` with the header provided in the previous patch (see Section 5 below).
 2. Add a new section at the top of the file documenting the latest push.
 
 ### Phase 1: Core Reliability & Billing Integration (Primary Focus)
+
 **Goal**: Make subscription + billing flows automatic and observable.
 
 **Priority Order**:
+
 1. Enhance `subscription.service.ts` (build on recent auto billingAccount change).
 2. Add `getBillingOverview` helper (critical for frontend self-service).
 3. Harden webhook processing (controller + service).
@@ -80,11 +90,13 @@ This is excellent for SaaS onboarding.
 5. Frontend integration (update `use-fees.ts` + `MySubscriptionPage`).
 
 ### Phase 2: Automation & Self-Service Polish
+
 - Automated dunning sequences.
 - Proration logic in `changePlan`.
 - Payment plan / installment support (if time allows).
 
 ### Phase 3: Reporting & Production Hardening
+
 - Financial exports and dashboards.
 - Comprehensive testing + monitoring.
 
@@ -271,6 +283,7 @@ export function useBillingOverview(schoolId: string) {
 #### Update `frontend/src/pages/billing/MySubscriptionPage.tsx`
 
 Use the new hook to display:
+
 - Current plan + status
 - Outstanding balance
 - Recent invoices list (with pay button)
@@ -299,6 +312,7 @@ return (
 **File**: `server/src/controllers/webhook.controller.ts`
 
 Recommended improvements:
+
 - Add better error handling and logging.
 - Ensure idempotency using existing middleware.
 - On successful payment confirmation, automatically update related invoice + subscription status.
@@ -364,6 +378,6 @@ Use the header provided in Section 4.1.
 
 **This guide contains everything needed for another AI agent to implement the changes without prior context.** All code examples are tailored to Edutrak’s existing style and file structure.
 
-If you need additional patches (e.g., full webhook hardening diff or frontend component updates), request them specifically. 
+If you need additional patches (e.g., full webhook hardening diff or frontend component updates), request them specifically.
 
 **Ready for execution.**

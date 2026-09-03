@@ -32,30 +32,25 @@
 
 To make this a **robust, isolated payment module** usable as a standalone SaaS:
 
-### **1. Decouple from School Context**
+### **1. Isolation Source = School (decision: "School IS the tenant")**
+
+> **Decision (2026-09):** Each school is the paying tenant. The whole app — request
+> middleware (`req.schoolId`), billing/subscriptions, fees, and the frontend — is
+> keyed by `School.id`. A parallel `Tenant` model was introduced mid-way and only ever
+> populated for onboarding-created schools; fee/payment writes inserted *school ids*
+> into `tenantId` FK columns (→ `PaymentProviderConfig_tenantId_fkey` violations).
+> Rather than complete that migration, the `Tenant` model was **retired** and payment
+> provider configs / fee refunds are keyed by `schoolId` (FK → `School`).
+>
+> If a genuine multi-school *organization* layer is ever needed, add it later under a
+> `Organization` model with a 1:N `Organization.schools` relation — do not resurrect
+> per-row `tenantId` columns.
 
 ```prisma
-// New: Tenant (not School)
-model Tenant {
-  id String @id @default(uuid())
-  name String
-  slug String @unique
-  paymentGatewayConfigs PaymentGatewayConfig[]
-  invoices TenantInvoice[]
-  subscriptions TenantSubscription[]
-  
-  // Billing for the SaaS itself
-  monthlyFeeMinor Int
-  status SubscriptionStatus
-}
-
-// Replace School-specific with generic Tenant
-model TenantInvoice {
-  id String @id @default(uuid())
-  tenantId String
-  customerId String
-  // ... rest same
-}
+// Isolation is by School — no parallel Tenant table.
+// PaymentProviderConfig (id, schoolId, provider, apiKey, secretKey, ...)
+// FeeRefund (id, schoolId, paymentId, invoiceId, ...)
+// FeeInvoice / FeePayment / LateFeesConfig / WebhookLog / WebhookEmission: schoolId-keyed
 ```
 
 ### **2. Build Payment Provider Abstraction**
@@ -76,7 +71,7 @@ class StripeProvider implements IPaymentProvider { ... }
 
 // Factory
 class PaymentProviderFactory {
-  static getProvider(tenantId: string): IPaymentProvider { ... }
+  static getProvider(schoolId: string): IPaymentProvider { ... }
 }
 ```
 
@@ -85,7 +80,7 @@ class PaymentProviderFactory {
 ```prisma
 model WebhookLog {
   id String @id @default(uuid())
-  tenantId String
+  schoolId String
   provider String // "MPESA", "FLUTTERWAVE", etc.
   event String   // "payment.confirmed", "payment.failed"
   payload Json
@@ -96,7 +91,7 @@ model WebhookLog {
 
 model PaymentProviderConfig {
   id String @id @default(uuid())
-  tenantId String @unique
+  schoolId String @unique
   provider String
   apiKey String
   secretKey String
@@ -166,13 +161,13 @@ model PaymentPlanInstallment {
 ```prisma
 model LateFeesConfig {
   id String @id @default(uuid())
-  tenantId String @unique
+  schoolId String @unique
   penaltyType String      // "FLAT", "PERCENTAGE", "COMPOUND"
   penaltyAmount Decimal   // 500 KES or 5%
   graceDaysDays Int       // 7 days before penalty applies
   maxPenalty Decimal?     // Cap penalty at this amount
   
-  @@index([tenantId])
+  @@index([schoolId])
 }
 
 // Auto-apply late fees via scheduled job
@@ -219,18 +214,18 @@ class NotificationQueue {
 ```typescript
 // server/src/services/reconciliation.service.ts
 class ReconciliationService {
-  async matchBankStatement(file: Buffer, tenantId: string) {
+  async matchBankStatement(file: Buffer, schoolId: string) {
     // Parse CSV → find matching payments
     // Flag unmatched transactions for review
   }
   
-  async generateReconciliationReport(tenantId, from, to) {
+  async generateReconciliationReport(schoolId, from, to) {
     // Expected vs. Actual
     // Variance analysis
     // Outstanding items
   }
   
-  async detectAnomalies(tenantId) {
+  async detectAnomalies(schoolId) {
     // Duplicate amounts within short timeframe
     // Unusually high/low amounts
     // Timing anomalies
@@ -241,20 +236,20 @@ class ReconciliationService {
 ### **9. API Endpoints (New Structure)**
 
 ```
-POST   /api/v1/tenants/:tenantId/invoices/pay-online
+POST   /api/v1/schools/:schoolId/invoices/pay-online
        → Initiates ONLINE payment with selected provider
 
 POST   /api/v1/webhooks/payments/mpesa
 POST   /api/v1/webhooks/payments/flutterwave
        → Async payment confirmation
 
-GET    /api/v1/tenants/:tenantId/invoices/:id/payment-status
+GET    /api/v1/schools/:schoolId/invoices/:id/payment-status
        → Real-time payment verification
 
-POST   /api/v1/tenants/:tenantId/invoices/:id/setup-payment-plan
+POST   /api/v1/schools/:schoolId/invoices/:id/setup-payment-plan
        → Create installment plan
 
-GET    /api/v1/tenants/:tenantId/reconciliation/report
+GET    /api/v1/schools/:schoolId/reconciliation/report
        → Bank reconciliation
 
 POST   /api/v1/webhooks/scheduled-jobs
@@ -264,16 +259,17 @@ POST   /api/v1/webhooks/scheduled-jobs
 ### **10. Database Migrations Path**
 
 ```sql
+-- Decision: School IS the tenant — key everything by school_id.
 -- Phase 1: Add provider abstraction
 CREATE TABLE payment_provider_configs (
   id UUID PRIMARY KEY,
-  tenant_id UUID NOT NULL,
+  school_id UUID NOT NULL REFERENCES schools(id),
   provider TEXT NOT NULL,
   api_key TEXT NOT NULL,
   secret_key TEXT NOT NULL,
   webhook_secret TEXT,
   is_active BOOLEAN DEFAULT true,
-  UNIQUE(tenant_id)
+  UNIQUE(school_id, provider)
 );
 
 -- Phase 2: Add payment plans
@@ -287,19 +283,14 @@ CREATE TABLE payment_plans (
 -- Phase 3: Add webhook logs
 CREATE TABLE webhook_logs (
   id UUID PRIMARY KEY,
-  tenant_id UUID,
+  school_id UUID,
   provider TEXT,
   event TEXT,
   payload JSONB,
   processed BOOLEAN
 );
-
--- Backfill: Migrate School → Tenant (one-time)
-INSERT INTO tenants (name, slug) 
-SELECT name, LOWER(REPLACE(name, ' ', '-')) FROM schools;
-
-UPDATE fee_invoices 
-SET tenant_id = (SELECT id FROM tenants WHERE school_id = fee_invoices.school_id);
+-- NOTE: There is NO Tenant table / tenant_id column. If a multi-school
+-- organization layer is required later, model it as Organization 1:N School.
 ```
 
 ---
@@ -320,7 +311,7 @@ SET tenant_id = (SELECT id FROM tenants WHERE school_id = fee_invoices.school_id
 
 Your fee module is **functionally complete but architecturally monolithic**. To make it SaaS-ready:
 
-1. **Decouple from School** → Use generic "Tenant" model
+1. **School is the tenant** → isolation is by `School.id` end-to-end; no parallel `Tenant` model
 2. **Abstract Payment Providers** → Support multiple gateways without code changes
 3. **Add Async Handling** → Webhooks for real-time payment verification
 4. **Automate Everything** → Reminders, late fees, reconciliation

@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { BillingInvoice, BillingInvoiceStatus } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
+import { useState } from "react";
+import { BillingInvoice, BillingInvoiceStatus } from "@/types";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -10,11 +10,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, formatDate, invoiceStatusClass } from '@/lib/utils';
-import { Eye, CreditCard } from 'lucide-react';
-import { PayInvoiceModal } from './PayInvoiceModal';
+} from "@/components/ui/table";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  formatCurrency,
+  formatDate,
+  invoiceStatusMeta,
+  invoiceStatusLabel,
+} from "@/lib/utils";
+import { Eye, CreditCard } from "lucide-react";
+import { PayInvoiceModal } from "./PayInvoiceModal";
 
 interface InvoiceHistoryTableProps {
   invoices: BillingInvoice[];
@@ -22,8 +27,14 @@ interface InvoiceHistoryTableProps {
   onPayInvoice?: (invoice: BillingInvoice) => void;
 }
 
-export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: InvoiceHistoryTableProps) {
-  const [selectedInvoice, setSelectedInvoice] = useState<BillingInvoice | null>(null);
+export function InvoiceHistoryTable({
+  invoices,
+  isLoading,
+  onPayInvoice,
+}: InvoiceHistoryTableProps) {
+  const [selectedInvoice, setSelectedInvoice] = useState<BillingInvoice | null>(
+    null,
+  );
   const [showPayModal, setShowPayModal] = useState(false);
 
   const handlePay = (invoice: BillingInvoice) => {
@@ -61,7 +72,9 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
           <CardTitle>Invoice History</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 text-center py-8">No invoices found</p>
+          <p className="text-sm text-gray-500 text-center py-8">
+            No invoices found
+          </p>
         </CardContent>
       </Card>
     );
@@ -88,19 +101,26 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
             <TableBody>
               {invoices.map((invoice) => {
                 const remaining = invoice.totalMinor - invoice.amountPaidMinor;
-                const isPayable = invoice.status === 'OPEN' && remaining > 0;
+                const isPayable = invoice.status === "OPEN" && remaining > 0;
 
                 return (
                   <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">{invoice.invoiceNumber}</TableCell>
+                    <TableCell className="font-medium">
+                      {invoice.invoiceNumber}
+                    </TableCell>
                     <TableCell>
-                      <Badge variant="outline" className={invoiceStatusClass(invoice.status)}>
-                        {invoice.status.toLowerCase()}
+                      <Badge
+                        variant="outline"
+                        className={invoiceStatusMeta(invoice).badge}
+                      >
+                        {invoiceStatusLabel(invoice)}
                       </Badge>
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">{formatCurrency(invoice.totalMinor / 100)}</p>
+                        <p className="font-medium">
+                          {formatCurrency(invoice.totalMinor / 100)}
+                        </p>
                         {remaining > 0 && (
                           <p className="text-xs text-gray-500">
                             {formatCurrency(remaining / 100)} due
@@ -108,9 +128,11 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
                         )}
                       </div>
                     </TableCell>
-                    <TableCell className="text-sm">{formatDate(invoice.dueAt)}</TableCell>
                     <TableCell className="text-sm">
-                      {invoice.paidAt ? formatDate(invoice.paidAt) : '—'}
+                      {formatDate(invoice.dueAt)}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {invoice.paidAt ? formatDate(invoice.paidAt) : "—"}
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
@@ -124,7 +146,11 @@ export function InvoiceHistoryTable({ invoices, isLoading, onPayInvoice }: Invoi
                             Pay Now
                           </Button>
                         )}
-                        <Button size="sm" variant="ghost" onClick={() => handleView(invoice)}>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => handleView(invoice)}
+                        >
                           <Eye className="h-3 w-3" />
                         </Button>
                       </div>

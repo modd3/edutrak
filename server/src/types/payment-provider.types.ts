@@ -125,7 +125,7 @@ export interface IPaymentProvider {
 
 export interface ProviderConfig {
   id: string;
-  tenantId: string;
+  schoolId: string;
   provider: string;
   apiKey: string;
   secretKey: string;

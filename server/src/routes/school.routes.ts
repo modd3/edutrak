@@ -8,12 +8,14 @@ import { authenticate,
         } from '../middleware/auth.middleware';
 import { validateUUIDParam, validatePagination } from '../middleware/validation';
 import { enforceSubscription } from '../middleware/subscription.middleware';
+import { enforceSchoolContext } from '../middleware/school-context';
 
 const router = Router();
 const schoolController = new SchoolController();
 
 router.use(authenticate);
-
+router.use(enforceSchoolContext);
+router.use(enforceSubscription);
 // School management (Super Admin only)
 router.post('/', authorize('SUPER_ADMIN'), schoolController.createSchool);
 router.put('/:id', authorize('SUPER_ADMIN'), validateUUIDParam, schoolController.updateSchool);

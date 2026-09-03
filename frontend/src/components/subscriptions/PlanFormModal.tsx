@@ -1,67 +1,89 @@
-import { useEffect } from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { useEffect } from "react";
+import { useForm, useFieldArray } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
-import { useCreatePlan, useUpdatePlan } from '@/hooks/use-plans';
-import { Plan } from '@/types';
-import { Badge } from '@/components/ui/badge';
+} from "@/components/ui/select";
+import { Loader2, Plus, Trash2 } from "lucide-react";
+import { useCreatePlan, useUpdatePlan } from "@/hooks/use-plans";
+import { Plan } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 // Mirrors the server-side FEATURE_REGISTRY so the UI offers known feature keys
-const FEATURE_REGISTRY: Record<string, { name: string; limitType: 'BOOLEAN' | 'COUNT' }> = {
-  'fees.core': { name: 'Fee Management', limitType: 'BOOLEAN' },
-  'fees.mpesa': { name: 'M-PESA Integration', limitType: 'BOOLEAN' },
-  'fees.report': { name: 'Fee Reports', limitType: 'BOOLEAN' },
-  'academic.core': { name: 'Academic Management', limitType: 'BOOLEAN' },
-  'assessments.bulk': { name: 'Bulk Grade Entry', limitType: 'BOOLEAN' },
-  'students.max': { name: 'Student Limit', limitType: 'COUNT' },
-  'teachers.max': { name: 'Teacher Limit', limitType: 'COUNT' },
-  'sms.monthly_quota': { name: 'SMS Quota', limitType: 'COUNT' },
-  'lms.core': { name: 'Learning Management System (Go LMS Integration)', limitType: 'BOOLEAN' },
-  'lms.analytics': { name: 'LMS Advanced Learning Analytics', limitType: 'BOOLEAN' },
-  'lms.storage_limit': { name: 'LMS Content Storage (GB)', limitType: 'COUNT' },
+const FEATURE_REGISTRY: Record<
+  string,
+  { name: string; limitType: "BOOLEAN" | "COUNT" }
+> = {
+  "fees.core": { name: "Fee Management", limitType: "BOOLEAN" },
+  "fees.mpesa": { name: "M-PESA Integration", limitType: "BOOLEAN" },
+  "fees.report": { name: "Fee Reports", limitType: "BOOLEAN" },
+  "academic.core": { name: "Academic Management", limitType: "BOOLEAN" },
+  "assessments.bulk": { name: "Bulk Grade Entry", limitType: "BOOLEAN" },
+  "students.max": { name: "Student Limit", limitType: "COUNT" },
+  "teachers.max": { name: "Teacher Limit", limitType: "COUNT" },
+  "sms.monthly_quota": { name: "SMS Quota", limitType: "COUNT" },
+  "lms.core": {
+    name: "Learning Management System (Go LMS Integration)",
+    limitType: "BOOLEAN",
+  },
+  "lms.analytics": {
+    name: "LMS Advanced Learning Analytics",
+    limitType: "BOOLEAN",
+  },
+  "lms.storage_limit": { name: "LMS Content Storage (GB)", limitType: "COUNT" },
 };
 
 const FEATURE_KEYS = Object.keys(FEATURE_REGISTRY);
 
 const planFormSchema = z.object({
-  key: z.string().min(1, 'Plan key is required').regex(/^[a-z0-9_-]+$/, 'Key must be lowercase with only letters, numbers, hyphens, and underscores'),
-  name: z.string().min(1, 'Plan name is required'),
+  key: z
+    .string()
+    .min(1, "Plan key is required")
+    .regex(
+      /^[a-z0-9_-]+$/,
+      "Key must be lowercase with only letters, numbers, hyphens, and underscores",
+    ),
+  name: z.string().min(1, "Plan name is required"),
   description: z.string().optional(),
-  priceMinor: z.number().min(0, 'Price must be greater than or equal to 0'),
-  currency: z.string().default('KES'),
-  billingInterval: z.enum(['MONTHLY', 'QUARTERLY', 'YEARLY'], {
-    errorMap: () => ({ message: 'Please select a valid billing interval' }),
+  priceMinor: z.number().min(0, "Price must be greater than or equal to 0"),
+  currency: z.string().default("KES"),
+  billingInterval: z.enum(["MONTHLY", "QUARTERLY", "YEARLY"], {
+    errorMap: () => ({ message: "Please select a valid billing interval" }),
   }),
   isActive: z.boolean().default(true),
-  features: z.array(
-    z.object({
-      featureKey: z.string().min(1, 'Select a feature'),
-      enabled: z.boolean().default(true),
-      limitType: z.enum(['BOOLEAN', 'COUNT']).default('BOOLEAN'),
-      limitValue: z.number().int().positive().optional().nullable(),
-    }).refine(
-      d => d.limitType === 'BOOLEAN' || d.limitValue !== undefined,
-      { message: 'Limit value is required when limit type is COUNT', path: ['limitValue'] }
+  features: z
+    .array(
+      z
+        .object({
+          featureKey: z.string().min(1, "Select a feature"),
+          enabled: z.boolean().default(true),
+          limitType: z.enum(["BOOLEAN", "COUNT"]).default("BOOLEAN"),
+          limitValue: z.number().int().positive().optional().nullable(),
+        })
+        .refine(
+          (d) => d.limitType === "BOOLEAN" || d.limitValue !== undefined,
+          {
+            message: "Limit value is required when limit type is COUNT",
+            path: ["limitValue"],
+          },
+        ),
     )
-  ).optional(),
+    .optional(),
 });
 
 type PlanFormInput = z.infer<typeof planFormSchema>;
@@ -94,48 +116,53 @@ export function PlanFormModal({
   } = useForm<PlanFormInput>({
     resolver: zodResolver(planFormSchema),
     defaultValues: {
-      key: initialData?.key || '',
-      name: initialData?.name || '',
-      description: initialData?.description || '',
+      key: initialData?.key || "",
+      name: initialData?.name || "",
+      description: initialData?.description || "",
       priceMinor: initialData?.priceMinor || 0,
-      currency: initialData?.currency || 'KES',
-      billingInterval: (initialData?.billingInterval as any) || 'MONTHLY',
-      isActive: initialData?.isActive !== undefined ? initialData.isActive : true,
-      features: initialData?.features?.map(f => ({
-        featureKey: f.featureKey,
-        enabled: f.enabled,
-        limitType: f.limitType as 'BOOLEAN' | 'COUNT',
-        limitValue: f.limitValue ?? null,
-      })) || [],
+      currency: initialData?.currency || "KES",
+      billingInterval: (initialData?.billingInterval as any) || "MONTHLY",
+      isActive:
+        initialData?.isActive !== undefined ? initialData.isActive : true,
+      features:
+        initialData?.features?.map((f) => ({
+          featureKey: f.featureKey,
+          enabled: f.enabled,
+          limitType: f.limitType as "BOOLEAN" | "COUNT",
+          limitValue: f.limitValue ?? null,
+        })) || [],
     },
   });
 
   const { fields, append, remove } = useFieldArray({
     control,
-    name: 'features',
+    name: "features",
   });
 
-  const billingInterval = watch('billingInterval');
-  const isActive = watch('isActive');
-  const features = watch('features');
+  const billingInterval = watch("billingInterval");
+  const isActive = watch("isActive");
+  const features = watch("features");
 
   useEffect(() => {
     if (open && initialData) {
-      setValue('key', initialData.key);
-      setValue('name', initialData.name);
-      setValue('description', initialData.description);
-      setValue('priceMinor', initialData.priceMinor);
-      setValue('currency', initialData.currency);
-      setValue('billingInterval', initialData.billingInterval as any);
-      setValue('isActive', initialData.isActive);
+      setValue("key", initialData.key);
+      setValue("name", initialData.name);
+      setValue("description", initialData.description);
+      setValue("priceMinor", initialData.priceMinor);
+      setValue("currency", initialData.currency);
+      setValue("billingInterval", initialData.billingInterval as any);
+      setValue("isActive", initialData.isActive);
 
       // Reset the features array with initial data
-      setValue('features', initialData.features?.map(f => ({
-        featureKey: f.featureKey,
-        enabled: f.enabled,
-        limitType: f.limitType as 'BOOLEAN' | 'COUNT',
-        limitValue: f.limitValue ?? null,
-      })) || []);
+      setValue(
+        "features",
+        initialData.features?.map((f) => ({
+          featureKey: f.featureKey,
+          enabled: f.enabled,
+          limitType: f.limitType as "BOOLEAN" | "COUNT",
+          limitValue: f.limitValue ?? null,
+        })) || [],
+      );
     }
   }, [open, initialData, setValue]);
 
@@ -143,12 +170,12 @@ export function PlanFormModal({
     try {
       // Strip out empty/incomplete feature rows
       const featuresPayload = (data.features || [])
-        .filter(f => f.featureKey)
-        .map(f => ({
+        .filter((f) => f.featureKey)
+        .map((f) => ({
           featureKey: f.featureKey,
           enabled: f.enabled,
           limitType: f.limitType,
-          limitValue: f.limitType === 'COUNT' ? f.limitValue : null,
+          limitValue: f.limitType === "COUNT" ? f.limitValue : null,
         }));
 
       if (isEditing && initialData) {
@@ -179,15 +206,15 @@ export function PlanFormModal({
       reset();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error submitting form:', error);
+      console.error("Error submitting form:", error);
     }
   };
 
   const handleAddFeature = () => {
     append({
-      featureKey: '',
+      featureKey: "",
       enabled: true,
-      limitType: 'BOOLEAN',
+      limitType: "BOOLEAN",
       limitValue: null,
     });
   };
@@ -197,22 +224,28 @@ export function PlanFormModal({
     setValue(`features.${index}.featureKey`, value);
     if (featureDef) {
       setValue(`features.${index}.limitType`, featureDef.limitType);
-      if (featureDef.limitType === 'BOOLEAN') {
+      if (featureDef.limitType === "BOOLEAN") {
         setValue(`features.${index}.limitValue`, null);
       }
     }
   };
 
   // Determine which feature keys are already selected (to prevent duplicates)
-  const selectedKeys = (features || []).map(f => f?.featureKey).filter(Boolean);
+  const selectedKeys = (features || [])
+    .map((f) => f?.featureKey)
+    .filter(Boolean);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Edit Plan' : 'Create New Plan'}</DialogTitle>
+          <DialogTitle>
+            {isEditing ? "Edit Plan" : "Create New Plan"}
+          </DialogTitle>
           <DialogDescription>
-            {isEditing ? 'Update the billing plan details and features' : 'Create a new billing plan with features for subscriptions'}
+            {isEditing
+              ? "Update the billing plan details and features"
+              : "Create a new billing plan with features for subscriptions"}
           </DialogDescription>
         </DialogHeader>
 
@@ -223,14 +256,17 @@ export function PlanFormModal({
             <Input
               id="key"
               placeholder="e.g., starter, pro, enterprise"
-              {...register('key')}
+              {...register("key")}
               disabled={isLoading || isEditing}
-              className={errors.key ? 'border-red-500' : ''}
+              className={errors.key ? "border-red-500" : ""}
             />
             {errors.key && (
               <p className="text-red-600 text-sm mt-1">{errors.key.message}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">Lowercase alphanumeric, hyphens, and underscores only. Cannot be changed after creation.</p>
+            <p className="text-xs text-gray-500 mt-1">
+              Lowercase alphanumeric, hyphens, and underscores only. Cannot be
+              changed after creation.
+            </p>
           </div>
 
           {/* Plan Name */}
@@ -239,9 +275,9 @@ export function PlanFormModal({
             <Input
               id="name"
               placeholder="e.g., Starter Plan"
-              {...register('name')}
+              {...register("name")}
               disabled={isLoading}
-              className={errors.name ? 'border-red-500' : ''}
+              className={errors.name ? "border-red-500" : ""}
             />
             {errors.name && (
               <p className="text-red-600 text-sm mt-1">{errors.name.message}</p>
@@ -254,11 +290,13 @@ export function PlanFormModal({
             <Input
               id="description"
               placeholder="Brief description of the plan"
-              {...register('description')}
+              {...register("description")}
               disabled={isLoading}
             />
             {errors.description && (
-              <p className="text-red-600 text-sm mt-1">{errors.description.message}</p>
+              <p className="text-red-600 text-sm mt-1">
+                {errors.description.message}
+              </p>
             )}
           </div>
 
@@ -271,20 +309,22 @@ export function PlanFormModal({
                 type="number"
                 min="0"
                 placeholder="e.g., 9999 for 99.99"
-                {...register('priceMinor', { valueAsNumber: true })}
+                {...register("priceMinor", { valueAsNumber: true })}
                 disabled={isLoading}
-                className={errors.priceMinor ? 'border-red-500' : ''}
+                className={errors.priceMinor ? "border-red-500" : ""}
               />
               {errors.priceMinor && (
-                <p className="text-red-600 text-sm mt-1">{errors.priceMinor.message}</p>
+                <p className="text-red-600 text-sm mt-1">
+                  {errors.priceMinor.message}
+                </p>
               )}
             </div>
 
             <div>
               <Label htmlFor="currency">Currency *</Label>
               <Select
-                value={watch('currency')}
-                onValueChange={(value) => setValue('currency', value)}
+                value={watch("currency")}
+                onValueChange={(value) => setValue("currency", value)}
                 disabled={isLoading}
               >
                 <SelectTrigger id="currency">
@@ -297,7 +337,9 @@ export function PlanFormModal({
                 </SelectContent>
               </Select>
               {errors.currency && (
-                <p className="text-red-600 text-sm mt-1">{errors.currency.message}</p>
+                <p className="text-red-600 text-sm mt-1">
+                  {errors.currency.message}
+                </p>
               )}
             </div>
           </div>
@@ -307,7 +349,9 @@ export function PlanFormModal({
             <Label htmlFor="billingInterval">Billing Interval *</Label>
             <Select
               value={billingInterval}
-              onValueChange={(value) => setValue('billingInterval', value as any)}
+              onValueChange={(value) =>
+                setValue("billingInterval", value as any)
+              }
               disabled={isLoading}
             >
               <SelectTrigger id="billingInterval">
@@ -320,7 +364,9 @@ export function PlanFormModal({
               </SelectContent>
             </Select>
             {errors.billingInterval && (
-              <p className="text-red-600 text-sm mt-1">{errors.billingInterval.message}</p>
+              <p className="text-red-600 text-sm mt-1">
+                {errors.billingInterval.message}
+              </p>
             )}
           </div>
 
@@ -330,7 +376,7 @@ export function PlanFormModal({
               type="checkbox"
               id="isActive"
               checked={isActive}
-              onChange={(e) => setValue('isActive', e.target.checked)}
+              onChange={(e) => setValue("isActive", e.target.checked)}
               disabled={isLoading}
               className="rounded border-gray-300"
             />
@@ -358,12 +404,16 @@ export function PlanFormModal({
 
             {fields.length === 0 && (
               <p className="text-sm text-gray-500 py-2">
-                No features configured. Click "Add Feature" to attach capabilities to this plan.
+                No features configured. Click "Add Feature" to attach
+                capabilities to this plan.
               </p>
             )}
 
             {fields.map((field, index) => (
-              <div key={field.id} className="border rounded-md p-3 bg-gray-50 space-y-3">
+              <div
+                key={field.id}
+                className="border rounded-md p-3 bg-gray-50 space-y-3"
+              >
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Feature #{index + 1}
@@ -385,22 +435,38 @@ export function PlanFormModal({
                   <div className="col-span-5">
                     <Label className="text-xs">Feature</Label>
                     <Select
-                      value={watch(`features.${index}.featureKey`) || ''}
-                      onValueChange={(value) => handleFeatureKeySelect(index, value)}
+                      value={watch(`features.${index}.featureKey`) || ""}
+                      onValueChange={(value) =>
+                        handleFeatureKeySelect(index, value)
+                      }
                       disabled={isLoading}
                     >
-                      <SelectTrigger className={errors.features?.[index]?.featureKey ? 'border-red-500' : ''}>
+                      <SelectTrigger
+                        className={
+                          errors.features?.[index]?.featureKey
+                            ? "border-red-500"
+                            : ""
+                        }
+                      >
                         <SelectValue placeholder="Select a feature..." />
                       </SelectTrigger>
                       <SelectContent>
                         {FEATURE_KEYS.map((key) => {
                           const isSelected = selectedKeys.includes(key);
-                          const isCurrent = (features?.[index]?.featureKey) === key;
+                          const isCurrent =
+                            features?.[index]?.featureKey === key;
                           return (
-                            <SelectItem key={key} value={key} disabled={isSelected && !isCurrent}>
+                            <SelectItem
+                              key={key}
+                              value={key}
+                              disabled={isSelected && !isCurrent}
+                            >
                               <span className="flex items-center gap-2">
                                 {FEATURE_REGISTRY[key].name}
-                                <Badge variant="outline" className="text-[10px] px-1 py-0">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] px-1 py-0"
+                                >
                                   {key}
                                 </Badge>
                               </span>
@@ -410,7 +476,9 @@ export function PlanFormModal({
                       </SelectContent>
                     </Select>
                     {errors.features?.[index]?.featureKey && (
-                      <p className="text-red-600 text-xs mt-1">{errors.features[index]?.featureKey?.message}</p>
+                      <p className="text-red-600 text-xs mt-1">
+                        {errors.features[index]?.featureKey?.message}
+                      </p>
                     )}
                   </div>
 
@@ -431,10 +499,10 @@ export function PlanFormModal({
                   <div className="col-span-2">
                     <Label className="text-xs">Limit Type</Label>
                     <Select
-                      value={watch(`features.${index}.limitType`) || 'BOOLEAN'}
-                      onValueChange={(value: 'BOOLEAN' | 'COUNT') => {
+                      value={watch(`features.${index}.limitType`) || "BOOLEAN"}
+                      onValueChange={(value: "BOOLEAN" | "COUNT") => {
                         setValue(`features.${index}.limitType`, value);
-                        if (value === 'BOOLEAN') {
+                        if (value === "BOOLEAN") {
                           setValue(`features.${index}.limitValue`, null);
                         }
                       }}
@@ -452,7 +520,7 @@ export function PlanFormModal({
 
                   {/* Limit Value (only for COUNT) */}
                   <div className="col-span-3">
-                    {watch(`features.${index}.limitType`) === 'COUNT' ? (
+                    {watch(`features.${index}.limitType`) === "COUNT" ? (
                       <>
                         <Label className="text-xs">Limit Value</Label>
                         <Input
@@ -460,13 +528,22 @@ export function PlanFormModal({
                           min="1"
                           placeholder="e.g., 500"
                           {...register(`features.${index}.limitValue`, {
-                            setValueAs: (v) => (v === '' || v === null || v === undefined ? null : Number(v)),
+                            setValueAs: (v) =>
+                              v === "" || v === null || v === undefined
+                                ? null
+                                : Number(v),
                           })}
                           disabled={isLoading}
-                          className={errors.features?.[index]?.limitValue ? 'border-red-500' : ''}
+                          className={
+                            errors.features?.[index]?.limitValue
+                              ? "border-red-500"
+                              : ""
+                          }
                         />
                         {errors.features?.[index]?.limitValue && (
-                          <p className="text-red-600 text-xs mt-1">{errors.features[index]?.limitValue?.message}</p>
+                          <p className="text-red-600 text-xs mt-1">
+                            {errors.features[index]?.limitValue?.message}
+                          </p>
                         )}
                       </>
                     ) : (
@@ -498,12 +575,12 @@ export function PlanFormModal({
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {isEditing ? 'Updating...' : 'Creating...'}
+                  {isEditing ? "Updating..." : "Creating..."}
                 </>
               ) : isEditing ? (
-                'Update Plan'
+                "Update Plan"
               ) : (
-                'Create Plan'
+                "Create Plan"
               )}
             </Button>
           </div>

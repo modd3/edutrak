@@ -1196,14 +1196,12 @@ export class FeeService extends BaseService {
    */
   async configurePaymentProvider(data: ConfigurePaymentProviderInput) {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
-    const sid = this.assertSchool(isSuperAdmin ? undefined : schoolId);
-    const effectiveSchoolId = isSuperAdmin ? sid : schoolId!;
-
+    const effectiveSchoolId = this.assertSchool(isSuperAdmin ? undefined : schoolId);
     // Check if this provider is already configured
     const existing = await this.prisma.paymentProviderConfig.findUnique({
       where: {
-        tenantId_provider: {
-          tenantId: effectiveSchoolId,
+        schoolId_provider: {
+          schoolId: effectiveSchoolId,
           provider: data.provider.toUpperCase(),
         },
       },
@@ -1216,7 +1214,7 @@ export class FeeService extends BaseService {
     const config = await this.prisma.paymentProviderConfig.create({
       data: {
         id: uuidv4(),
-        tenantId: effectiveSchoolId,
+        schoolId: effectiveSchoolId,
         provider: data.provider.toUpperCase(),
         apiKey: encrypt(data.apiKey),
         secretKey: encrypt(data.secretKey),
@@ -1247,7 +1245,7 @@ export class FeeService extends BaseService {
     const existing = await this.prisma.paymentProviderConfig.findFirst({
       where: {
         id: providerId,
-        ...(isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' }),
+        ...(isSuperAdmin ? {} : { schoolId: schoolId ?? 'NONE' }),
       },
     });
     if (!existing) throw new Error('Payment provider config not found or access denied');
@@ -1265,11 +1263,11 @@ export class FeeService extends BaseService {
     });
 
     // Invalidate factory cache
-    PaymentProviderFactory.invalidateCache(existing.tenantId);
+    PaymentProviderFactory.invalidateCache(existing.schoolId);
 
     logger.info('Payment provider updated', {
       providerId,
-      tenantId: existing.tenantId,
+      schoolId: existing.schoolId,
     });
 
     return config;
@@ -1282,10 +1280,10 @@ export class FeeService extends BaseService {
     const { schoolId, isSuperAdmin } = this.getSchoolContext();
 
     const configs = await this.prisma.paymentProviderConfig.findMany({
-      where: isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' },
+      where: isSuperAdmin ? {} : { schoolId: schoolId ?? 'NONE' },
       select: {
         id: true,
-        tenantId: true,
+        schoolId: true,
         provider: true,
         isActive: true,
         callbackUrl: true,
@@ -1308,7 +1306,7 @@ export class FeeService extends BaseService {
     const existing = await this.prisma.paymentProviderConfig.findFirst({
       where: {
         id: providerId,
-        ...(isSuperAdmin ? {} : { tenantId: schoolId ?? 'NONE' }),
+        ...(isSuperAdmin ? {} : { schoolId: schoolId ?? 'NONE' }),
       },
     });
     if (!existing) throw new Error('Payment provider config not found or access denied');
@@ -1318,12 +1316,12 @@ export class FeeService extends BaseService {
     });
 
     // Invalidate factory cache
-    PaymentProviderFactory.invalidateCache(existing.tenantId);
+    PaymentProviderFactory.invalidateCache(existing.schoolId);
 
     logger.info('Payment provider removed', {
       providerId,
       provider: existing.provider,
-      tenantId: existing.tenantId,
+      schoolId: existing.schoolId,
     });
   }
 

@@ -10,7 +10,7 @@ export class OnboardingController {
   /**
    * POST /onboarding/register
    *
-   * Self-service tenant registration. Provisions a new school workspace
+   * Self-service school registration. Provisions a new school workspace
    * atomically and returns auth tokens so the user is logged in immediately.
    *
    * Public endpoint — no authentication required.
@@ -54,7 +54,7 @@ export class OnboardingController {
         return ResponseUtil.error(res, err.message, 400);
       }
 
-      // P2002 = Prisma unique constraint violation (race condition on email / slug)
+      // P2002 = Prisma unique constraint violation (race condition on email / school constraints)
       if (err.code === 'P2002') {
         return ResponseUtil.conflict(
           res,

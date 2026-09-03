@@ -10,24 +10,15 @@ export class WebhookEmitterService {
     private readonly LMS_WEBHOOK_URL = process.env.LMS_WEBHOOK_URL || 'http://localhost:8080/api/webhooks/edutrak';
     private readonly SHARED_SECRET = process.env.EDUTRAK_WEBHOOK_SECRET;
 
-    async emitEvent(eventType: string, payload: any, schoolId?: string, tenantId?: string) {
-        let resolvedTenantId = tenantId;
-        if (!resolvedTenantId && schoolId) {
-            const school = await prisma.school.findUnique({
-                where: { id: schoolId},
-                select: { tenantId: true},
-            });
-            resolvedTenantId = school?.tenantId || null
-        }
-
+    async emitEvent(eventType: string, payload: any, schoolId?: string) {
         const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
 
         const webhookPayload = {
             eventId,
             eventType,
             timestamp: new Date().toISOString(),
-            schoolId, 
-            data: payload, 
+            schoolId,
+            data: payload,
             source: 'edutrak',
         };
 
@@ -36,7 +27,6 @@ export class WebhookEmitterService {
 
         const emission = await prisma.webhookEmission.create({
             data: {
-                tenantId: resolvedTenantId || null,
                 target: 'go-lms',
                 eventType,
                 eventId,
@@ -89,7 +79,7 @@ export class WebhookEmitterService {
     }
 
     // Convenience methods for common events
-    async emitUserEvent(user: any, action: 'created' | 'updated' | 'deleted', tenantID?: string) {
+    async emitUserEvent(user: any, action: 'created' | 'updated' | 'deleted') {
         const payload: any = {
             userId: user.id,
             email: user.email,
@@ -105,11 +95,11 @@ export class WebhookEmitterService {
             payload.admissionNo = user.student.admissionNo;
             payload.gender = user.student.gender;
         }
-        logger.info("Emitting user event", { action, payload, userId: user.id, schoolId: user.schoolId, tenantID });
-        return this.emitEvent(`user.${action}`, payload, user.schoolId, tenantID);
+        logger.info("Emitting user event", { action, payload, userId: user.id, schoolId: user.schoolId });
+        return this.emitEvent(`user.${action}`, payload, user.schoolId);
     }
 
-    async emitStudentEvent(student: any, action: 'created' | 'updated' | 'deleted', tenantId?: string) {
+    async emitStudentEvent(student: any, action: 'created' | 'updated' | 'deleted') {
         return this.emitEvent(`student.${action}`, {
             userId: student.id,
             email: student.user?.email,
@@ -119,10 +109,10 @@ export class WebhookEmitterService {
             schoolId: student.schoolId,
             gender: student.gender,
             isActive: student.user?.isActive ?? true,
-        }, student.schoolId, tenantId);
+        }, student.schoolId);
     }
 
-    async emitEnrollmentEvent(enrollment: any, action: 'created' | 'updated', tenantId?: string) {
+    async emitEnrollmentEvent(enrollment: any, action: 'created' | 'updated') {
         return this.emitEvent(`enrollment.${action}`, {
             enrollmentId: enrollment.id,
             studentId: enrollment.studentId,
@@ -131,10 +121,10 @@ export class WebhookEmitterService {
             academicYearId: enrollment.academicYearId,
             status: enrollment.status,
             schoolId: enrollment.school?.id || enrollment.schoolId,
-        }, enrollment.school?.id || enrollment.schoolId, tenantId);
+        }, enrollment.school?.id || enrollment.schoolId);
     }
 
-    async emitSubscriptionEvent(subscription: any, action: 'created' | 'updated' | 'status_changed' | 'canceled', tenantId?: string) {
+    async emitSubscriptionEvent(subscription: any, action: 'created' | 'updated' | 'status_changed' | 'canceled') {
         const lmsFeature = subscription.plan?.features?.find((f: any) => f.featureKey === 'lms.core');
         const storageFeature = subscription.plan?.features?.find((f: any) => f.featureKey === 'lms.storage_limit');
         const lmsEnabled = lmsFeature ? lmsFeature.enabled : true; // Default true if plan features not populated or core enabled
@@ -152,7 +142,7 @@ export class WebhookEmitterService {
                 storageLimitGb: storageFeature ? storageFeature.limitValue : 10,
                 status: subscription.status,
             }
-        }, subscription.schoolId, tenantId);
+        }, subscription.schoolId);
     }
 }
 

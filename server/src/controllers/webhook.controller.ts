@@ -40,17 +40,17 @@ export class WebhookController {
         },
       });
 
-      const tenantId = await this.resolveTenantFromWebhook(provider, rawBody);
+      const schoolId = await this.resolveSchoolFromWebhook(provider, rawBody);
 
-      if (!tenantId) {
-        logger.warn('Could not resolve tenant from webhook', { provider, webhookLogId: webhookLog.id });
+      if (!schoolId) {
+        logger.warn('Could not resolve school from webhook', { provider, webhookLogId: webhookLog.id });
         return res.status(200).json({ status: 'received' });
       }
 
-      // Verify signature against the tenant's webhookSecret
-      const verified = await this.verifySignature(provider, tenantId, signature, req.body);
+      // Verify signature against the school's webhookSecret
+      const verified = await this.verifySignature(provider, schoolId, signature, req.body);
       if (!verified) {
-        logger.warn('Webhook signature verification failed', { provider, tenantId, webhookLogId: webhookLog.id });
+        logger.warn('Webhook signature verification failed', { provider, schoolId, webhookLogId: webhookLog.id });
         await this.prisma.webhookLog.update({
           where: { id: webhookLog.id },
           data: { error: 'Signature verification failed' },
@@ -59,7 +59,7 @@ export class WebhookController {
         return res.status(200).json({ status: 'received' });
       }
 
-      const paymentProvider = await PaymentProviderFactory.getProvider(tenantId, provider);
+      const paymentProvider = await PaymentProviderFactory.getProvider(schoolId, provider);
       const webhookPayload: WebhookPayload = {
         provider,
         event: (req.headers['x-event-name'] as string) || 'payment.notification',
@@ -154,7 +154,7 @@ export class WebhookController {
    * Resolve which school owns this webhook by looking up the pending payment
    * (M-Pesa: by CheckoutRequestID) or the provider config (Flutterwave: by tx_ref).
    */
-  private async resolveTenantFromWebhook(
+  private async resolveSchoolFromWebhook(
     provider: string,
     rawBody: Record<string, unknown>
   ): Promise<string | null> {
@@ -185,51 +185,51 @@ export class WebhookController {
         // so verifySignature can run; if it fails we discard)
         const config = await this.prisma.paymentProviderConfig.findFirst({
           where: { provider: 'FLUTTERWAVE', isActive: true },
-          select: { tenantId: true },
+          select: { schoolId: true },
         });
-        return config?.tenantId ?? null;
+        return config?.schoolId ?? null;
       }
 
       return null;
     } catch (error: any) {
-      logger.error('Error resolving tenant from webhook', { error: error.message });
+      logger.error('Error resolving school from webhook', { error: error.message });
       return null;
     }
   }
 
   /**
-   * Verify the webhook signature against the stored webhookSecret for the tenant.
+   * Verify the webhook signature against the stored webhookSecret for the school.
    *
    * M-Pesa (Daraja): Safaricom does not sign STK Push callbacks — we accept
    *   them if we can match the CheckoutRequestID to a known pending payment (done
-   *   above in resolveTenantFromWebhook), which is sufficient for this flow.
+   *   above in resolveSchoolFromWebhook), which is sufficient for this flow.
    *
    * Flutterwave: Sends `verif-hash` header matching the webhook secret configured
    *   in the Flutterwave dashboard.
    */
   private async verifySignature(
     provider: string,
-    tenantId: string,
+    schoolId: string,
     signature: string | undefined,
     body: unknown
   ): Promise<boolean> {
     // M-Pesa STK Push callbacks are not HMAC-signed by Safaricom;
-    // tenant resolution via CheckoutRequestID is our security check.
+    // school resolution via CheckoutRequestID is our security check.
     if (provider === 'MPESA') return true;
 
     if (!signature) {
-      logger.warn('Missing signature for provider', { provider, tenantId });
+      logger.warn('Missing signature for provider', { provider, schoolId });
       return false;
     }
 
     const config = await this.prisma.paymentProviderConfig.findFirst({
-      where: { tenantId, provider, isActive: true },
+      where: { schoolId, provider, isActive: true },
       select: { webhookSecret: true },
     });
 
     if (!config?.webhookSecret) {
       // No secret configured — allow but warn
-      logger.warn('No webhookSecret configured for provider, skipping signature check', { provider, tenantId });
+      logger.warn('No webhookSecret configured for provider, skipping signature check', { provider, schoolId });
       return true;
     }
 

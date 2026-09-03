@@ -1,7 +1,7 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { billingInvoicesApi } from '@/api/billing-invoices-api';
-import { useSchoolContext } from './use-school-context';
-import { toast } from 'sonner';
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { billingInvoicesApi } from "@/api/billing-invoices-api";
+import { useSchoolContext } from "./use-school-context";
+import { toast } from "sonner";
 
 /**
  * Fetch billing invoices for the current school
@@ -14,7 +14,7 @@ export function useBillingInvoices(params?: {
   const { schoolId } = useSchoolContext();
 
   return useQuery({
-    queryKey: ['billing-invoices', { schoolId, ...params }],
+    queryKey: ["billing-invoices", { schoolId, ...params }],
     queryFn: async () => {
       const response = await billingInvoicesApi.getMyInvoices(params);
       return response.data;
@@ -33,7 +33,7 @@ export function useAllBillingInvoices(params?: {
   limit?: number;
 }) {
   return useQuery({
-    queryKey: ['billing-invoices', 'all', params],
+    queryKey: ["billing-invoices", "all", params],
     queryFn: async () => {
       const response = await billingInvoicesApi.listInvoices(params);
       return response;
@@ -50,25 +50,47 @@ export function usePayInvoice() {
   const { schoolId } = useSchoolContext();
 
   return useMutation({
-    mutationFn: async ({ invoiceId, phoneNumber, idempotencyKey }: { invoiceId: string; phoneNumber: string; idempotencyKey?: string }) => {
+    mutationFn: async ({
+      invoiceId,
+      phoneNumber,
+      idempotencyKey,
+      provider = "MPESA",
+    }: {
+      invoiceId: string;
+      phoneNumber?: string;
+      idempotencyKey?: string;
+      provider?: string;
+    }) => {
       const headers: Record<string, string> = {};
       if (idempotencyKey) {
-        headers['Idempotency-Key'] = idempotencyKey;
+        headers["Idempotency-Key"] = idempotencyKey;
       }
-      const response = await billingInvoicesApi.payInvoice(invoiceId, phoneNumber, headers);
+      const response = await billingInvoicesApi.payInvoice(
+        invoiceId,
+        phoneNumber,
+        provider,
+        headers,
+      );
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['billing-invoices', { schoolId }] });
-      toast.success('M-Pesa STK Push sent! Check your phone to enter PIN.');
+      queryClient.invalidateQueries({
+        queryKey: ["billing-invoices", { schoolId }],
+      });
+      toast.success("M-Pesa STK Push sent! Check your phone to enter PIN.");
     },
     onError: (error: any) => {
       const status = error.response?.status;
       if (status === 409) {
-        toast.info('This payment is already in progress. Please check your phone or wait a moment and try again.');
+        toast.info(
+          "This payment is already in progress. Please check your phone or wait a moment and try again.",
+        );
         return;
       }
-      const message = error.response?.data?.error || error.message || 'Failed to initiate payment';
+      const message =
+        error.response?.data?.error ||
+        error.message ||
+        "Failed to initiate payment";
       toast.error(message);
     },
   });

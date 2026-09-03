@@ -437,7 +437,7 @@ export class SubscriptionService {
    * Consolidated billing overview for self-service portal
    */
   async getBillingOverview(schoolId: string) {
-    const [subscription, billingAccount, recentInvoices, activePlans, unusedUsage] = await Promise.all([
+    const [subscription, billingAccount, recentInvoices, activePlans, unusedUsage, outstandingAgg] = await Promise.all([
       (prisma as any).tenantSubscription.findFirst({
         where: { schoolId },
         orderBy: { createdAt: 'desc' },
@@ -465,14 +465,14 @@ export class SubscriptionService {
         orderBy: { createdAt: 'desc' },
         take: 5,
       }),
+      (prisma as any).billingInvoice.aggregate({
+        where: { schoolId, status: 'OPEN' },
+        _sum: { totalMinor: true, amountPaidMinor: true },
+      }),
     ]);
 
-    let totalOutstandingMinor = 0;
-    if (recentInvoices && recentInvoices.length > 0) {
-      totalOutstandingMinor = recentInvoices
-        .filter((inv: any) => inv.status === 'OPEN' || inv.status === 'OVERDUE')
-        .reduce((sum: number, inv: any) => sum + (inv.totalMinor - inv.amountPaidMinor), 0);
-    }
+    const totalOutstandingMinor =
+      ((outstandingAgg?._sum?.totalMinor ?? 0) - (outstandingAgg?._sum?.amountPaidMinor ?? 0)) || 0;
 
     return {
       subscription,
