@@ -28,6 +28,7 @@ export class SubscriptionService {
       logger.error(`Plan not found for id ${data.planId}`);
       throw new Error('Plan not found');
     }
+    if (!plan.isActive) throw new Error('Selected plan is not active');
 
     // Check for existing non-terminal subscription
     const existingSubscription = await (prisma as any).tenantSubscription.findFirst({
@@ -44,67 +45,47 @@ export class SubscriptionService {
       throw new Error('This school already has an active subscription. Please cancel or expire the current subscription before creating a new one.');
     }
 
-    // Auto-create billing account if one doesn't exist
-    const existingAccount = await (prisma as any).billingAccount.findUnique({
-      where: { schoolId: data.schoolId },
-    });
-    if (!existingAccount) {
-      const school: School = await (prisma as any).school.findUnique({
-        where: { id: data.schoolId },
-        select: { name: true },
+    // Account, subscription and opening invoice must either all exist or none
+    // do. A subscription without an invoice cannot be recovered by customers.
+    const subscription = await (prisma as any).$transaction(async (tx: any) => {
+      const school: School | null = await tx.school.findUnique({
+        where: { id: data.schoolId }, select: { name: true },
       });
-      await (prisma as any).billingAccount.create({
-        data: {
-          id: randomUUID(),
-          schoolId: data.schoolId,
-          legalName: school?.name || data.schoolId,
-           preferredCurrency: plan.currency || 'KES',
+      if (!school) throw new Error('School not found');
+
+      await tx.billingAccount.upsert({
+        where: { schoolId: data.schoolId },
+        update: {},
+        create: {
+          id: randomUUID(), schoolId: data.schoolId, legalName: school.name,
+          preferredCurrency: plan.currency || 'KES',
         },
       });
-    }
 
-    const subscription = await (prisma as any).tenantSubscription.create({
-      data: {
-        id: randomUUID(),
-        schoolId: data.schoolId,
-        planId: data.planId,
-        status: data.trialEndsAt ? 'TRIALING' : 'ACTIVE',
-        startsAt: new Date(data.startsAt),
-        currentPeriodStart: new Date(data.currentPeriodStart),
-        currentPeriodEnd: new Date(data.currentPeriodEnd),
-        trialEndsAt: data.trialEndsAt ? new Date(data.trialEndsAt) : null,
-      },
-      include: { plan: true, school: true },
-    });
-
-    // Generate initial invoice for the subscription
-    try {
-      const now = new Date();
-      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-      const schoolShort = data.schoolId.substring(0, 8).toUpperCase();
-      const invoiceNumber = `SUB-INV-${dateStr}-${schoolShort}-1`;
-      
-      await (prisma as any).billingInvoice.create({
+      const created = await tx.tenantSubscription.create({
         data: {
-          schoolId: data.schoolId,
-          subscriptionId: subscription.id,
-          invoiceNumber,
-          subtotalMinor: plan.priceMinor,
-          taxMinor: 0,
-          totalMinor: plan.priceMinor,
-          amountPaidMinor: 0,
-          currency: plan.currency || 'KES',
-          status: 'OPEN',
+          id: randomUUID(), schoolId: data.schoolId, planId: data.planId,
+          status: data.trialEndsAt ? 'TRIALING' : 'ACTIVE',
+          startsAt: new Date(data.startsAt), currentPeriodStart: new Date(data.currentPeriodStart),
+          currentPeriodEnd: new Date(data.currentPeriodEnd),
+          trialEndsAt: data.trialEndsAt ? new Date(data.trialEndsAt) : null,
+        },
+        include: { plan: true, school: true },
+      });
+
+      const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      const schoolShort = data.schoolId.substring(0, 8).toUpperCase();
+      const invoiceNumber = `SUB-INV-${dateStr}-${schoolShort}-${randomUUID().slice(0, 8).toUpperCase()}`;
+      await tx.billingInvoice.create({
+        data: {
+          schoolId: data.schoolId, subscriptionId: created.id, invoiceNumber,
+          subtotalMinor: plan.priceMinor, taxMinor: 0, totalMinor: plan.priceMinor,
+          amountPaidMinor: 0, currency: plan.currency || 'KES', status: 'OPEN',
           dueAt: new Date(data.currentPeriodEnd),
         },
       });
-      logger.info(`Generated initial invoice ${invoiceNumber} for subscription ${subscription.id}`);
-    } catch (invoiceError: any) {
-      logger.error(`Failed to generate initial invoice for subscription ${subscription.id}`, {
-        error: invoiceError.message,
-      });
-      // Don't fail subscription creation if invoice generation fails
-    }
+      return created;
+    });
 
     // Audit logging
     if (createdByUserId) {

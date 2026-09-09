@@ -129,6 +129,10 @@ export class WebhookController {
           where: { transactionRef: callback.CheckoutRequestID, status: 'PENDING' },
           data: { status: 'FAILED' },
         });
+        await this.prisma.billingPayment.updateMany({
+          where: { providerReference: callback.CheckoutRequestID, status: 'PENDING' },
+          data: { status: 'FAILED' },
+        });
       }
 
       return res.status(200).json({ ResultCode: 0, ResultDesc: 'Success' });
@@ -179,6 +183,11 @@ export class WebhookController {
             select: { schoolId: true },
           });
           if (payment) return payment.schoolId;
+          const billingPayment = await this.prisma.billingPayment.findFirst({
+            where: { providerReference: txRef, status: 'PENDING' },
+            select: { schoolId: true },
+          });
+          if (billingPayment) return billingPayment.schoolId;
         }
         // Fall back: match by first active Flutterwave config that has the right secret
         // (handled during signature verification — here we return the first active one
@@ -228,9 +237,21 @@ export class WebhookController {
     });
 
     if (!config?.webhookSecret) {
-      // No secret configured — allow but warn
-      logger.warn('No webhookSecret configured for provider, skipping signature check', { provider, schoolId });
-      return true;
+      const subscriptionPayment = provider === 'FLUTTERWAVE'
+        ? await this.prisma.billingPayment.findFirst({ where: { schoolId, provider: 'FLUTTERWAVE', status: 'PENDING' }, select: { id: true } })
+        : null;
+      if (subscriptionPayment) {
+        const platformSecret = process.env.FLUTTERWAVE_WEBHOOK_SECRET;
+        if (!platformSecret) {
+          logger.error('Flutterwave subscription webhook secret is not configured');
+          return false;
+        }
+        const expected = Buffer.from(platformSecret);
+        const received = Buffer.from(signature || '');
+        return expected.length === received.length && timingSafeEqual(expected, received);
+      }
+      logger.warn('No webhookSecret configured for provider', { provider, schoolId });
+      return false;
     }
 
     try {
@@ -337,6 +358,16 @@ export class WebhookController {
       });
 
       if (billingPayment) {
+        if (provider === 'FLUTTERWAVE') {
+          const transaction = (rawBody as any)?.data;
+          const chargedAmount = Number(transaction?.amount);
+          if (!Number.isFinite(chargedAmount) || Math.round(chargedAmount * 100) !== billingPayment.amountMinor) {
+            throw new Error('Flutterwave webhook amount does not match the billing payment');
+          }
+          if (transaction?.currency && transaction.currency !== billingPayment.currency) {
+            throw new Error('Flutterwave webhook currency does not match the billing payment');
+          }
+        }
         const paymentId = billingPayment.id;
 
         await this.prisma.$transaction(async (tx: any) => {
@@ -357,6 +388,10 @@ export class WebhookController {
               paidAt: new Date(),
               providerReference: mpesaReceiptCode || billingPayment.providerReference,
             },
+          });
+          await tx.billingPaymentAttempt.updateMany({
+            where: { billingPaymentId: paymentId, status: 'PENDING' },
+            data: { status: 'COMPLETED', completedAt: new Date() },
           });
 
           if (billingPayment.billingInvoiceId) {

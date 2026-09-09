@@ -12,6 +12,12 @@ router.post('/invoices', authorize('SUPER_ADMIN'), controller.createInvoice.bind
 router.get('/invoices', authorize('ADMIN', 'SUPER_ADMIN'), controller.listInvoices.bind(controller));
 router.get('/invoices/my', authorize('ADMIN', 'SUPER_ADMIN'), controller.getMyInvoices.bind(controller));
 router.post(
+  '/invoices/:invoiceId/checkout-sessions',
+  authorize('ADMIN', 'SUPER_ADMIN'),
+  idempotencyMiddleware(),
+  controller.createCheckoutSession.bind(controller)
+);
+router.post(
   '/payments/pay-invoice',
   authorize('ADMIN', 'SUPER_ADMIN'),
   idempotencyMiddleware(),

@@ -20,8 +20,13 @@ export class BillingInvoiceController {
 
   async listInvoices(req: Request, res: Response): Promise<Response> {
     try {
+      const user = (req as any).user;
       const result = await billingInvoiceService.listInvoices({
-        schoolId: req.query.schoolId as string | undefined,
+        // A school administrator must never be able to override their tenant
+        // with a query parameter. SUPER_ADMIN may use the optional filter.
+        schoolId: user?.role === 'ADMIN'
+          ? user.schoolId
+          : req.query.schoolId as string | undefined,
         status: req.query.status as string | undefined,
         page: req.query.page ? Number(req.query.page) : undefined,
         limit: req.query.limit ? Number(req.query.limit) : undefined,
@@ -29,6 +34,89 @@ export class BillingInvoiceController {
       return ResponseUtil.paginated(res, 'Billing invoices retrieved successfully', result.invoices, result.pagination);
     } catch (error: any) {
       return ResponseUtil.serverError(res, error.message);
+    }
+  }
+
+  /**
+   * Creates a provider-neutral hosted checkout session for a subscription
+   * invoice. Card data stays on Flutterwave's hosted checkout page.
+   */
+  async createCheckoutSession(req: Request, res: Response): Promise<Response> {
+    try {
+      const schoolId = (req as any).user?.schoolId;
+      if (!schoolId) return ResponseUtil.error(res, 'School context required', 400);
+
+      const { provider = 'FLUTTERWAVE', paymentMethod = 'CARD', saveForAutomaticRenewal = false, returnUrl } = req.body;
+      if (String(provider).toUpperCase() !== 'FLUTTERWAVE') {
+        return ResponseUtil.error(res, 'Only Flutterwave is available for subscription checkout', 400);
+      }
+      if (!['CARD', 'MPESA'].includes(String(paymentMethod).toUpperCase())) {
+        return ResponseUtil.error(res, 'paymentMethod must be CARD or MPESA', 400);
+      }
+
+      const invoice = await (prisma as any).billingInvoice.findUnique({
+        where: { id: req.params.invoiceId },
+        include: { subscription: true, school: { select: { name: true, email: true } } },
+      });
+      if (!invoice) return ResponseUtil.notFound(res, 'Invoice');
+      if (invoice.schoolId !== schoolId) return ResponseUtil.forbidden(res, 'You do not have access to this invoice');
+      if (invoice.status !== 'OPEN') return ResponseUtil.error(res, `Invoice is already ${invoice.status}`, 400);
+
+      const amountMinor = invoice.totalMinor - invoice.amountPaidMinor;
+      if (amountMinor <= 0) return ResponseUtil.error(res, 'Invoice is already fully paid', 400);
+
+      const idempotencyKey = (req as any).idempotencyKey as string | undefined;
+      if (idempotencyKey) {
+        const existing = await (prisma as any).billingPaymentAttempt.findUnique({
+          where: { schoolId_idempotencyKey: { schoolId, idempotencyKey } },
+        });
+        if (existing?.checkoutUrl && existing.status === 'PENDING') {
+          return ResponseUtil.success(res, 'Checkout session already created', existing);
+        }
+      }
+
+      const transactionRef = `SUB-${invoice.invoiceNumber}-${randomUUID()}`;
+      const checkoutProvider = PaymentProviderFactory.getSubscriptionProvider('FLUTTERWAVE');
+      const session = await checkoutProvider.initiatePayment({
+        amount: amountMinor,
+        currency: invoice.currency,
+        transactionRef,
+        description: `EduTrak subscription invoice ${invoice.invoiceNumber}`,
+        email: invoice.school?.email || undefined,
+        callbackUrl: returnUrl || `${process.env.FRONTEND_URL || ''}/billing/payment-return`,
+        metadata: {
+          billingInvoiceId: invoice.id,
+          schoolId,
+          subscriptionId: invoice.subscriptionId,
+          paymentMethod: String(paymentMethod).toUpperCase(),
+          saveForAutomaticRenewal: Boolean(saveForAutomaticRenewal),
+        },
+      });
+
+      const result = await (prisma as any).$transaction(async (tx: any) => {
+        const payment = await tx.billingPayment.create({
+          data: {
+            id: randomUUID(), schoolId, subscriptionId: invoice.subscriptionId, billingInvoiceId: invoice.id,
+            provider: 'FLUTTERWAVE', providerReference: session.providerTransactionId,
+            amountMinor, currency: invoice.currency, status: 'PENDING',
+            metadata: { transactionRef, paymentMethod: String(paymentMethod).toUpperCase(), saveForAutomaticRenewal: Boolean(saveForAutomaticRenewal) },
+          },
+        });
+        return tx.billingPaymentAttempt.create({
+          data: {
+            schoolId, billingInvoiceId: invoice.id, billingPaymentId: payment.id,
+            provider: 'FLUTTERWAVE', paymentMethod: String(paymentMethod).toUpperCase(),
+            idempotencyKey: idempotencyKey || null, providerSessionId: session.providerTransactionId,
+            checkoutUrl: session.redirectUrl || null, amountMinor, currency: invoice.currency,
+            metadata: { transactionRef, saveForAutomaticRenewal: Boolean(saveForAutomaticRenewal) },
+          },
+        });
+      });
+
+      return ResponseUtil.created(res, 'Checkout session created', result);
+    } catch (error: any) {
+      logger.error('Failed to create billing checkout session', { error: error.message });
+      return ResponseUtil.error(res, error.message, 400);
     }
   }
 

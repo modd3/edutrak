@@ -51,18 +51,14 @@ export function MySubscriptionPage() {
     schoolStatistics?.data ||
     {}) as Record<string, any>;
 
-  console.log("School Statistics: ", schoolStatistics);
-  console.log("School Stats: ", schoolStats?.usersByRole?.STUDENT);
   const studentCount = schoolStats?.usersByRole?.STUDENT || 0;
   const teacherCount = schoolStats?.usersByRole?.TEACHER || 0;
 
   const studentsLimit = getPlanFeatureLimit(plan, "students.max", 0);
   const teachersLimit = getPlanFeatureLimit(plan, "teachers.max", 0);
 
-  // Usage is derived from live plan limits until a dedicated usage endpoint
-  // is exposed; cards render healthy/at-limit states from the ratio.
-  const atStudentLimit = studentsLimit > 0;
-  const atTeacherLimit = teachersLimit > 0;
+  const atStudentLimit = studentsLimit > 0 && studentCount >= studentsLimit;
+  const atTeacherLimit = teachersLimit > 0 && teacherCount >= teachersLimit;
 
   // Flatten payment history from all invoices (server now includes payments)
   const payments = useMemo(

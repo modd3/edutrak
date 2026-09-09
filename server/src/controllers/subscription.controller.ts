@@ -15,7 +15,7 @@ export class SubscriptionController {
         body.schoolId = user.schoolId;
       }
 
-      const subscription = await subscriptionService.createSubscription(body);
+      const subscription = await subscriptionService.createSubscription(body, user.userId);
       return ResponseUtil.created(res, 'Subscription created successfully', subscription);
     } catch (error: any) {
       return ResponseUtil.error(res, error.message, 400);
@@ -142,7 +142,7 @@ export class SubscriptionController {
   async getOverview(req: Request, res: Response): Promise<Response> {
     try {
       const user = (req as any).user;
-      const schoolId = user?.schoolId || (req.query.schoolId as string);
+      const schoolId = user?.role === 'ADMIN' ? user.schoolId : (req.query.schoolId as string) || user?.schoolId;
       if (!schoolId) {
         return ResponseUtil.error(res, 'School context required', 400);
       }
@@ -166,6 +166,12 @@ export class SubscriptionController {
         return ResponseUtil.error(res, 'newPlanId query param required', 400);
       }
 
+      const subscription = await subscriptionService.getSubscriptionById(id);
+      if (!subscription) return ResponseUtil.notFound(res, 'Subscription');
+      const user = (req as any).user;
+      if (user.role === 'ADMIN' && subscription.schoolId !== user.schoolId) {
+        return ResponseUtil.forbidden(res, 'You do not have access to this subscription');
+      }
       const result = await subscriptionService.calculateProration(id, newPlanId as string);
       return ResponseUtil.success(res, 'Proration preview calculated successfully', result);
     } catch (error: any) {

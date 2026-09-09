@@ -13,8 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, Smartphone, CheckCircle2, AlertCircle } from "lucide-react";
-import { usePayInvoice } from "@/hooks/use-billing-invoices";
+import { Loader2, Smartphone, CheckCircle2, AlertCircle, CreditCard } from "lucide-react";
+import { usePayInvoice, useCreateBillingCheckout } from "@/hooks/use-billing-invoices";
 import { BillingInvoice } from "@/types";
 import {
   formatCurrency,
@@ -43,8 +43,11 @@ export function PayInvoiceModal({
     "form",
   );
   const [errorMessage, setErrorMessage] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<"CARD" | "MPESA">("CARD");
+  const [saveForAutomaticRenewal, setSaveForAutomaticRenewal] = useState(true);
 
   const payMutation = usePayInvoice();
+  const checkoutMutation = useCreateBillingCheckout();
 
   const form = useForm<PayInvoiceInput>({
     resolver: zodResolver(payInvoiceSchema),
@@ -71,6 +74,25 @@ export function PayInvoiceModal({
           error.message ||
           "Payment initiation failed",
       );
+    }
+  };
+
+  const handleCardCheckout = async () => {
+    if (!invoice) return;
+    setErrorMessage("");
+    setStep("pending");
+    try {
+      const response = await checkoutMutation.mutateAsync({
+        invoiceId: invoice.id,
+        paymentMethod: "CARD",
+        saveForAutomaticRenewal,
+      });
+      const checkoutUrl = response?.data?.checkoutUrl;
+      if (!checkoutUrl) throw new Error("Checkout session did not include a payment URL");
+      window.location.assign(checkoutUrl);
+    } catch (error: any) {
+      setStep("error");
+      setErrorMessage(error.response?.data?.error || error.message || "Unable to start card checkout");
     }
   };
 
@@ -121,6 +143,28 @@ export function PayInvoiceModal({
 
         {/* Form Step */}
         {step === "form" && (
+          <>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant={paymentMethod === "CARD" ? "default" : "outline"} onClick={() => setPaymentMethod("CARD")}>
+                <CreditCard className="mr-2 h-4 w-4" /> Card
+              </Button>
+              <Button type="button" variant={paymentMethod === "MPESA" ? "default" : "outline"} onClick={() => setPaymentMethod("MPESA")}>
+                <Smartphone className="mr-2 h-4 w-4" /> M-Pesa
+              </Button>
+            </div>
+
+            {paymentMethod === "CARD" ? (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">You will complete payment on Flutterwave&apos;s secure checkout. EduTrak never sees or stores your card number.</p>
+                <label className="flex gap-2 rounded-md border p-3 text-sm">
+                  <input type="checkbox" checked={saveForAutomaticRenewal} onChange={(event) => setSaveForAutomaticRenewal(event.target.checked)} />
+                  <span>Save this card for automatic renewal. You can update or cancel renewal before the next invoice is due.</span>
+                </label>
+                <Button type="button" className="w-full" onClick={handleCardCheckout} disabled={checkoutMutation.isPending}>
+                  {checkoutMutation.isPending ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Opening secure checkout...</> : <><CreditCard className="mr-2 h-4 w-4" /> Pay securely by card</>}
+                </Button>
+              </div>
+            ) : (
           <form
             onSubmit={form.handleSubmit(handleSubmit)}
             className="space-y-4"
@@ -162,6 +206,8 @@ export function PayInvoiceModal({
               )}
             </Button>
           </form>
+            )}
+          </>
         )}
 
         {/* Pending Step */}
