@@ -145,7 +145,12 @@ export class DarajaProvider implements IPaymentProvider {
       throw new Error('Valid phone number is required for M-Pesa payments');
     }
 
-    const amount = charge.amount.toString();
+    // Daraja accepts whole KES while all internal billing amounts are minor
+    // units. Rejecting sub-shilling values avoids silently rounding a charge.
+    if (charge.amount % 100 !== 0) {
+      throw new Error('M-Pesa charges must be a whole number of Kenyan shillings');
+    }
+    const amount = (charge.amount / 100).toString();
 
     const request: DarajaSTKPushRequest = {
       BusinessShortCode: this.config.businessShortcode,

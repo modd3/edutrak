@@ -85,6 +85,32 @@ export class PaymentProviderFactory {
   }
 
   /**
+   * Returns the processor used to collect EduTrak subscription revenue.
+   * This is deliberately separate from tenant payment-provider configuration:
+   * a school may use its own credentials to collect parent fees, but it must
+   * never control the credentials used to pay EduTrak.
+   */
+  static getSubscriptionProvider(providerName = 'FLUTTERWAVE'): IPaymentProvider {
+    const provider = providerName.toUpperCase();
+    if (provider !== 'FLUTTERWAVE') {
+      throw new Error(`Unsupported subscription payment provider: ${provider}`);
+    }
+
+    const secretKey = process.env.FLUTTERWAVE_SECRET_KEY;
+    const publicKey = process.env.FLUTTERWAVE_PUBLIC_KEY;
+    if (!secretKey || !publicKey) {
+      throw new Error('Flutterwave subscription billing is not configured');
+    }
+
+    return new FlutterwaveProvider({
+      publicKey,
+      secretKey,
+      encryptionKey: process.env.FLUTTERWAVE_ENCRYPTION_KEY || '',
+      environment: process.env.FLUTTERWAVE_ENVIRONMENT === 'production' ? 'production' : 'sandbox',
+    });
+  }
+
+  /**
    * Get all configured providers for a school.
    */
   static async getProvidersForSchool(
@@ -164,7 +190,12 @@ export class PaymentProviderFactory {
       case 'MPESA':
         return new DarajaProvider(config);
       case 'FLUTTERWAVE':
-        return new FlutterwaveProvider(config as any);
+        return new FlutterwaveProvider({
+          publicKey: config.apiKey,
+          secretKey: config.secretKey,
+          encryptionKey: config.extraConfig?.encryptionKey || '',
+          environment: config.extraConfig?.environment === 'production' ? 'production' : 'sandbox',
+        });
       // Future providers:
       // case 'STRIPE':
       //   return new StripeProvider(config);

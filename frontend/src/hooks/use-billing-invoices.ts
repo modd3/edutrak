@@ -2,6 +2,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { billingInvoicesApi } from "@/api/billing-invoices-api";
 import { useSchoolContext } from "./use-school-context";
 import { toast } from "sonner";
+import { generateIdempotencyKey } from "@/lib/utils";
 
 /**
  * Fetch billing invoices for the current school
@@ -93,5 +94,25 @@ export function usePayInvoice() {
         "Failed to initiate payment";
       toast.error(message);
     },
+  });
+}
+
+/** Creates a hosted Flutterwave session; card data never enters EduTrak. */
+export function useCreateBillingCheckout() {
+  const queryClient = useQueryClient();
+  const { schoolId } = useSchoolContext();
+
+  return useMutation({
+    mutationFn: async ({ invoiceId, paymentMethod, saveForAutomaticRenewal }: {
+      invoiceId: string;
+      paymentMethod: 'CARD' | 'MPESA';
+      saveForAutomaticRenewal?: boolean;
+    }) => billingInvoicesApi.createCheckoutSession(invoiceId, {
+      paymentMethod,
+      saveForAutomaticRenewal,
+      returnUrl: `${window.location.origin}/billing/my-subscription`,
+    }, { 'Idempotency-Key': generateIdempotencyKey('billing-checkout') }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['billing-invoices', { schoolId }] }),
+    onError: (error: any) => toast.error(error.response?.data?.error || error.message || 'Unable to start checkout'),
   });
 }

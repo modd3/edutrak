@@ -9,50 +9,52 @@ datasource db {
 }
 
 model School {
-  id                    String                 @id @default(uuid())
-  name                  String
-  registrationNo        String?                @unique
-  type                  SchoolType
-  county                String
-  subCounty             String?
-  ward                  String?
-  knecCode              String?                @unique
-  kemisCode             String?                @unique
-  phone                 String?
-  email                 String?
-  address               String?
-  ownership             Ownership
-  boardingStatus        BoardingStatus
-  gender                SchoolGender
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
-  academicYears         AcademicYear[]
-  assessmentDefinitions AssessmentDefinition[]
-  assessmentResults     AssessmentResult[]
-  assessmentWeights     AssessmentWeight[]
-  auditLogs             AuditLog[]
-  billingAccount        BillingAccount?
-  billingInvoices       BillingInvoice[]
-  billingPayments       BillingPayment[]
-  classes               Class[]
-  classSubjects         ClassSubject[]
-  documentTemplates     DocumentTemplate[]
-  feeInvoices           FeeInvoice[]
-  feePayments           FeePayment[]
-  feeRefunds            FeeRefund[]
-  feeStructures         FeeStructure[]
+  id                     String                  @id @default(uuid())
+  name                   String
+  registrationNo         String?                 @unique
+  type                   SchoolType
+  county                 String
+  subCounty              String?
+  ward                   String?
+  knecCode               String?                 @unique
+  kemisCode              String?                 @unique
+  phone                  String?
+  email                  String?
+  address                String?
+  ownership              Ownership
+  boardingStatus         BoardingStatus
+  gender                 SchoolGender
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  academicYears          AcademicYear[]
+  assessmentDefinitions  AssessmentDefinition[]
+  assessmentResults      AssessmentResult[]
+  assessmentWeights      AssessmentWeight[]
+  auditLogs              AuditLog[]
+  billingAccount         BillingAccount?
+  billingInvoices        BillingInvoice[]
+  billingPayments        BillingPayment[]
+  billingPaymentAttempts BillingPaymentAttempt[]
+  billingPaymentMethods  BillingPaymentMethod[]
+  classes                Class[]
+  classSubjects          ClassSubject[]
+  documentTemplates      DocumentTemplate[]
+  feeInvoices            FeeInvoice[]
+  feePayments            FeePayment[]
+  feeRefunds             FeeRefund[]
+  feeStructures          FeeStructure[]
   paymentProviderConfigs PaymentProviderConfig[]
-  brandingConfig        SchoolBrandingConfig?
-  streams               Stream[]
-  students              Student[]
-  studentClasses        StudentClass[]
-  studentClassSubjects  StudentClassSubject[]
-  subjectOfferings      SubjectOffering[]
-  subscriptions         TenantSubscription[]
-  terms                 Term[]
-  timetables            Timetable[]
-  usageMetrics          UsageMetric[]
-  users                 User[]
+  brandingConfig         SchoolBrandingConfig?
+  streams                Stream[]
+  students               Student[]
+  studentClasses         StudentClass[]
+  studentClassSubjects   StudentClassSubject[]
+  subjectOfferings       SubjectOffering[]
+  subscriptions          TenantSubscription[]
+  terms                  Term[]
+  timetables             Timetable[]
+  usageMetrics           UsageMetric[]
+  users                  User[]
 
   @@index([county])
   @@index([type])
@@ -152,49 +154,105 @@ model BillingAccount {
 }
 
 model BillingInvoice {
-  id              String               @id @default(uuid())
+  id              String                  @id @default(uuid())
   schoolId        String
   subscriptionId  String
-  invoiceNumber   String               @unique
-  status          BillingInvoiceStatus @default(OPEN)
+  invoiceNumber   String                  @unique
+  status          BillingInvoiceStatus    @default(OPEN)
   subtotalMinor   Int
-  taxMinor        Int                  @default(0)
+  taxMinor        Int                     @default(0)
   totalMinor      Int
-  amountPaidMinor Int                  @default(0)
-  currency        String               @default("KES")
-  issuedAt        DateTime             @default(now())
+  amountPaidMinor Int                     @default(0)
+  currency        String                  @default("KES")
+  issuedAt        DateTime                @default(now())
   dueAt           DateTime
   paidAt          DateTime?
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
-  school          School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subscription    TenantSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  school          School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscription    TenantSubscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
   payments        BillingPayment[]
+  paymentAttempts BillingPaymentAttempt[]
 
   @@index([schoolId, status])
   @@index([subscriptionId])
 }
 
 model BillingPayment {
-  id                String               @id @default(uuid())
+  id                String                  @id @default(uuid())
   schoolId          String
   subscriptionId    String
   billingInvoiceId  String?
   provider          String
   providerReference String?
   amountMinor       Int
-  currency          String               @default("KES")
-  status            BillingPaymentStatus @default(PENDING)
+  currency          String                  @default("KES")
+  status            BillingPaymentStatus    @default(PENDING)
   paidAt            DateTime?
   metadata          Json?
-  createdAt         DateTime             @default(now())
-  updatedAt         DateTime             @updatedAt
-  invoice           BillingInvoice?      @relation(fields: [billingInvoiceId], references: [id])
-  school            School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  subscription      TenantSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+  invoice           BillingInvoice?         @relation(fields: [billingInvoiceId], references: [id])
+  school            School                  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  subscription      TenantSubscription      @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  attempts          BillingPaymentAttempt[]
 
   @@index([schoolId, status])
   @@index([billingInvoiceId])
+}
+
+/// A customer-facing checkout attempt. This is intentionally separate from a
+/// settled payment: one invoice can have several failed or abandoned attempts.
+model BillingPaymentAttempt {
+  id                String               @id @default(uuid())
+  schoolId          String
+  billingInvoiceId  String
+  billingPaymentId  String?
+  provider          String
+  paymentMethod     String
+  idempotencyKey    String?
+  providerSessionId String?              @unique
+  checkoutUrl       String?
+  amountMinor       Int
+  currency          String               @default("KES")
+  status            BillingPaymentStatus @default(PENDING)
+  failureCode       String?
+  failureMessage    String?
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  invoice           BillingInvoice       @relation(fields: [billingInvoiceId], references: [id], onDelete: Cascade)
+  payment           BillingPayment?      @relation(fields: [billingPaymentId], references: [id], onDelete: SetNull)
+  school            School               @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, idempotencyKey])
+  @@index([billingInvoiceId, status])
+  @@index([provider, status])
+}
+
+/// Tokenized payment details supplied by a processor. No PAN or CVV is ever
+/// stored in EduTrak.
+model BillingPaymentMethod {
+  id                 String    @id @default(uuid())
+  schoolId           String
+  provider           String
+  providerCustomerId String?
+  providerToken      String    @unique
+  brand              String?
+  last4              String?
+  expiryMonth        Int?
+  expiryYear         Int?
+  autoRenewConsentAt DateTime?
+  consentVersion     String?
+  isDefault          Boolean   @default(false)
+  isActive           Boolean   @default(true)
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  school             School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@index([schoolId, isActive])
 }
 
 model UsageMetric {
