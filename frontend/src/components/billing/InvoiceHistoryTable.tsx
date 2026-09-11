@@ -18,7 +18,7 @@ import {
   invoiceStatusMeta,
   invoiceStatusLabel,
 } from "@/lib/utils";
-import { Eye, CreditCard } from "lucide-react";
+import { ArrowUpRight, CreditCard, FileText } from "lucide-react";
 import { PayInvoiceModal } from "./PayInvoiceModal";
 
 interface InvoiceHistoryTableProps {
@@ -50,9 +50,9 @@ export function InvoiceHistoryTable({
 
   if (isLoading) {
     return (
-      <Card>
+      <Card className="border-slate-200 shadow-sm">
         <CardHeader>
-          <CardTitle>Invoice History</CardTitle>
+          <CardTitle className="text-lg">Invoices</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-3">
@@ -67,30 +67,29 @@ export function InvoiceHistoryTable({
 
   if (invoices.length === 0) {
     return (
-      <Card>
+      <Card className="border-slate-200 shadow-sm">
         <CardHeader>
-          <CardTitle>Invoice History</CardTitle>
+          <CardTitle className="text-lg">Invoices</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 text-center py-8">
-            No invoices found
-          </p>
+          <div className="py-8 text-center"><FileText className="mx-auto mb-3 h-8 w-8 text-slate-300" /><p className="font-medium text-slate-700">No invoices yet</p><p className="mt-1 text-sm text-slate-500">Your subscription invoices will appear here.</p></div>
         </CardContent>
       </Card>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Invoice History</CardTitle>
+    <Card className="border-slate-200 shadow-sm">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+        <div><CardTitle className="text-lg">Invoices</CardTitle><p className="mt-1 text-sm text-muted-foreground">Track payments, due dates, and receipts.</p></div>
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{invoices.length} recent</span>
       </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
-                <TableHead>Invoice #</TableHead>
+              <TableRow className="bg-slate-50/70 hover:bg-slate-50/70">
+                <TableHead>Invoice</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Due Date</TableHead>
@@ -105,8 +104,9 @@ export function InvoiceHistoryTable({
 
                 return (
                   <TableRow key={invoice.id}>
-                    <TableCell className="font-medium">
-                      {invoice.invoiceNumber}
+                    <TableCell>
+                      <p className="font-medium text-slate-900">{invoice.invoiceNumber}</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Issued {formatDate(invoice.issuedAt)}</p>
                     </TableCell>
                     <TableCell>
                       <Badge
@@ -118,12 +118,12 @@ export function InvoiceHistoryTable({
                     </TableCell>
                     <TableCell>
                       <div>
-                        <p className="font-medium">
-                          {formatCurrency(invoice.totalMinor / 100)}
+                        <p className="font-semibold text-slate-900">
+                          {formatCurrency(invoice.totalMinor / 100, invoice.currency)}
                         </p>
                         {remaining > 0 && (
                           <p className="text-xs text-gray-500">
-                            {formatCurrency(remaining / 100)} due
+                            {formatCurrency(remaining / 100, invoice.currency)} due
                           </p>
                         )}
                       </div>
@@ -137,21 +137,12 @@ export function InvoiceHistoryTable({
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
                         {isPayable && (
-                          <Button
-                            size="sm"
-                            onClick={() => handlePay(invoice)}
-                            className="gap-1"
-                          >
-                            <CreditCard className="h-3 w-3" />
-                            Pay Now
+                          <Button size="sm" onClick={() => handlePay(invoice)} className="gap-1.5">
+                            <CreditCard className="h-3.5 w-3.5" /> Pay now
                           </Button>
                         )}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => handleView(invoice)}
-                        >
-                          <Eye className="h-3 w-3" />
+                        <Button size="sm" variant="ghost" className="gap-1 text-slate-600" onClick={() => handleView(invoice)}>
+                          Details <ArrowUpRight className="h-3.5 w-3.5" />
                         </Button>
                       </div>
                     </TableCell>
