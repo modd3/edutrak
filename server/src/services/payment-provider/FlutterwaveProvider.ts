@@ -28,7 +28,9 @@ export class FlutterwaveProvider implements IPaymentProvider {
       },
       body: JSON.stringify({
         tx_ref: charge.transactionRef,
-        amount: charge.amount,
+        // EduTrak stores money in minor units; Flutterwave expects the amount
+        // in the currency's display units (e.g. 50000 -> KES 500.00).
+        amount: charge.amount / 100,
         currency: charge.currency,
         redirect_url: charge.callbackUrl,
         customer: {

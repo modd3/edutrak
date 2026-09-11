@@ -1,5 +1,5 @@
 import type { Subscription } from '@/types';
-import { formatCurrency, formatDate, getPlanFeatureLimit, SUBSCRIPTION_STATUS_META } from '@/lib/utils';
+import { formatCurrency, getPlanFeatureLimit, intervalLabel, SUBSCRIPTION_STATUS_META } from '@/lib/utils';
 
 interface CurrentPlanCardProps {
   subscription?: Subscription | null;
@@ -67,7 +67,7 @@ export function CurrentPlanCard({ subscription, isLoading }: CurrentPlanCardProp
             {planName}
           </h2>
           <p className="text-sm text-white/50 m-0 mb-6">
-            Next renewal date:{' '}
+            {status === 'TRIALING' ? 'Trial ends:' : 'Next renewal:'}{' '}
             <span className="text-white/75 font-semibold">{renewalDate}</span>
           </p>
 
@@ -79,7 +79,7 @@ export function CurrentPlanCard({ subscription, isLoading }: CurrentPlanCardProp
         </div>
 
         <div className="bg-white/10 border border-white/20 rounded-2xl px-7 py-5 text-center backdrop-blur-sm">
-          <div className="text-[13px] text-white/50 font-medium mb-1">Monthly price</div>
+          <div className="text-[13px] text-white/50 font-medium mb-1">Plan price</div>
           <div className="flex items-start justify-center gap-0.5">
             <span className="text-lg font-bold text-white/60 mt-1.5">
               {currency === 'KES' ? 'KSh' : '$'}
@@ -88,7 +88,7 @@ export function CurrentPlanCard({ subscription, isLoading }: CurrentPlanCardProp
               {formatCurrency(priceMinor / 100, currency).replace(/[^\d.,]/g, '').split('.')[0] || '0'}
             </span>
           </div>
-          <div className="text-xs text-white/40 mt-1">per month</div>
+          <div className="text-xs text-white/40 mt-1">{intervalLabel(plan?.billingInterval || 'MONTHLY')}</div>
         </div>
       </div>
     </div>

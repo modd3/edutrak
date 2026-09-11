@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { CreditCard } from "lucide-react";
+import { ArrowUpRight, CheckCircle2, CreditCard, ReceiptText, ShieldCheck } from "lucide-react";
 import { BillingInvoice } from "@/types";
 import { formatCurrency, getPlanFeatureLimit } from "@/lib/utils";
 import { CurrentPlanCard } from "@/components/billing/CurrentPlanCard";
@@ -19,6 +19,7 @@ import { UpgradeModal } from "@/components/billing/UpgradeModal";
 import { LimitWarningModal } from "@/components/billing/LimitWarningModal";
 import { PayInvoiceModal } from "@/components/billing/PayInvoiceModal";
 import { useSchoolStatistics } from "@/hooks/use-schools";
+import { BillingPageHeader } from "@/components/billing/BillingPageHeader";
 
 export function MySubscriptionPage() {
   const [showLimitWarningModal, setShowLimitWarningModal] = useState(false);
@@ -33,6 +34,7 @@ export function MySubscriptionPage() {
   const subscription = overview?.subscription;
   const invoices = overview?.recentInvoices || [];
   const outstandingMinor = overview?.outstandingBalanceMinor || 0;
+  const openInvoices = invoices.filter((invoice) => invoice.status === "OPEN");
 
   const registryData = useFeatureRegistry();
   const registry = registryData.data?.data || {};
@@ -51,18 +53,14 @@ export function MySubscriptionPage() {
     schoolStatistics?.data ||
     {}) as Record<string, any>;
 
-  console.log("School Statistics: ", schoolStatistics);
-  console.log("School Stats: ", schoolStats?.usersByRole?.STUDENT);
   const studentCount = schoolStats?.usersByRole?.STUDENT || 0;
   const teacherCount = schoolStats?.usersByRole?.TEACHER || 0;
 
   const studentsLimit = getPlanFeatureLimit(plan, "students.max", 0);
   const teachersLimit = getPlanFeatureLimit(plan, "teachers.max", 0);
 
-  // Usage is derived from live plan limits until a dedicated usage endpoint
-  // is exposed; cards render healthy/at-limit states from the ratio.
-  const atStudentLimit = studentsLimit > 0;
-  const atTeacherLimit = teachersLimit > 0;
+  const atStudentLimit = studentsLimit > 0 && studentCount >= studentsLimit;
+  const atTeacherLimit = teachersLimit > 0 && teacherCount >= teachersLimit;
 
   // Flatten payment history from all invoices (server now includes payments)
   const payments = useMemo(
@@ -99,9 +97,17 @@ export function MySubscriptionPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="mx-auto max-w-6xl space-y-6 pb-10">
+      <div className="flex flex-col gap-4 border-b border-slate-100 pb-6 sm:flex-row sm:items-end sm:justify-between">
+        <BillingPageHeader />
+        {subscription && (
+          <Button variant="outline" className="shrink-0 gap-2" onClick={() => setShowUpgradeModal(true)}>
+            Explore plans <ArrowUpRight className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
       {!subscription && (
-        <Alert className="border-blue-200 bg-blue-50">
+        <Alert className="border-indigo-200 bg-indigo-50">
           <AlertDescription>
             No active subscription found. Choose a plan to get started.
           </AlertDescription>
@@ -111,6 +117,24 @@ export function MySubscriptionPage() {
       {subscription && (
         <>
           <CurrentPlanCard subscription={subscription} />
+
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><ShieldCheck className="h-4 w-4 text-emerald-600" /> Plan status</div>
+              <p className="font-semibold text-slate-900">Your school is covered</p>
+              <p className="mt-1 text-sm text-slate-500">Access is managed from this billing space.</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><ReceiptText className="h-4 w-4 text-indigo-600" /> Invoices</div>
+              <p className="font-semibold text-slate-900">{openInvoices.length === 0 ? "Nothing due" : `${openInvoices.length} invoice${openInvoices.length > 1 ? "s" : ""} open`}</p>
+              <p className="mt-1 text-sm text-slate-500">{openInvoices.length === 0 ? "Your recent billing is up to date." : "Review and pay before service is affected."}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500"><CreditCard className="h-4 w-4 text-indigo-600" /> Payment methods</div>
+              <p className="font-semibold text-slate-900">Card & M-Pesa supported</p>
+              <p className="mt-1 text-sm text-slate-500">Choose a secure method whenever you pay.</p>
+            </div>
+          </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <CapacityCard
@@ -179,9 +203,10 @@ export function MySubscriptionPage() {
         subscriptionId={subscription?.id}
       />
 
-      <Card>
+      <Card className="border-slate-200 shadow-sm">
         <CardHeader>
-          <CardTitle>Plan Features</CardTitle>
+          <CardTitle className="text-lg">What&apos;s included</CardTitle>
+          <p className="text-sm text-muted-foreground">Your current plan&apos;s features and allowances.</p>
         </CardHeader>
         <CardContent>
           {sortedFeatures.length > 0 ? (
@@ -199,27 +224,35 @@ export function MySubscriptionPage() {
       </Card>
 
       {outstandingMinor > 0 && (
-        <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg flex items-center justify-between">
+        <div className="flex flex-col gap-4 rounded-2xl border border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium text-orange-900">
-              Outstanding Balance
+            <p className="text-sm font-semibold text-amber-950">
+              Payment needed
             </p>
-            <p className="text-xs text-orange-700">
-              {formatCurrency(outstandingMinor / 100, overview?.currency)} due —
-              pay now to avoid service interruption.
+            <p className="mt-1 text-sm text-amber-800">
+              {formatCurrency(outstandingMinor / 100, overview?.currency)} is due. Pay securely to keep your service uninterrupted.
             </p>
           </div>
-          <Button size="sm" className="gap-1" onClick={handlePayOutstanding}>
+          <Button size="sm" className="gap-1 self-start sm:self-auto" onClick={handlePayOutstanding}>
             <CreditCard className="h-4 w-4" />
             Pay Now
           </Button>
         </div>
       )}
 
-      <InvoiceHistoryTable
-        invoices={invoices}
-        onPayInvoice={handlePayInvoice}
-      />
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1.65fr)_minmax(280px,0.75fr)]">
+        <InvoiceHistoryTable invoices={invoices} onPayInvoice={handlePayInvoice} />
+        <Card className="h-fit border-slate-200 shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-lg">Billing confidence</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4 text-sm text-slate-600">
+            <div className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>Every payment is linked to an invoice and appears in your history.</span></div>
+            <div className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>Card payments complete through a secure hosted checkout.</span></div>
+            <div className="flex gap-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /><span>Need help? Contact billing support before your renewal date.</span></div>
+          </CardContent>
+        </Card>
+      </div>
 
       <PaymentHistoryTable payments={payments} />
 

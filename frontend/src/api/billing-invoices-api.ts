@@ -8,6 +8,14 @@ export interface BillingInvoicesFilter {
 }
 
 export const billingInvoicesApi = {
+  createCheckoutSession: async (
+    invoiceId: string,
+    data: { paymentMethod: 'CARD' | 'MPESA'; saveForAutomaticRenewal?: boolean; returnUrl?: string },
+    headers?: Record<string, string>,
+  ) => {
+    const response = await api.post(`/billing/invoices/${invoiceId}/checkout-sessions`, data, { headers });
+    return response.data;
+  },
   /**
    * Get billing invoices for the authenticated admin's school
    */
